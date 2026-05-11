@@ -1,0 +1,20 @@
+.DS_Store
+
+# Vite / Node
+node_modules/
+dist/
+coverage/
+
+# Project-specific nested outputs
+dentcool-project/node_modules/
+dentcool-project/dist/
+dentcool-project/coverage/
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# Local source archives
+Disertacion.zip
+_tmp_dental_zip/
