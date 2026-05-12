@@ -451,6 +451,7 @@ function BackgroundCategoryEditor({
   itemPlaceholder,
   onToggle,
   onAddItem,
+  onRemoveItem,
   onLabelChange,
   onBlockCommentChange,
 }) {
@@ -475,6 +476,15 @@ function BackgroundCategoryEditor({
                 placeholder={itemPlaceholder}
               />
             </label>
+            <button
+              className="btn btn-ghost patient-item-remove"
+              type="button"
+              onClick={() => onRemoveItem?.(item.id)}
+              aria-label={`Eliminar ${item.label || 'item'}`}
+              title="Eliminar item"
+            >
+              <Icon.trash />
+            </button>
           </div>
         ))}
       </div>
@@ -514,6 +524,13 @@ function PatientBackgroundSection({ draft, activePatient, onCollectionChange, on
     ]);
   };
 
+  const removeItem = (collectionKey, itemId) => {
+    onCollectionChange(
+      collectionKey,
+      draft[collectionKey].filter((item) => item.id !== itemId)
+    );
+  };
+
   return (
     <form className="patient-section-body" onSubmit={onSubmit}>
       <div className="patient-section-intro">
@@ -529,6 +546,7 @@ function PatientBackgroundSection({ draft, activePatient, onCollectionChange, on
           onToggle={(itemId) => updateItem('medicalBackground', itemId, (item) => ({ ...item, active: !item.active }))}
           onLabelChange={(itemId, value) => updateItem('medicalBackground', itemId, (item) => ({ ...item, label: value }))}
           onAddItem={() => addItem('medicalBackground', 'Nuevo antecedente medico')}
+          onRemoveItem={(itemId) => removeItem('medicalBackground', itemId)}
           onBlockCommentChange={(value) => onCollectionChange('medicalBackgroundComment', value)}
         />
         <BackgroundCategoryEditor
@@ -540,6 +558,7 @@ function PatientBackgroundSection({ draft, activePatient, onCollectionChange, on
           onToggle={(itemId) => updateItem('allergies', itemId, (item) => ({ ...item, active: !item.active }))}
           onLabelChange={(itemId, value) => updateItem('allergies', itemId, (item) => ({ ...item, label: value }))}
           onAddItem={() => addItem('allergies', 'Nueva alergia o medicamento')}
+          onRemoveItem={(itemId) => removeItem('allergies', itemId)}
           onBlockCommentChange={(value) => onCollectionChange('allergiesComment', value)}
         />
         <BackgroundCategoryEditor
@@ -551,6 +570,7 @@ function PatientBackgroundSection({ draft, activePatient, onCollectionChange, on
           onToggle={(itemId) => updateItem('dentalHabits', itemId, (item) => ({ ...item, active: !item.active }))}
           onLabelChange={(itemId, value) => updateItem('dentalHabits', itemId, (item) => ({ ...item, label: value }))}
           onAddItem={() => addItem('dentalHabits', 'Nuevo habito o antecedente')}
+          onRemoveItem={(itemId) => removeItem('dentalHabits', itemId)}
           onBlockCommentChange={(value) => onCollectionChange('dentalHabitsComment', value)}
         />
       </div>

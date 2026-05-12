@@ -835,6 +835,9 @@ h1, h2, h3, h4, h5 { font-family: var(--font-display); }
 }
 
 .patient-history-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 3px 0;
   border: none;
   background: transparent;
@@ -869,6 +872,8 @@ h1, h2, h3, h4, h5 { font-family: var(--font-display); }
 }
 
 .patient-history-edit-row .patient-history-mainline {
+  flex: 1;
+  min-width: 0;
   position: relative;
 }
 
@@ -905,6 +910,31 @@ h1, h2, h3, h4, h5 { font-family: var(--font-display); }
   height: 38px;
   font-size: 13px;
   color: #94a3b8;
+}
+
+.patient-item-remove {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d8e1ec;
+  background: rgba(255, 255, 255, 0.92);
+  color: #64748b;
+}
+
+.patient-item-remove:hover {
+  border-color: rgba(248, 113, 113, 0.34);
+  color: #ef4444;
+  background: #fff;
+}
+
+.patient-item-remove .icon {
+  width: 15px;
+  height: 15px;
 }
 
 .patient-history-edit-row.active .patient-inline-input {
