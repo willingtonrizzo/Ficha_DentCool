@@ -36,6 +36,9 @@
 - [x] Llevar el odontograma al paciente activo
 - [x] Validar alta y edicion de paciente con reglas base
 - [x] Volver real el tab `Antecedentes` por paciente activo
+- [x] Dejar `Inicio` como pantalla de entrada
+- [x] Convertir `Pacientes` en directorio general en filas
+- [x] Separar `Ver ficha` de `Editar ficha`
 
 ## En curso / siguiente
 

@@ -80,6 +80,9 @@ Hecho:
 - `Antecedentes` dejo de ser una maqueta fija y ahora refleja el paciente activo real
 - el tab `Antecedentes` ahora muestra antecedentes medicos, alergias/medicamentos y habitos dentales reales por paciente
 - el contador de `Antecedentes` ahora se calcula desde items activos reales del paciente
+- la app ahora abre en `Inicio` como pantalla inicial
+- `Pacientes` paso a ser un directorio general en filas
+- desde el directorio se puede entrar a `Ver ficha` para abrir odontograma y tabs clinicos, o `Editar ficha` para abrir la hoja lateral
 - se agrego `CONTEXTO-ACTIVO-FICHA-DENTCOOL.md` como handoff persistente de sesion
 - se agrego la skill local `dentcool-contexto` para reconstruir estado del proyecto al retomar
 - `AGENTS.md` ahora define protocolo obligatorio de retoma y cierre de sesion
@@ -118,6 +121,7 @@ Hecho:
 - la persistencia actual cubre directorio, odontograma y ficha clinica lateral por paciente, pero aun convive con un `uiContext` global residual
 - la vista `Inicio` todavia mezcla datos reales locales con KPIs mock, por lo que todavia no debe asumirse como panel operativo real
 - aunque la ficha lateral ya concentra casi toda la edicion del paciente, el flujo general aun necesita pulido de UX para escritorio clinico
+- el directorio de pacientes ya cambio a filas y aun falta validar ese comportamiento en Render con datos reales del navegador
 - aun no hay validacion automatica del flujo clinico
 - el alta de paciente ya tiene validaciones base, pero todavia faltan reglas de negocio mas profundas para agenda, documentos reales y trazabilidad clinica
 - `Antecedentes` ya es real por paciente, pero conviene seguir revisando el resto de tabs una por una para quitar cualquier mock remanente

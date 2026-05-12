@@ -43,6 +43,19 @@ describe('patients helpers', () => {
     expect(draft.dentalHabits.every((item) => !item.active && item.comment === '')).toBe(true);
   });
 
+  it('preserves deleted antecedent rows on draft patients', () => {
+    const draftPatient = createEmptyPatient(8);
+    const withoutPregnancy = createPatient({
+      ...draftPatient,
+      medicalBackground: draftPatient.medicalBackground.filter((item) => item.label !== 'Embarazo'),
+    });
+
+    const reopenedDraft = createPatientDraft(withoutPregnancy);
+
+    expect(reopenedDraft.medicalBackground.some((item) => item.label === 'Embarazo')).toBe(false);
+    expect(reopenedDraft.medicalBackground.length).toBe(draftPatient.medicalBackground.length - 1);
+  });
+
   it('builds initials and age safely', () => {
     expect(buildPatientInitials('')).toBe('PA');
     expect(calculateAge('1990-05-10', new Date('2026-05-10T12:00:00Z'))).toBe(36);

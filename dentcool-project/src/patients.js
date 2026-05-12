@@ -182,15 +182,9 @@ export function createPatient(input) {
   const id = input.id ?? `patient-${slugify(fullName) || 'sin-nombre'}`;
   const alerts = Array.isArray(input.alerts) ? input.alerts : [];
   const isDraftPatient = id.startsWith('patient-new-');
-  const medicalBackground = isDraftPatient
-    ? buildDraftBackgroundItems(input.medicalBackground, DEFAULT_MEDICAL_BACKGROUND)
-    : input.medicalBackground;
-  const allergies = isDraftPatient
-    ? buildDraftBackgroundItems(input.allergies, DEFAULT_ALLERGIES)
-    : input.allergies;
-  const dentalHabits = isDraftPatient
-    ? buildDraftBackgroundItems(input.dentalHabits, DEFAULT_DENTAL_HABITS)
-    : input.dentalHabits;
+  const medicalBackground = input.medicalBackground;
+  const allergies = input.allergies;
+  const dentalHabits = input.dentalHabits;
 
   return {
     id,
@@ -229,15 +223,9 @@ export function createPatientDraft(patient) {
     patient?.id?.startsWith('patient-new-') &&
     (patient?.fullName === 'Paciente nuevo' || !patient?.fullName);
   const isDraftPatient = Boolean(patient?.id?.startsWith('patient-new-'));
-  const medicalBackground = isDraftPatient
-    ? buildDraftBackgroundItems(patient?.medicalBackground, DEFAULT_MEDICAL_BACKGROUND)
-    : patient?.medicalBackground;
-  const allergies = isDraftPatient
-    ? buildDraftBackgroundItems(patient?.allergies, DEFAULT_ALLERGIES)
-    : patient?.allergies;
-  const dentalHabits = isDraftPatient
-    ? buildDraftBackgroundItems(patient?.dentalHabits, DEFAULT_DENTAL_HABITS)
-    : patient?.dentalHabits;
+  const medicalBackground = patient?.medicalBackground;
+  const allergies = patient?.allergies;
+  const dentalHabits = patient?.dentalHabits;
 
   return {
     id: patient?.id ?? '',

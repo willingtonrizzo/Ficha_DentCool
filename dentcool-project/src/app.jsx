@@ -63,10 +63,11 @@ export function Sidebar({ activeView = 'patients', onNavigate, patientCount = 0,
       <div className="nav-section">Clinico</div>
       {items1.map((it, i) => {
         const I = Icon[it.ic];
+        const isActive = it.view === activeView || (it.view === 'patients' && activeView === 'patient');
         return (
           <button
             key={i}
-            className={`nav-item ${it.view === activeView ? 'active' : ''}`}
+            className={`nav-item ${isActive ? 'active' : ''}`}
             onClick={() => it.view && onNavigate?.(it.view)}
           >
             <I cls="ic" />
@@ -110,7 +111,13 @@ export function TopbarInner({ patientName, activeView = 'patients' }) {
           <>
             <span>Inicio</span>
             <span className="sep">/</span>
-            <strong>Resumen operativo</strong>
+            <strong>Bienvenida</strong>
+          </>
+        ) : activeView === 'patients' ? (
+          <>
+            <span>Pacientes</span>
+            <span className="sep">/</span>
+            <strong>Directorio general</strong>
           </>
         ) : (
           <>
@@ -169,8 +176,8 @@ export function HomeDashboard({ patients, activePatient }) {
     <div className="home-dashboard">
       <div className="home-hero card">
         <div className="home-hero-copy">
-          <div className="patients-eyebrow">Inicio</div>
-          <h2>Panel operativo de la clinica</h2>
+          <div className="patients-eyebrow">Bienvenida</div>
+          <h2>Bienvenida al panel operativo de la clinica</h2>
           <p>Vista rapida para abrir la jornada, revisar agenda, detectar alertas y volver a la ficha clinica sin perder el hilo.</p>
           <div className="home-hero-tags">
             <span className="patient-chip">{patients.length} pacientes locales</span>
@@ -303,6 +310,56 @@ export function HomeDashboard({ patients, activePatient }) {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+export function PatientsDirectoryView({ patients, agendaCount = 0, onCreatePatient, onOpenPatient }) {
+  return (
+    <div className="patients-directory-page">
+      <div className="card patients-directory-page-hero">
+        <div className="patients-directory-page-copy">
+          <div className="patients-eyebrow">Pacientes</div>
+          <h2>Directorio general de la clinica</h2>
+          <p>Selecciona un paciente para abrir su ficha, revisar su ultima atencion o entrar directo a editarla.</p>
+        </div>
+        <div className="patients-directory-page-actions">
+          <span className="patient-chip">{patients.length} pacientes locales</span>
+          <span className="patient-chip">{agendaCount} citas proximas</span>
+          <button className="btn btn-primary patient-directory-btn" type="button" onClick={onCreatePatient}>
+            <Icon.plus />
+            Nuevo paciente
+          </button>
+        </div>
+      </div>
+      <div className="patients-directory-grid">
+        {patients.map((patient) => (
+          <article key={patient.id} className="card patients-directory-row">
+            <div className="patient-directory-row-main">
+              <div className="patient-directory-avatar">{patient.initials}</div>
+              <div className="patient-directory-copy">
+                <div className="patient-directory-main">
+                  <span>{getPatientDisplayName(patient)}</span>
+                </div>
+                <div className="patient-directory-record">{patient.recordNumber}</div>
+                <div className="patient-directory-meta">{patient.rut || 'Sin RUT'} · {patient.phone || 'Sin telefono'}</div>
+              </div>
+            </div>
+            <div className="patient-directory-row-stats">
+              <span><strong>Ultima atencion</strong>{patient.lastVisit || 'Sin registro'}</span>
+              <span><strong>Proxima cita</strong>{patient.nextVisit || 'Sin agendar'}</span>
+            </div>
+              <div className="patient-directory-card-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => onOpenPatient?.(patient.id, 'datos')}>
+                  Ver ficha
+                </button>
+                <button type="button" className="btn btn-primary" onClick={() => onOpenPatient?.(patient.id, 'edit')}>
+                  Editar ficha
+                </button>
+              </div>
+          </article>
+        ))}
       </div>
     </div>
   );

@@ -16,7 +16,6 @@ import {
   saveUiContext,
 } from '../storage';
 import { STORAGE_KEYS } from '../data';
-import { DEFAULT_ALLERGIES, DEFAULT_DENTAL_HABITS, DEFAULT_MEDICAL_BACKGROUND } from '../patients';
 
 describe('storage', () => {
   beforeEach(() => {
@@ -79,7 +78,7 @@ describe('storage', () => {
 
     expect(resetTeeth[16].O).toBe('caries');
     expect(resetUi).toEqual({
-      activeView: 'patients',
+      activeView: 'home',
       selectedTooth: 16,
       selectedSurface: 'O',
       activeTab: 'antecedentes',
@@ -99,7 +98,7 @@ describe('storage', () => {
     expect(loadActivePatientId()).toBe(updated[1].id);
   });
 
-  it('migrates untouched draft patients to blank backgrounds on load', () => {
+  it('preserves deleted draft antecedents on load', () => {
     window.localStorage.setItem(
       STORAGE_KEYS.patients,
       JSON.stringify([
@@ -107,15 +106,12 @@ describe('storage', () => {
           id: 'patient-new-123',
           fullName: 'Pedro K',
           medicalBackground: [
-            ...DEFAULT_MEDICAL_BACKGROUND,
             { label: 'Neuritica', active: true, comment: '' },
           ],
           allergies: [
-            ...DEFAULT_ALLERGIES,
             { label: 'Peces', active: true, comment: 'ok' },
           ],
           dentalHabits: [
-            ...DEFAULT_DENTAL_HABITS,
             { label: 'camina dormido', active: true, comment: 'N/A' },
           ],
         },
@@ -125,13 +121,9 @@ describe('storage', () => {
     const restored = loadPatientDirectory();
 
     expect(restored[0].fullName).toBe('Pedro K');
-    expect(restored[0].medicalBackground.some((item) => item.label === 'Embarazo')).toBe(true);
-    expect(restored[0].medicalBackground.find((item) => item.label === 'Embarazo')?.active).toBe(false);
-    expect(restored[0].allergies.some((item) => item.label === 'Penicilina')).toBe(true);
-    expect(restored[0].allergies.find((item) => item.label === 'Penicilina')?.active).toBe(false);
-    expect(restored[0].dentalHabits.some((item) => item.label === 'Bruxismo nocturno')).toBe(true);
-    expect(restored[0].dentalHabits.find((item) => item.label === 'Bruxismo nocturno')?.active).toBe(false);
+    expect(restored[0].medicalBackground.some((item) => item.label === 'Embarazo')).toBe(false);
     expect(restored[0].medicalBackground.some((item) => item.label === 'Neuritica')).toBe(true);
+    expect(restored[0].allergies.some((item) => item.label === 'Penicilina')).toBe(false);
     expect(restored[0].allergies.some((item) => item.label === 'Peces')).toBe(true);
     expect(restored[0].dentalHabits.some((item) => item.label === 'camina dormido')).toBe(true);
   });

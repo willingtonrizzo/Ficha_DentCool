@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { EVOLUTION, HISTORY, STORAGE_KEYS, TREATMENTS } from './data';
-import { FloatingNewPatientButton, HomeDashboard, Sidebar, TopbarInner, PatientHeader, PatientsSheet, Odontogram, ToothPanel } from './app';
+import { FloatingNewPatientButton, HomeDashboard, PatientsDirectoryView, Sidebar, TopbarInner, PatientHeader, PatientsSheet, Odontogram, ToothPanel } from './app';
 import { Tabs, Antecedentes, Motivo, Evolucion, Presupuesto, Documentos, Historial, TreatmentsTable, NextAppointments } from './tabs';
 import { updateToothSurfaceState } from './odontogram';
 import { buildClinicalRecordFromMocks, createClinicalPatientRecord, createDiagnosis, createDocumentEntry, createEvolutionNote, createHistoryEntry, createTreatmentEntry, TREATMENT_STATUS, resolveMotivoDiagnosticoRecord } from './clinical-model';
@@ -37,7 +37,7 @@ export default function App() {
     : null;
   const hasLegacyTeethState =
     typeof window !== 'undefined' && window.localStorage.getItem(STORAGE_KEYS.odontogram) != null;
-  const [activeView, setActiveView] = useState(initialUiContext.activeView);
+  const [activeView, setActiveView] = useState('home');
   const [teeth, setTeeth] = useState(() =>
     hasLegacyTeethState ? loadTeethState() : initialPatientRecord?.odontogram ?? loadTeethState()
   );
@@ -171,6 +171,19 @@ export default function App() {
   };
 
   const handleOpenPatientSheet = (sectionId = 'datos') => {
+    setPatientSheetSection(sectionId);
+    setIsPatientSheetOpen(true);
+  };
+
+  const handleOpenPatientFromDirectory = (patientId) => {
+    setActivePatientId(patientId);
+    setActiveView('patient');
+    setIsPatientSheetOpen(false);
+  };
+
+  const handleEditPatientFromDirectory = (patientId, sectionId = 'datos') => {
+    setActivePatientId(patientId);
+    setActiveView('patient');
     setPatientSheetSection(sectionId);
     setIsPatientSheetOpen(true);
   };
@@ -687,6 +700,36 @@ export default function App() {
         <div className="content">
           {activeView === 'home' ? (
             <HomeDashboard patients={patients} activePatient={visibleActivePatient} />
+          ) : activeView === 'patients' ? (
+            <>
+              <FloatingNewPatientButton onClick={handleCreatePatient} />
+              <PatientsDirectoryView
+                patients={patients}
+                agendaCount={agendaCount}
+                onCreatePatient={handleCreatePatient}
+                onOpenPatient={(patientId, actionSection) => (
+                  actionSection === 'edit'
+                    ? handleEditPatientFromDirectory(patientId, 'datos')
+                    : handleOpenPatientFromDirectory(patientId)
+                )}
+              />
+              <PatientsSheet
+                open={isPatientSheetOpen}
+                patients={patients}
+                activePatientId={activePatientId}
+                activeSection={patientSheetSection}
+                saveState={patientSaveState}
+                lastSavedAt={lastPatientSavedAt}
+                onSelectPatient={setActivePatientId}
+                onCreatePatient={handleCreatePatient}
+                onSavePatient={handleSavePatient}
+                onDraftChange={handleDraftPatientChange}
+                onDeletePatient={handleDeletePatient}
+                onSectionChange={setPatientSheetSection}
+                renderClinicalSection={renderSheetClinicalSection}
+                onClose={handleClosePatientSheet}
+              />
+            </>
           ) : (
             <>
               <FloatingNewPatientButton onClick={handleCreatePatient} />

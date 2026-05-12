@@ -31,6 +31,8 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - Existe persistencia local del odontograma por `patientId`.
 - Existe validacion base para alta y edicion de pacientes.
 - `Antecedentes` ya refleja datos reales del paciente activo en la tab principal.
+- `Inicio` es la pantalla inicial y `Pacientes` funciona como directorio general en filas.
+- Desde el directorio ya se puede abrir `Ver ficha` para la pagina clinica o `Editar ficha` para la hoja lateral.
 - Existen pruebas automatizadas base del odontograma y de persistencia local.
 - Existe un modelo clinico base y un esquema inicial de `SQLite`.
 
@@ -53,6 +55,7 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 
 - La jerarquia general es buena para escritorio: header de paciente, odontograma central, panel lateral y tabs.
 - La nueva vista `Inicio` sirve como puerta de entrada operativa sin desplazar el flujo clinico principal.
+- El directorio de pacientes ahora esta separado en filas y no abre una ficha especifica por defecto.
 - El nuevo bloque de pacientes se integra sin quitar protagonismo al odontograma.
 - El odontograma ya es el foco visual principal.
 - Hay buena base para adaptar referencias externas sin copiar interfaces sobrecargadas.

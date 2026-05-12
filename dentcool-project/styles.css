@@ -429,6 +429,90 @@ h1, h2, h3, h4, h5 { font-family: var(--font-display); }
   min-height: 0;
 }
 
+.patients-directory-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.patients-directory-page-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 22px;
+}
+
+.patients-directory-page-copy h2 {
+  margin: 6px 0 8px;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+.patients-directory-page-copy p {
+  margin: 0;
+  max-width: 720px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.patients-directory-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.patients-directory-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.patients-directory-row {
+  padding: 16px 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(240px, 0.8fr) auto;
+  gap: 16px;
+  align-items: center;
+}
+
+.patient-directory-row-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.patient-directory-row-stats {
+  display: grid;
+  gap: 8px;
+  padding-top: 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.patient-directory-row-stats strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--ink);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.patient-directory-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
 .patients-directory {
   border-right: 1px solid var(--border-2);
   padding: 18px 18px 20px;

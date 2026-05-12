@@ -54,7 +54,7 @@ export function resetTeethState() {
 }
 
 const DEFAULT_UI_CONTEXT = {
-  activeView: 'patients',
+  activeView: 'home',
   selectedTooth: 16,
   selectedSurface: 'O',
   activeTab: 'antecedentes',
