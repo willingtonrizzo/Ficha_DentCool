@@ -77,6 +77,9 @@ Hecho:
 - el alta y la edicion de paciente ahora validan nombre obligatorio, RUT con formato basico y RUT no duplicado
 - la ficha lateral ahora muestra errores de validacion visibles antes de guardar
 - el primer guardado de un paciente nuevo ya completa automaticamente la fecha de registro si estaba vacia
+- `Antecedentes` dejo de ser una maqueta fija y ahora refleja el paciente activo real
+- el tab `Antecedentes` ahora muestra antecedentes medicos, alergias/medicamentos y habitos dentales reales por paciente
+- el contador de `Antecedentes` ahora se calcula desde items activos reales del paciente
 - se agrego `CONTEXTO-ACTIVO-FICHA-DENTCOOL.md` como handoff persistente de sesion
 - se agrego la skill local `dentcool-contexto` para reconstruir estado del proyecto al retomar
 - `AGENTS.md` ahora define protocolo obligatorio de retoma y cierre de sesion
@@ -117,4 +120,5 @@ Hecho:
 - aunque la ficha lateral ya concentra casi toda la edicion del paciente, el flujo general aun necesita pulido de UX para escritorio clinico
 - aun no hay validacion automatica del flujo clinico
 - el alta de paciente ya tiene validaciones base, pero todavia faltan reglas de negocio mas profundas para agenda, documentos reales y trazabilidad clinica
+- `Antecedentes` ya es real por paciente, pero conviene seguir revisando el resto de tabs una por una para quitar cualquier mock remanente
 - aunque ya existe handoff persistente, sigue siendo necesario mantenerlo actualizado al cerrar cada bloque

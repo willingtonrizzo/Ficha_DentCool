@@ -578,19 +578,20 @@ export function PatientsSheet({
   open,
   patients,
   activePatientId,
+  activeSection,
   saveState,
   lastSavedAt,
   onSelectPatient,
   onCreatePatient,
   onSavePatient,
   onDeletePatient,
+  onSectionChange,
   renderClinicalSection,
   onClose,
 }) {
   if (!open) return null;
 
   const [query, setQuery] = useState('');
-  const [activeSection, setActiveSection] = useState('datos');
   const [validationErrors, setValidationErrors] = useState({});
   const activePatient = patients.find((patient) => patient.id === activePatientId) ?? patients[0] ?? null;
   const [draft, setDraft] = useState(() => createPatientDraft(activePatient));
@@ -733,7 +734,7 @@ export function PatientsSheet({
                 <button
                   key={section.id}
                   className={`patient-sheet-nav-item ${activeSection === section.id ? 'active' : ''}`}
-                  onClick={() => setActiveSection(section.id)}
+                  onClick={() => onSectionChange?.(section.id)}
                   type="button"
                 >
                   <span>{section.label}</span>

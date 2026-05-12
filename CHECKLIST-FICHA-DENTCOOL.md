@@ -35,6 +35,7 @@
 - [x] Limpiar y controlar borradores vacios `Paciente nuevo`
 - [x] Llevar el odontograma al paciente activo
 - [x] Validar alta y edicion de paciente con reglas base
+- [x] Volver real el tab `Antecedentes` por paciente activo
 
 ## En curso / siguiente
 

@@ -22,40 +22,69 @@ export function Tabs({ active, onChange, counts }) {
   );
 }
 
-export function Antecedentes() {
+export function Antecedentes({ patient, onEditPatient }) {
+  const medicalBackground = patient?.medicalBackground ?? [];
+  const allergies = patient?.allergies ?? [];
+  const dentalHabits = patient?.dentalHabits ?? [];
+
   return (
-    <div className="ant-grid">
-      <div className="ant-block">
-        <h4>Antecedentes medicos</h4>
-        <div className="ant-list">
-          <div className="ant-row no"><span className="check" /><span>Diabetes</span></div>
-          <div className="ant-row no"><span className="check" /><span>Hipertension</span></div>
-          <div className="ant-row"><span className="check"><Icon.check /></span><span>Embarazo</span><span className="pill">22 sem</span></div>
-          <div className="ant-row no"><span className="check" /><span>Enfermedad cardiovascular</span></div>
-          <div className="ant-row no"><span className="check" /><span>Trastornos de coagulacion</span></div>
-          <div className="ant-row no"><span className="check" /><span>VIH / Hepatitis</span></div>
+    <div className="ant-shell">
+      <div className="ant-header">
+        <div>
+          <div className="muted" style={{ fontSize: 12 }}>Antecedentes del paciente activo</div>
+          <div className="ant-patient-name">{patient?.fullName ?? 'Sin paciente seleccionado'}</div>
         </div>
+        <button className="btn btn-secondary" type="button" onClick={onEditPatient}>
+          <Icon.edit />
+          Editar antecedentes
+        </button>
       </div>
-      <div className="ant-block">
-        <h4>Alergias y medicamentos</h4>
-        <div className="ant-list">
-          <div className="ant-row" style={{ color: 'var(--red)' }}><span className="check" style={{ background: 'var(--red)' }}><Icon.alert /></span><span><strong>Penicilina</strong> — anafilaxia</span></div>
-          <div className="ant-row no"><span className="check" /><span>Anestesicos</span></div>
-          <div className="ant-row no"><span className="check" /><span>Latex</span></div>
-          <div className="ant-row" style={{ marginTop: 8, color: 'var(--ink)' }}><span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>Medicamentos actuales:</span></div>
-          <div className="ant-row" style={{ paddingLeft: 0 }}>· Acido folico 5 mg / dia</div>
-          <div className="ant-row" style={{ paddingLeft: 0 }}>· Hierro 100 mg / dia</div>
+      <div className="ant-grid">
+        <div className="ant-block">
+          <h4>Antecedentes medicos</h4>
+          <div className="ant-list">
+            {medicalBackground.length > 0 ? medicalBackground.map((item) => (
+              <div key={item.id} className={`ant-row ${item.active ? '' : 'no'}`}>
+                <span className="check">{item.active ? <Icon.check /> : null}</span>
+                <span>{item.label}</span>
+                {item.comment ? <span className="pill">{item.comment}</span> : null}
+              </div>
+            )) : (
+              <div className="ant-row no"><span className="check" /><span>Sin antecedentes medicos registrados</span></div>
+            )}
+          </div>
         </div>
-      </div>
-      <div className="ant-block">
-        <h4>Habitos y antecedentes dentales</h4>
-        <div className="ant-list">
-          <div className="ant-row"><span className="check"><Icon.check /></span><span>Bruxismo nocturno</span><span className="pill" style={{ background: 'var(--blue)' }}>Plano</span></div>
-          <div className="ant-row no"><span className="check" /><span>Tabaquismo</span></div>
-          <div className="ant-row no"><span className="check" /><span>Consumo de alcohol</span></div>
-          <div className="ant-row"><span className="check"><Icon.check /></span><span>Cepillado 3× al dia</span></div>
-          <div className="ant-row"><span className="check"><Icon.check /></span><span>Hilo dental</span></div>
-          <div className="ant-row no"><span className="check" /><span>Enjuague bucal</span></div>
+        <div className="ant-block">
+          <h4>Alergias y medicamentos</h4>
+          <div className="ant-list">
+            {allergies.length > 0 ? allergies.map((item) => (
+              <div key={item.id} className={`ant-row ${item.active ? '' : 'no'}`} style={item.active && item.comment ? { color: 'var(--red)' } : undefined}>
+                <span className="check" style={item.active ? { background: item.comment ? 'var(--red)' : 'var(--brand-grad)' } : undefined}>
+                  {item.active ? <Icon.alert /> : null}
+                </span>
+                <span>
+                  {item.active && item.comment ? <strong>{item.label}</strong> : item.label}
+                </span>
+                {item.comment ? <span className="pill" style={item.active ? { background: 'var(--red)' } : undefined}>{item.comment}</span> : null}
+              </div>
+            )) : (
+              <div className="ant-row no"><span className="check" /><span>Sin alergias ni medicamentos registrados</span></div>
+            )}
+          </div>
+        </div>
+        <div className="ant-block">
+          <h4>Habitos y antecedentes dentales</h4>
+          <div className="ant-list">
+            {dentalHabits.length > 0 ? dentalHabits.map((item) => (
+              <div key={item.id} className={`ant-row ${item.active ? '' : 'no'}`}>
+                <span className="check">{item.active ? <Icon.check /> : null}</span>
+                <span>{item.label}</span>
+                {item.comment ? <span className="pill" style={{ background: 'var(--blue)' }}>{item.comment}</span> : null}
+              </div>
+            )) : (
+              <div className="ant-row no"><span className="check" /><span>Sin habitos dentales registrados</span></div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -70,6 +99,8 @@ export function Motivo({
   onDiagnosisChange,
   onAddDiagnosis,
   onRemoveDiagnosis,
+  onOpenSection,
+  mirror = false,
 }) {
   const saveLabel =
     saveState === 'dirty'
@@ -81,83 +112,123 @@ export function Motivo({
   return (
     <div className="motivo-layout">
       <div className="motivo-main-column">
-        <div className="motivo-save-note">{saveLabel}</div>
-
-        <div className="motivo-block">
-          <h4 style={sectionTitleStyle}>Motivo de consulta</h4>
-          <div style={calloutStyle}>
-            <textarea
-              className="motivo-callout-input"
-              value={record.consultationReason}
-              onChange={(event) => onFieldChange('consultationReason', event.target.value)}
-              placeholder="Describe el motivo principal referido por el paciente."
-            />
-          </div>
-        </div>
-
-        <div className="motivo-block">
-          <h4 style={sectionTitleStyle}>Enfermedad o historia actual</h4>
-          <div style={bodyCardStyle}>
-            <textarea
-              className="motivo-body-input"
-              value={record.currentIllness}
-              onChange={(event) => onFieldChange('currentIllness', event.target.value)}
-              placeholder="Duracion, desencadenantes, dolor, sensibilidad y antecedentes inmediatos."
-            />
-          </div>
-        </div>
-
-        <div className="motivo-block">
-          <h4 style={sectionTitleStyle}>Examen clinico</h4>
-          <div className="motivo-exam-grid">
-            <MotivoField
-              label="Extraoral"
-              value={record.extraoralExam}
-              placeholder="ATM, simetria facial, apertura, hallazgos extraorales."
-              onChange={(value) => onFieldChange('extraoralExam', value)}
-            />
-            <MotivoField
-              label="Intraoral"
-              value={record.intraoralExam}
-              placeholder="Mucosas, encia, lesiones, restauraciones, hallazgos por sector."
-              onChange={(value) => onFieldChange('intraoralExam', value)}
-            />
-            <MotivoField
-              label="Periodontal"
-              value={record.periodontalExam}
-              placeholder="Sondaje, sangrado, placa, movilidad u otros indices."
-              onChange={(value) => onFieldChange('periodontalExam', value)}
-            />
-            <MotivoField
-              label="Impresion clinica"
-              value={record.clinicalImpression}
-              placeholder="Sintesis clinica y criterio de evaluacion."
-              onChange={(value) => onFieldChange('clinicalImpression', value)}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="motivo-side-column">
-        <div className="motivo-diagnosis-head">
-          <h4 style={sectionTitleStyle}>Diagnostico</h4>
-          <button className="btn btn-secondary" onClick={onAddDiagnosis}><Icon.plus />Agregar</button>
-        </div>
-        <div className="motivo-diagnosis-list">
-          {record.diagnoses.map((diagnosis) => (
-            <DiagEditor
-              key={diagnosis.id}
-              diagnosis={diagnosis}
-              onChange={onDiagnosisChange}
-              onRemove={onRemoveDiagnosis}
-            />
-          ))}
-          {record.diagnoses.length === 0 && (
-            <div className="motivo-empty-state">
-              Aun no hay diagnosticos cargados para este paciente.
-            </div>
+        <div className="mirror-toolbar">
+          <div className="motivo-save-note">{saveLabel}</div>
+          {mirror && (
+            <button className="btn btn-secondary" type="button" onClick={() => onOpenSection?.('motivo')}>
+              <Icon.edit />
+              Editar ficha
+            </button>
           )}
         </div>
+
+        {mirror ? (
+          <div className="mirror-clinical-grid">
+            <div className="mirror-block">
+              <h4 style={sectionTitleStyle}>Motivo de consulta</h4>
+              <p>{record.consultationReason || 'Sin motivo registrado.'}</p>
+            </div>
+            <div className="mirror-block">
+              <h4 style={sectionTitleStyle}>Historia actual</h4>
+              <p>{record.currentIllness || 'Sin historia actual registrada.'}</p>
+            </div>
+            <div className="mirror-block">
+              <h4 style={sectionTitleStyle}>Examen clinico</h4>
+              <p><strong>Extraoral:</strong> {record.extraoralExam || 'Sin registro.'}</p>
+              <p><strong>Intraoral:</strong> {record.intraoralExam || 'Sin registro.'}</p>
+              <p><strong>Periodontal:</strong> {record.periodontalExam || 'Sin registro.'}</p>
+              <p><strong>Impresion:</strong> {record.clinicalImpression || 'Sin registro.'}</p>
+            </div>
+            <div className="mirror-block mirror-block-wide">
+              <h4 style={sectionTitleStyle}>Diagnosticos</h4>
+              <div className="mirror-chip-list">
+                {record.diagnoses.length > 0 ? record.diagnoses.map((diagnosis) => (
+                  <span key={diagnosis.id} className="mirror-chip">
+                    {diagnosis.code || 'Sin codigo'} · {diagnosis.title || 'Sin titulo'}
+                  </span>
+                )) : <span className="muted">Sin diagnosticos cargados.</span>}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="motivo-block">
+              <h4 style={sectionTitleStyle}>Motivo de consulta</h4>
+              <div style={calloutStyle}>
+                <textarea
+                  className="motivo-callout-input"
+                  value={record.consultationReason}
+                  onChange={(event) => onFieldChange('consultationReason', event.target.value)}
+                  placeholder="Describe el motivo principal referido por el paciente."
+                />
+              </div>
+            </div>
+
+            <div className="motivo-block">
+              <h4 style={sectionTitleStyle}>Enfermedad o historia actual</h4>
+              <div style={bodyCardStyle}>
+                <textarea
+                  className="motivo-body-input"
+                  value={record.currentIllness}
+                  onChange={(event) => onFieldChange('currentIllness', event.target.value)}
+                  placeholder="Duracion, desencadenantes, dolor, sensibilidad y antecedentes inmediatos."
+                />
+              </div>
+            </div>
+
+            <div className="motivo-block">
+              <h4 style={sectionTitleStyle}>Examen clinico</h4>
+              <div className="motivo-exam-grid">
+                <MotivoField
+                  label="Extraoral"
+                  value={record.extraoralExam}
+                  placeholder="ATM, simetria facial, apertura, hallazgos extraorales."
+                  onChange={(value) => onFieldChange('extraoralExam', value)}
+                />
+                <MotivoField
+                  label="Intraoral"
+                  value={record.intraoralExam}
+                  placeholder="Mucosas, encia, lesiones, restauraciones, hallazgos por sector."
+                  onChange={(value) => onFieldChange('intraoralExam', value)}
+                />
+                <MotivoField
+                  label="Periodontal"
+                  value={record.periodontalExam}
+                  placeholder="Sondaje, sangrado, placa, movilidad u otros indices."
+                  onChange={(value) => onFieldChange('periodontalExam', value)}
+                />
+                <MotivoField
+                  label="Impresion clinica"
+                  value={record.clinicalImpression}
+                  placeholder="Sintesis clinica y criterio de evaluacion."
+                  onChange={(value) => onFieldChange('clinicalImpression', value)}
+                />
+              </div>
+            </div>
+
+            <div className="motivo-side-column">
+              <div className="motivo-diagnosis-head">
+                <h4 style={sectionTitleStyle}>Diagnostico</h4>
+                <button className="btn btn-secondary" onClick={onAddDiagnosis}><Icon.plus />Agregar</button>
+              </div>
+              <div className="motivo-diagnosis-list">
+                {record.diagnoses.map((diagnosis) => (
+                  <DiagEditor
+                    key={diagnosis.id}
+                    diagnosis={diagnosis}
+                    onChange={onDiagnosisChange}
+                    onRemove={onRemoveDiagnosis}
+                  />
+                ))}
+                {record.diagnoses.length === 0 && (
+                  <div className="motivo-empty-state">
+                    Aun no hay diagnosticos cargados para este paciente.
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -220,6 +291,8 @@ export function Evolucion({
   onNoteChange,
   onAddNote,
   onRemoveNote,
+  onOpenSection,
+  mirror = false,
 }) {
   const saveLabel =
     saveState === 'dirty'
@@ -235,13 +308,29 @@ export function Evolucion({
           <div className="muted" style={{ fontSize: 12.5 }}>{evolutionNotes.length} entradas · ordenadas por fecha</div>
           <div className="evolution-save-note">{saveLabel}</div>
         </div>
-        <button className="btn btn-primary" onClick={onAddNote}><Icon.plus />Nueva nota clinica</button>
+        <div className="evolution-toolbar-actions">
+          {mirror && (
+            <button className="btn btn-secondary" type="button" onClick={() => onOpenSection?.('evolucion')}>
+              <Icon.edit />
+              Editar ficha
+            </button>
+          )}
+          {!mirror && <button className="btn btn-primary" onClick={onAddNote}><Icon.plus />Nueva nota clinica</button>}
+        </div>
       </div>
       <div className="evol-list">
         {evolutionNotes.map((e) => (
           <div key={e.id} className="evol-item editable">
             <div className="evol-date"><strong>{extractDateParts(e.dateLabel).day}</strong>{extractDateParts(e.dateLabel).month} <br />{extractDateParts(e.dateLabel).year}</div>
             <div className="evol-body">
+              {mirror ? (
+                <>
+                  <div className="mirror-note-title">{e.title || 'Sin titulo'}</div>
+                  <div className="mirror-note-meta">{e.dateLabel || 'Sin fecha'} · {e.author || 'Sin profesional'}</div>
+                  <p className="mirror-note-text">{e.text || 'Sin detalle registrado.'}</p>
+                </>
+              ) : (
+                <>
               <div className="evolution-entry-head">
                 <input
                   className="evolution-title-input"
@@ -278,6 +367,8 @@ export function Evolucion({
               <div className="evol-tags">
                 {e.tags.map((tag, j) => <span key={j} className={`tag ${tag.tone}`}>{tag.label}</span>)}
               </div>
+                </>
+              )}
             </div>
           </div>
         ))}
@@ -295,6 +386,8 @@ export function Presupuesto({
   onTreatmentChange,
   onAddTreatment,
   onRemoveTreatment,
+  onOpenSection,
+  mirror = false,
 }) {
   const total = treatments.reduce((s, t) => s + t.cost, 0);
   const pagado = treatments.reduce((s, t) => s + t.paid, 0);
@@ -328,9 +421,22 @@ export function Presupuesto({
           <div className="budget-plan-bar">
             <span style={{ width: `${Math.max(18, Math.round((pagado / Math.max(total, 1)) * 100))}%` }} />
           </div>
-          <div className="budget-plan-caption">Avance financiero del plan</div>
+        <div className="budget-plan-caption">Avance financiero del plan</div>
         </div>
-        <div className="budget-plan-list">
+        {mirror ? (
+          <div className="budget-plan-mirror">
+            {topItems.map((item) => (
+              <div key={item.id} className="mirror-plan-row">
+                <div>
+                  <div className="mirror-plan-title">{item.procedure || 'Sin procedimiento'}</div>
+                  <div className="mirror-plan-meta">{item.toothFdi} · {item.clinician || 'Sin profesional'}</div>
+                </div>
+                <span className={`status ${legacyStatusClass(item.status)}`}><span className="dot" />{labelForStatus(item.status)}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="budget-plan-list">
           {topItems.map((item) => (
             <div key={item.id} className="budget-plan-item">
               <div className="budget-plan-item-main">
@@ -357,7 +463,8 @@ export function Presupuesto({
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        )}
       </div>
 
       <div>
@@ -385,8 +492,14 @@ export function Presupuesto({
         ))}
       </div>
       <div className="budget-actions">
+        {mirror && (
+          <button className="btn btn-secondary" type="button" onClick={() => onOpenSection?.('presupuesto')}>
+            <Icon.edit />
+            Editar ficha
+          </button>
+        )}
         <button className="btn btn-secondary"><Icon.download />Exportar presupuesto PDF</button>
-        <button className="btn btn-primary" onClick={onAddTreatment}><Icon.plus />Agregar tratamiento</button>
+        {!mirror && <button className="btn btn-primary" onClick={onAddTreatment}><Icon.plus />Agregar tratamiento</button>}
       </div>
       </div>
     </div>
@@ -400,6 +513,8 @@ export function Documentos({
   onDocumentChange,
   onAddDocument,
   onRemoveDocument,
+  mirror = false,
+  onOpenSection,
 }) {
   const saveLabel =
     saveState === 'dirty'
@@ -424,7 +539,14 @@ export function Documentos({
           <div className="muted" style={{ fontSize: 12.5 }}>{documents.length} archivos registrados</div>
           <div className="documents-save-note">{saveLabel}</div>
         </div>
-        <button className="btn btn-primary" onClick={onAddDocument}><Icon.plus />Nuevo documento</button>
+        {mirror ? (
+          <button className="btn btn-secondary" type="button" onClick={() => onOpenSection?.('documentos')}>
+            <Icon.edit />
+            Editar ficha
+          </button>
+        ) : (
+          <button className="btn btn-primary" onClick={onAddDocument}><Icon.plus />Nuevo documento</button>
+        )}
       </div>
       <div className="documents-list">
         {documents.map((d) => (
@@ -434,43 +556,22 @@ export function Documentos({
             </div>
             <div className="document-main">
               <div className="document-head">
-                <input
-                  className="document-name-input"
-                  value={d.name}
-                  onChange={(event) => onDocumentChange(d.id, 'name', event.target.value)}
-                  placeholder="Nombre del documento"
-                />
-                <button className="btn btn-ghost" onClick={() => onRemoveDocument(d.id)}><Icon.trash /></button>
+                <div className="document-title">{d.name}</div>
+                {!mirror && <button className="btn btn-ghost" onClick={() => onRemoveDocument(d.id)}><Icon.trash /></button>}
               </div>
               <div className="document-fields">
-                <label className="document-field">
+                <div className="document-field">
                   <span>Fecha</span>
-                  <input
-                    value={d.dateLabel}
-                    onChange={(event) => onDocumentChange(d.id, 'dateLabel', event.target.value)}
-                    placeholder="11-05-2026"
-                  />
-                </label>
-                <label className="document-field">
+                  <div className="document-value">{d.dateLabel || 'Sin fecha'}</div>
+                </div>
+                <div className="document-field">
                   <span>Extension</span>
-                  <select value={d.ext} onChange={(event) => onDocumentChange(d.id, 'ext', event.target.value)}>
-                    <option value="pdf">PDF</option>
-                    <option value="jpg">JPG</option>
-                    <option value="png">PNG</option>
-                    <option value="dcm">DCM</option>
-                  </select>
-                </label>
-                <label className="document-field">
+                  <div className="document-value">{d.ext.toUpperCase()}</div>
+                </div>
+                <div className="document-field">
                   <span>Tipo</span>
-                  <select value={d.kind} onChange={(event) => onDocumentChange(d.id, 'kind', event.target.value)}>
-                    <option value="general">General</option>
-                    <option value="radiografia">Radiografia</option>
-                    <option value="foto">Foto</option>
-                    <option value="consentimiento">Consentimiento</option>
-                    <option value="presupuesto">Presupuesto</option>
-                    <option value="informe">Informe</option>
-                  </select>
-                </label>
+                  <div className="document-value">{kindLabel[d.kind] ?? 'General'}</div>
+                </div>
               </div>
               <div className="document-meta-line">
                 <span className={`ext ${d.ext}`}>{d.ext.toUpperCase()}</span>
@@ -497,6 +598,8 @@ export function Historial({
   onEntryChange,
   onAddEntry,
   onRemoveEntry,
+  onOpenSection,
+  mirror = false,
 }) {
   const saveLabel =
     saveState === 'dirty'
@@ -512,53 +615,78 @@ export function Historial({
           <div className="muted" style={{ fontSize: 12.5 }}>{historyEntries.length} eventos registrados</div>
           <div className="history-save-note">{saveLabel}</div>
         </div>
-        <button className="btn btn-primary" onClick={onAddEntry}><Icon.plus />Nuevo evento</button>
+        <div className="history-toolbar-actions">
+          {mirror && (
+            <button className="btn btn-secondary" type="button" onClick={() => onOpenSection?.('historial')}>
+              <Icon.edit />
+              Editar ficha
+            </button>
+          )}
+          {!mirror && <button className="btn btn-primary" onClick={onAddEntry}><Icon.plus />Nuevo evento</button>}
+        </div>
       </div>
       <div className="history-list">
         {historyEntries.map((h) => (
           <div key={h.id} className="history-row editable">
             <div className="history-date">
-              <input
-                className="history-date-input"
-                value={h.dateLabel}
-                onChange={(event) => onEntryChange(h.id, 'dateLabel', event.target.value)}
-                placeholder="11-05-2026"
-              />
+              {mirror ? (
+                <span className="mirror-date">{h.dateLabel || 'Sin fecha'}</span>
+              ) : (
+                <input
+                  className="history-date-input"
+                  value={h.dateLabel}
+                  onChange={(event) => onEntryChange(h.id, 'dateLabel', event.target.value)}
+                  placeholder="11-05-2026"
+                />
+              )}
             </div>
             <div className="history-main">
-              <div className="history-entry-head">
-                <input
-                  className="history-title-input"
-                  value={h.title}
-                  onChange={(event) => onEntryChange(h.id, 'title', event.target.value)}
-                  placeholder="Titulo del evento"
-                />
-                <select
-                  className="history-category-select"
-                  value={h.category}
-                  onChange={(event) => onEntryChange(h.id, 'category', event.target.value)}
-                >
-                  <option value="general">General</option>
-                  <option value="control">Control</option>
-                  <option value="tratamiento">Tratamiento</option>
-                  <option value="protesis">Protesis</option>
-                  <option value="prevencion">Prevencion</option>
-                  <option value="administrativo">Administrativo</option>
-                </select>
-                <button className="btn btn-ghost" onClick={() => onRemoveEntry(h.id)}><Icon.trash /></button>
-              </div>
-              <input
-                className="history-clinician-input"
-                value={h.clinician}
-                onChange={(event) => onEntryChange(h.id, 'clinician', event.target.value)}
-                placeholder="Profesional responsable"
-              />
-              <textarea
-                className="history-summary-input"
-                value={h.summary}
-                onChange={(event) => onEntryChange(h.id, 'summary', event.target.value)}
-                placeholder="Resumen breve del evento, control, procedimiento o decision clinica."
-              />
+              {mirror ? (
+                <>
+                  <div className="history-entry-head">
+                    <div className="mirror-note-title">{h.title || 'Sin titulo'}</div>
+                    <span className="status plan"><span className="dot" />{(h.category || 'general').toUpperCase()}</span>
+                  </div>
+                  <div className="mirror-note-meta">{h.clinician || 'Sin profesional'}</div>
+                  <p className="mirror-note-text">{h.summary || 'Sin resumen registrado.'}</p>
+                </>
+              ) : (
+                <>
+                  <div className="history-entry-head">
+                    <input
+                      className="history-title-input"
+                      value={h.title}
+                      onChange={(event) => onEntryChange(h.id, 'title', event.target.value)}
+                      placeholder="Titulo del evento"
+                    />
+                    <select
+                      className="history-category-select"
+                      value={h.category}
+                      onChange={(event) => onEntryChange(h.id, 'category', event.target.value)}
+                    >
+                      <option value="general">General</option>
+                      <option value="control">Control</option>
+                      <option value="tratamiento">Tratamiento</option>
+                      <option value="protesis">Protesis</option>
+                      <option value="prevencion">Prevencion</option>
+                      <option value="administrativo">Administrativo</option>
+                    </select>
+                    <button className="btn btn-ghost" onClick={() => onRemoveEntry(h.id)}><Icon.trash /></button>
+                  </div>
+                  <input
+                    className="history-clinician-input"
+                    value={h.clinician}
+                    onChange={(event) => onEntryChange(h.id, 'clinician', event.target.value)}
+                    placeholder="Profesional responsable"
+                  />
+                  <textarea
+                    className="history-summary-input"
+                    value={h.summary}
+                    onChange={(event) => onEntryChange(h.id, 'summary', event.target.value)}
+                    placeholder="Resumen breve del evento, control, procedimiento o decision clinica."
+                  />
+                </>
+              )}
             </div>
           </div>
         ))}

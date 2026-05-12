@@ -54,6 +54,7 @@ export default function App() {
   const [patientSaveState, setPatientSaveState] = useState('loaded');
   const [clinicalSaveState, setClinicalSaveState] = useState('loaded');
   const [isPatientSheetOpen, setIsPatientSheetOpen] = useState(false);
+  const [patientSheetSection, setPatientSheetSection] = useState('datos');
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const [lastPatientSavedAt, setLastPatientSavedAt] = useState(null);
   const [lastClinicalSavedAt, setLastClinicalSavedAt] = useState(null);
@@ -143,7 +144,8 @@ export default function App() {
     });
   };
 
-  const handleOpenPatientSheet = () => {
+  const handleOpenPatientSheet = (sectionId = 'datos') => {
+    setPatientSheetSection(sectionId);
     setIsPatientSheetOpen(true);
   };
 
@@ -554,6 +556,12 @@ export default function App() {
   });
 
   const { patient, record } = clinicalData;
+  counts.ant = patient
+    ? [patient.medicalBackground, patient.allergies, patient.dentalHabits].reduce(
+        (total, collection) => total + collection.filter((item) => item.active).length,
+        0
+      )
+    : 0;
   counts.evol = record.evolutionNotes.length;
   counts.tx = record.treatments.length;
   counts.docs = record.documents.length;
@@ -570,6 +578,7 @@ export default function App() {
           onDiagnosisChange={handleDiagnosisChange}
           onAddDiagnosis={handleAddDiagnosis}
           onRemoveDiagnosis={handleRemoveDiagnosis}
+          onOpenSection={handleOpenPatientSheet}
         />
       );
     }
@@ -583,6 +592,7 @@ export default function App() {
           onNoteChange={handleEvolutionNoteChange}
           onAddNote={handleAddEvolutionNote}
           onRemoveNote={handleRemoveEvolutionNote}
+          onOpenSection={handleOpenPatientSheet}
         />
       );
     }
@@ -598,6 +608,7 @@ export default function App() {
           onTreatmentChange={handleTreatmentChange}
           onAddTreatment={handleAddTreatment}
           onRemoveTreatment={handleRemoveTreatment}
+          onOpenSection={handleOpenPatientSheet}
         />
       );
     }
@@ -611,6 +622,7 @@ export default function App() {
           onDocumentChange={handleDocumentChange}
           onAddDocument={handleAddDocument}
           onRemoveDocument={handleRemoveDocument}
+          onOpenSection={handleOpenPatientSheet}
         />
       );
     }
@@ -624,6 +636,7 @@ export default function App() {
           onEntryChange={handleHistoryEntryChange}
           onAddEntry={handleAddHistoryEntry}
           onRemoveEntry={handleRemoveHistoryEntry}
+          onOpenSection={handleOpenPatientSheet}
         />
       );
     }
@@ -655,12 +668,14 @@ export default function App() {
                 open={isPatientSheetOpen}
                 patients={patients}
                 activePatientId={activePatientId}
+                activeSection={patientSheetSection}
                 saveState={patientSaveState}
                 lastSavedAt={lastPatientSavedAt}
                 onSelectPatient={setActivePatientId}
                 onCreatePatient={handleCreatePatient}
                 onSavePatient={handleSavePatient}
                 onDeletePatient={handleDeletePatient}
+                onSectionChange={setPatientSheetSection}
                 renderClinicalSection={renderSheetClinicalSection}
                 onClose={handleClosePatientSheet}
               />
@@ -680,7 +695,9 @@ export default function App() {
                   <div className="card">
                     <Tabs active={activeTab} onChange={setActiveTab} counts={counts} />
                     <div className="tab-content">
-                      {activeTab === 'antecedentes' && <Antecedentes />}
+                      {activeTab === 'antecedentes' && (
+                        <Antecedentes patient={patient} onEditPatient={() => handleOpenPatientSheet('antecedentes')} />
+                      )}
                       {activeTab === 'motivo' && (
                         <Motivo
                           record={record.motivoDiagnostico}
@@ -690,6 +707,8 @@ export default function App() {
                           onDiagnosisChange={handleDiagnosisChange}
                           onAddDiagnosis={handleAddDiagnosis}
                           onRemoveDiagnosis={handleRemoveDiagnosis}
+                          onOpenSection={handleOpenPatientSheet}
+                          mirror
                         />
                       )}
                       {activeTab === 'evolucion' && (
@@ -700,6 +719,8 @@ export default function App() {
                           onNoteChange={handleEvolutionNoteChange}
                           onAddNote={handleAddEvolutionNote}
                           onRemoveNote={handleRemoveEvolutionNote}
+                          onOpenSection={handleOpenPatientSheet}
+                          mirror
                         />
                       )}
                       {activeTab === 'presupuesto' && (
@@ -712,6 +733,8 @@ export default function App() {
                           onTreatmentChange={handleTreatmentChange}
                           onAddTreatment={handleAddTreatment}
                           onRemoveTreatment={handleRemoveTreatment}
+                          onOpenSection={handleOpenPatientSheet}
+                          mirror
                         />
                       )}
                       {activeTab === 'documentos' && (
@@ -722,6 +745,8 @@ export default function App() {
                           onDocumentChange={handleDocumentChange}
                           onAddDocument={handleAddDocument}
                           onRemoveDocument={handleRemoveDocument}
+                          mirror
+                          onOpenSection={handleOpenPatientSheet}
                         />
                       )}
                       {activeTab === 'historial' && (
@@ -732,6 +757,8 @@ export default function App() {
                           onEntryChange={handleHistoryEntryChange}
                           onAddEntry={handleAddHistoryEntry}
                           onRemoveEntry={handleRemoveHistoryEntry}
+                          onOpenSection={handleOpenPatientSheet}
+                          mirror
                         />
                       )}
                     </div>

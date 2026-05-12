@@ -30,6 +30,7 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - Existe persistencia local de `Documentos` por `patientId`.
 - Existe persistencia local del odontograma por `patientId`.
 - Existe validacion base para alta y edicion de pacientes.
+- `Antecedentes` ya refleja datos reales del paciente activo en la tab principal.
 - Existen pruebas automatizadas base del odontograma y de persistencia local.
 - Existe un modelo clinico base y un esquema inicial de `SQLite`.
 
@@ -57,6 +58,7 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - Hay buena base para adaptar referencias externas sin copiar interfaces sobrecargadas.
 - Falta trabajar feedback funcional: guardado, error, exito, cambios pendientes.
 - `Inicio` ya usa datos reales para directorio y seguimientos visibles, pero todavia combina eso con KPIs mock.
+- `Antecedentes` ya no depende de contenido fijo hardcodeado.
 
 ### Funcionalidades
 
@@ -71,6 +73,7 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - La ficha lateral ya concentra la edicion administrativa y clinica principal por paciente.
 - El odontograma ya se guarda por paciente junto con su contexto clinico principal.
 - El formulario administrativo del paciente ya valida nombre, RUT y duplicidad basica.
+- La vista de `Antecedentes` ya dejo de depender de contenido fijo hardcodeado.
 
 ### Testing
 
