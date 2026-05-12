@@ -16,6 +16,7 @@ import {
   saveUiContext,
 } from '../storage';
 import { STORAGE_KEYS } from '../data';
+import { DEFAULT_ALLERGIES, DEFAULT_DENTAL_HABITS, DEFAULT_MEDICAL_BACKGROUND } from '../patients';
 
 describe('storage', () => {
   beforeEach(() => {
@@ -96,6 +97,43 @@ describe('storage', () => {
 
     expect(loadPatientDirectory()[0].phone).toBe('+56 9 0000 1111');
     expect(loadActivePatientId()).toBe(updated[1].id);
+  });
+
+  it('migrates untouched draft patients to blank backgrounds on load', () => {
+    window.localStorage.setItem(
+      STORAGE_KEYS.patients,
+      JSON.stringify([
+        {
+          id: 'patient-new-123',
+          fullName: 'Pedro K',
+          medicalBackground: [
+            ...DEFAULT_MEDICAL_BACKGROUND,
+            { label: 'Neuritica', active: true, comment: '' },
+          ],
+          allergies: [
+            ...DEFAULT_ALLERGIES,
+            { label: 'Peces', active: true, comment: 'ok' },
+          ],
+          dentalHabits: [
+            ...DEFAULT_DENTAL_HABITS,
+            { label: 'camina dormido', active: true, comment: 'N/A' },
+          ],
+        },
+      ])
+    );
+
+    const restored = loadPatientDirectory();
+
+    expect(restored[0].fullName).toBe('Pedro K');
+    expect(restored[0].medicalBackground.some((item) => item.label === 'Embarazo')).toBe(true);
+    expect(restored[0].medicalBackground.find((item) => item.label === 'Embarazo')?.active).toBe(false);
+    expect(restored[0].allergies.some((item) => item.label === 'Penicilina')).toBe(true);
+    expect(restored[0].allergies.find((item) => item.label === 'Penicilina')?.active).toBe(false);
+    expect(restored[0].dentalHabits.some((item) => item.label === 'Bruxismo nocturno')).toBe(true);
+    expect(restored[0].dentalHabits.find((item) => item.label === 'Bruxismo nocturno')?.active).toBe(false);
+    expect(restored[0].medicalBackground.some((item) => item.label === 'Neuritica')).toBe(true);
+    expect(restored[0].allergies.some((item) => item.label === 'Peces')).toBe(true);
+    expect(restored[0].dentalHabits.some((item) => item.label === 'camina dormido')).toBe(true);
   });
 
   it('persists and restores clinical records by patient', () => {

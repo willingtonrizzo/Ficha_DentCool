@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { EVOLUTION, HISTORY, STORAGE_KEYS, TREATMENTS } from './data';
-import { FloatingNewPatientButton, HomeDashboard, Sidebar, TopbarInner, PatientHeader, PatientQuickBar, PatientsSheet, Odontogram, ToothPanel } from './app';
+import { FloatingNewPatientButton, HomeDashboard, Sidebar, TopbarInner, PatientHeader, PatientsSheet, Odontogram, ToothPanel } from './app';
 import { Tabs, Antecedentes, Motivo, Evolucion, Presupuesto, Documentos, Historial, TreatmentsTable, NextAppointments } from './tabs';
 import { updateToothSurfaceState } from './odontogram';
 import { buildClinicalRecordFromMocks, createClinicalPatientRecord, createDiagnosis, createDocumentEntry, createEvolutionNote, createHistoryEntry, createTreatmentEntry, TREATMENT_STATUS, resolveMotivoDiagnosticoRecord } from './clinical-model';
-import { createEmptyPatient, createPatient, isEmptyDraftPatient, normalizeRut, validatePatientDraft } from './patients';
+import { createEmptyPatient, createPatient, getPatientDisplayName, isEmptyDraftPatient, normalizeRut, validatePatientDraft } from './patients';
 import {
   loadActivePatientId,
   loadClinicalRecords,
@@ -55,6 +55,7 @@ export default function App() {
   const [clinicalSaveState, setClinicalSaveState] = useState('loaded');
   const [isPatientSheetOpen, setIsPatientSheetOpen] = useState(false);
   const [patientSheetSection, setPatientSheetSection] = useState('datos');
+  const [patientDraftPreview, setPatientDraftPreview] = useState(null);
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const [lastPatientSavedAt, setLastPatientSavedAt] = useState(null);
   const [lastClinicalSavedAt, setLastClinicalSavedAt] = useState(null);
@@ -67,6 +68,7 @@ export default function App() {
   const skipNextOdontogramPersistRef = useRef(false);
 
   const activePatient = patients.find((patient) => patient.id === activePatientId) ?? patients[0] ?? null;
+  const visibleActivePatient = patientDraftPreview?.id === activePatientId ? patientDraftPreview : activePatient;
   const agendaCount = patients.filter(
     (patient) => patient.nextVisit && patient.nextVisit !== 'Sin cita' && patient.nextVisit !== 'Sin agendar'
   ).length;
@@ -131,7 +133,31 @@ export default function App() {
           : patient
       )
     );
+    setPatientDraftPreview(null);
     return { valid: true, errors: {} };
+  };
+
+  const handleDraftPatientChange = (draft) => {
+    if (!draft?.id) return;
+    setPatientDraftPreview(createPatient({
+      ...patients.find((patient) => patient.id === draft.id),
+      ...draft,
+      rut: normalizeRut(draft.rut ?? ''),
+    }));
+    setPatients((current) =>
+      current.map((patient) =>
+        patient.id === draft.id
+          ? createPatient({
+              ...patient,
+              ...draft,
+              rut: normalizeRut(draft.rut ?? '') || patient.rut,
+              email: (draft.email ?? '').trim() || patient.email,
+              fullName: (draft.fullName ?? '').trim() || patient.fullName,
+              registeredAt: patient.registeredAt || draft.registeredAt || '',
+            })
+          : patient
+      )
+    );
   };
 
   const handleDeletePatient = (patientId) => {
@@ -152,6 +178,10 @@ export default function App() {
   const handleClosePatientSheet = () => {
     setIsPatientSheetOpen(false);
   };
+
+  useEffect(() => {
+    setPatientDraftPreview(null);
+  }, [activePatientId]);
 
   const updateActiveClinicalRecord = (updater) => {
     if (!activePatient) return;
@@ -542,12 +572,12 @@ export default function App() {
   };
 
   const clinicalData = buildClinicalRecordFromMocks({
-    patient: activePatient,
+    patient: visibleActivePatient,
     teeth,
     treatments: TREATMENTS,
     evolution: EVOLUTION,
     history: HISTORY,
-    clinicalRecord: activePatient ? clinicalRecords[activePatient.id] : undefined,
+    clinicalRecord: visibleActivePatient ? clinicalRecords[visibleActivePatient.id] : undefined,
     uiContext: {
       selectedTooth: selected,
       selectedSurface,
@@ -653,16 +683,12 @@ export default function App() {
         agendaCount={agendaCount}
       />
       <div className="main">
-        <TopbarInner patientName={patient?.fullName ?? 'Paciente'} activeView={activeView} />
+        <TopbarInner patientName={getPatientDisplayName(visibleActivePatient, 'Paciente')} activeView={activeView} />
         <div className="content">
           {activeView === 'home' ? (
-            <HomeDashboard patients={patients} activePatient={patient} />
+            <HomeDashboard patients={patients} activePatient={visibleActivePatient} />
           ) : (
             <>
-              <PatientQuickBar
-                patient={patient}
-                onOpenDirectory={handleOpenPatientSheet}
-              />
               <FloatingNewPatientButton onClick={handleCreatePatient} />
               <PatientsSheet
                 open={isPatientSheetOpen}
@@ -674,12 +700,13 @@ export default function App() {
                 onSelectPatient={setActivePatientId}
                 onCreatePatient={handleCreatePatient}
                 onSavePatient={handleSavePatient}
+                onDraftChange={handleDraftPatientChange}
                 onDeletePatient={handleDeletePatient}
                 onSectionChange={setPatientSheetSection}
                 renderClinicalSection={renderSheetClinicalSection}
                 onClose={handleClosePatientSheet}
               />
-              <PatientHeader patient={patient} onEditPatient={handleOpenPatientSheet} />
+              <PatientHeader patient={visibleActivePatient} onEditPatient={handleOpenPatientSheet} onOpenDirectory={handleOpenPatientSheet} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '2px 2px 12px', gap: 12 }}>
                 <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>
                   {saveState === 'loaded' && 'Odontograma cargado desde el estado local o mock inicial.'}
@@ -696,7 +723,7 @@ export default function App() {
                     <Tabs active={activeTab} onChange={setActiveTab} counts={counts} />
                     <div className="tab-content">
                       {activeTab === 'antecedentes' && (
-                        <Antecedentes patient={patient} onEditPatient={() => handleOpenPatientSheet('antecedentes')} />
+                        <Antecedentes patient={visibleActivePatient} onEditPatient={() => handleOpenPatientSheet('antecedentes')} />
                       )}
                       {activeTab === 'motivo' && (
                         <Motivo

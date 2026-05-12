@@ -1,6 +1,13 @@
 import { STORAGE_KEYS } from './data';
 import { cloneInitialTeeth } from './odontogram';
-import { createPatient, createSeedPatients } from './patients';
+import {
+  createPatient,
+  createSeedPatients,
+  DEFAULT_ALLERGIES,
+  DEFAULT_DENTAL_HABITS,
+  DEFAULT_MEDICAL_BACKGROUND,
+  isUntouchedBackgroundCollection,
+} from './patients';
 import { createClinicalPatientRecord, createMotivoDiagnosticoRecord } from './clinical-model';
 
 function isPlainObject(value) {

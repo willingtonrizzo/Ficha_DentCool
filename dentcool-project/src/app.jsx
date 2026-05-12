@@ -8,7 +8,7 @@ import {
   LOWER_LEFT,
   toothName,
 } from './data';
-import { createPatientDraft } from './patients';
+import { createPatientDraft, getPatientDisplayName } from './patients';
 import { Tooth } from './tooth';
 
 export const Icon = {
@@ -143,7 +143,7 @@ export function HomeDashboard({ patients, activePatient }) {
     .slice(0, 4)
     .map((patient) => ({
       id: patient.id,
-      patient: patient.fullName,
+      patient: getPatientDisplayName(patient),
       schedule: patient.nextVisit,
       detail: `${patient.recordNumber} · ${patient.phone || 'Sin telefono registrado'}`,
     }));
@@ -181,7 +181,7 @@ export function HomeDashboard({ patients, activePatient }) {
         <div className="home-hero-side">
           <div className="home-focus-card">
             <div className="home-focus-label">Turno en foco</div>
-            <div className="home-focus-name">{activePatient?.fullName ?? 'Sin paciente'}</div>
+            <div className="home-focus-name">{getPatientDisplayName(activePatient, 'Sin paciente')}</div>
             <div className="home-focus-meta">{activePatient?.recordNumber ?? 'Sin ficha'} · {activePatient?.nextVisit || 'Sin cita agendada'}</div>
             <div className="home-focus-divider" />
             <div className="home-focus-mini">Proxima accion: abrir antecedentes, confirmar motivo y revisar presupuesto.</div>
@@ -233,7 +233,7 @@ export function HomeDashboard({ patients, activePatient }) {
                   <div key={patient.id} className="home-list-row">
                     <div className="patient-directory-avatar">{patient.initials}</div>
                     <div className="home-list-copy">
-                      <div className="home-list-title">{patient.fullName}</div>
+                      <div className="home-list-title">{getPatientDisplayName(patient)}</div>
                       <div className="home-list-meta">{patient.rut || 'Sin RUT'} · {patient.nextVisit || 'Sin cita'}</div>
                     </div>
                   </div>
@@ -308,52 +308,44 @@ export function HomeDashboard({ patients, activePatient }) {
   );
 }
 
-export function PatientHeader({ patient, onEditPatient }) {
+export function PatientHeader({ patient, onEditPatient, onOpenDirectory }) {
   const p = patient;
   return (
     <div className="patient-card">
-      <div className="patient-photo">{p.initials}</div>
-      <div className="patient-info">
-        <div className="patient-line">
-          <div className="patient-name">{p.fullName}</div>
-          <span className="patient-tag active-tag">Activo</span>
-          <span className="patient-tag">Ficha #{p.recordNumber}</span>
+      <div className="patient-card-topline">
+        <div>
+          <div className="patients-eyebrow">Pacientes</div>
+          <div className="patient-card-title">Ficha clinica activa</div>
         </div>
-        <div className="patient-subline">
-          <span className="patient-chip">RUT {p.rut}</span>
-          <span className="patient-chip">Edad {p.age ?? '—'} anos</span>
-          <span className="patient-chip">Nac. {p.birthDateLabel}</span>
-          <span className="patient-chip">Tel. {p.phone}</span>
-        </div>
-        <div className="alert-pills">
-          {p.alerts.map((a, i) => (
-            <span key={i} className={`alert-pill ${a.severity}`}>
-              <span className="dot"></span>{a.text}
-            </span>
-          ))}
-        </div>
-      </div>
-      <div className="patient-actions">
-        <button className="btn btn-ghost"><Icon.print /></button>
-        <button className="btn btn-secondary" onClick={onEditPatient}><Icon.edit />Editar ficha</button>
-        <button className="btn btn-primary"><Icon.plus />Atencion</button>
-      </div>
-    </div>
-  );
-}
-
-export function PatientQuickBar({ patient, onOpenDirectory }) {
-  return (
-    <div className="card patient-quickbar">
-      <div className="patient-quickbar-copy">
-        <div className="patients-eyebrow">Pacientes</div>
-        <div className="patient-quickbar-title">Ficha clinica activa</div>
-        <div className="patient-quickbar-meta">
-          {patient?.fullName ?? 'Sin paciente'} · {patient?.recordNumber ?? 'Sin ficha'} · {patient?.nextVisit || 'Sin cita'}
-        </div>
-      </div>
-      <div className="patient-quickbar-actions">
         <button className="btn btn-secondary patient-directory-btn" onClick={onOpenDirectory}><Icon.users />Directorio de pacientes</button>
+      </div>
+      <div className="patient-card-body">
+        <div className="patient-photo">{p.initials}</div>
+        <div className="patient-info">
+          <div className="patient-line">
+            <div className="patient-name">{getPatientDisplayName(p)}</div>
+            <span className="patient-tag active-tag">Activo</span>
+            <span className="patient-tag">Ficha #{p.recordNumber}</span>
+          </div>
+          <div className="patient-subline">
+            <span className="patient-chip">RUT {p.rut}</span>
+            <span className="patient-chip">Edad {p.age ?? '—'} anos</span>
+            <span className="patient-chip">Nac. {p.birthDateLabel}</span>
+            <span className="patient-chip">Tel. {p.phone}</span>
+          </div>
+          <div className="alert-pills">
+            {p.alerts.map((a, i) => (
+              <span key={i} className={`alert-pill ${a.severity}`}>
+                <span className="dot"></span>{a.text}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="patient-actions">
+          <button className="btn btn-ghost"><Icon.print /></button>
+          <button className="btn btn-secondary" onClick={onEditPatient}><Icon.edit />Editar ficha</button>
+          <button className="btn btn-primary"><Icon.plus />Atencion</button>
+        </div>
       </div>
     </div>
   );
@@ -584,6 +576,7 @@ export function PatientsSheet({
   onSelectPatient,
   onCreatePatient,
   onSavePatient,
+  onDraftChange,
   onDeletePatient,
   onSectionChange,
   renderClinicalSection,
@@ -608,7 +601,7 @@ export function PatientsSheet({
     const search = query.trim().toLowerCase();
     if (!search) return true;
 
-    return [patient.fullName, patient.rut, patient.phone]
+    return [getPatientDisplayName(patient), patient.rut, patient.phone]
       .filter(Boolean)
       .some((value) => value.toLowerCase().includes(search));
   });
@@ -626,19 +619,21 @@ export function PatientsSheet({
   useEffect(() => {
     setDraft(createPatientDraft(activePatient));
     setValidationErrors({});
-  }, [activePatient]);
+  }, [activePatient?.id]);
 
   const handleDraftChange = (key, value) => {
+    const nextDraft = {
+      ...draft,
+      [key]: value,
+    };
     setValidationErrors((current) => {
       if (!current[key]) return current;
       const next = { ...current };
       delete next[key];
       return next;
     });
-    setDraft((current) => ({
-      ...current,
-      [key]: value,
-    }));
+    setDraft(nextDraft);
+    onDraftChange?.(nextDraft);
   };
 
   const handleSubmit = (event) => {
@@ -698,7 +693,7 @@ export function PatientsSheet({
                   <div className="patient-directory-avatar">{patient.initials}</div>
                   <div className="patient-directory-copy">
                     <div className="patient-directory-main">
-                      <span>{patient.fullName}</span>
+                      <span>{getPatientDisplayName(patient)}</span>
                       {isEmptyDraftPatient(patient) && (
                         <button
                           className="patient-directory-clear"

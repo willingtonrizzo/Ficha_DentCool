@@ -1,20 +1,20 @@
 import { PATIENTS } from './data';
 
-const DEFAULT_MEDICAL_BACKGROUND = [
+export const DEFAULT_MEDICAL_BACKGROUND = [
   { id: 'medical-diabetes', label: 'Diabetes', active: false, comment: '' },
   { id: 'medical-hypertension', label: 'Hipertension', active: false, comment: '' },
   { id: 'medical-pregnancy', label: 'Embarazo', active: true, comment: '22 sem' },
   { id: 'medical-cardiovascular', label: 'Enfermedad cardiovascular', active: false, comment: '' },
 ];
 
-const DEFAULT_ALLERGIES = [
+export const DEFAULT_ALLERGIES = [
   { id: 'allergy-penicillin', label: 'Penicilina', active: true, comment: 'anafilaxia' },
   { id: 'allergy-latex', label: 'Latex', active: false, comment: '' },
   { id: 'medication-folic', label: 'Acido folico 5 mg / dia', active: true, comment: 'Medicamento actual' },
   { id: 'medication-iron', label: 'Hierro 100 mg / dia', active: true, comment: 'Medicamento actual' },
 ];
 
-const DEFAULT_DENTAL_HABITS = [
+export const DEFAULT_DENTAL_HABITS = [
   { id: 'habit-bruxism', label: 'Bruxismo nocturno', active: true, comment: 'Plano' },
   { id: 'habit-brushing', label: 'Cepillado 3x al dia', active: true, comment: '' },
   { id: 'habit-floss', label: 'Hilo dental', active: true, comment: '' },
@@ -41,6 +41,11 @@ export function buildPatientInitials(fullName) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('');
+}
+
+export function getPatientDisplayName(patient, fallback = 'Paciente nuevo') {
+  const value = patient?.fullName ?? '';
+  return value.trim() || fallback;
 }
 
 export function calculateAge(birthDate, referenceDate = new Date()) {
@@ -83,11 +88,109 @@ function cloneBackgroundItems(items, fallback) {
   }));
 }
 
+export function isUntouchedBackgroundCollection(items, template) {
+  if (!Array.isArray(items) || items.length !== template.length) return false;
+  return items.every((item, index) => {
+    const expected = template[index];
+    return (
+      item?.label === expected.label &&
+      Boolean(item?.active) === Boolean(expected.active) &&
+      (item?.comment ?? '') === (expected.comment ?? '')
+    );
+  });
+}
+
+function cloneBackgroundItemsStrict(items) {
+  if (!Array.isArray(items)) return [];
+  return items.map((item, index) => ({
+    id: item.id ?? `${slugify(item.label ?? 'item') || 'item'}-${index + 1}`,
+    label: item.label ?? '',
+    active: Boolean(item.active),
+    comment: item.comment ?? '',
+  }));
+}
+
+export function stripDefaultBackgroundItems(items, template) {
+  if (!Array.isArray(items)) return [];
+  const templateLabels = new Set(template.map((item) => item.label));
+  return items.filter((item) => !templateLabels.has(item?.label));
+}
+
+function buildDraftBackgroundItems(items, template) {
+  const source = Array.isArray(items) ? items : [];
+  const templateByLabel = new Map();
+
+  for (const item of source) {
+    if (template.some((base) => base.label === item?.label)) {
+      templateByLabel.set(item.label, item);
+    }
+  }
+
+  const templateRows = template.map((base, index) => {
+    const current = templateByLabel.get(base.label);
+    if (!current) {
+      return {
+        id: base.id ?? `${slugify(base.label ?? 'item') || 'item'}-${index + 1}`,
+        label: base.label ?? '',
+        active: false,
+        comment: '',
+      };
+    }
+
+    const unchanged =
+      Boolean(current.active) === Boolean(base.active) &&
+      (current.comment ?? '') === (base.comment ?? '');
+
+    if (unchanged) {
+      return {
+        id: base.id ?? `${slugify(base.label ?? 'item') || 'item'}-${index + 1}`,
+        label: base.label ?? '',
+        active: false,
+        comment: '',
+      };
+    }
+
+    return {
+      id: current.id ?? base.id ?? `${slugify(base.label ?? 'item') || 'item'}-${index + 1}`,
+      label: current.label ?? base.label ?? '',
+      active: Boolean(current.active),
+      comment: current.comment ?? '',
+    };
+  });
+
+  const customRows = source.filter((item) => !template.some((base) => base.label === item?.label));
+  return [...templateRows, ...customRows.map((item, index) => ({
+    id: item.id ?? `${slugify(item.label ?? 'item') || 'item'}-${templateRows.length + index + 1}`,
+    label: item.label ?? '',
+    active: Boolean(item.active),
+    comment: item.comment ?? '',
+  }))];
+}
+
+function createBlankBackgroundItems(template) {
+  return template.map((item, index) => ({
+    id: item.id ?? `${slugify(item.label ?? 'item') || 'item'}-${index + 1}`,
+    label: item.label ?? '',
+    active: false,
+    comment: '',
+  }));
+}
+
 export function createPatient(input) {
   const fullName = (input.fullName ?? input.name ?? 'Paciente sin nombre').trim() || 'Paciente sin nombre';
   const birthDate = input.birthDate ?? '';
   const id = input.id ?? `patient-${slugify(fullName) || 'sin-nombre'}`;
   const alerts = Array.isArray(input.alerts) ? input.alerts : [];
+  const isDraftPatient = id.startsWith('patient-new-');
+  const medicalBackground = isDraftPatient
+    ? buildDraftBackgroundItems(input.medicalBackground, DEFAULT_MEDICAL_BACKGROUND)
+    : input.medicalBackground;
+  const allergies = isDraftPatient
+    ? buildDraftBackgroundItems(input.allergies, DEFAULT_ALLERGIES)
+    : input.allergies;
+  const dentalHabits = isDraftPatient
+    ? buildDraftBackgroundItems(input.dentalHabits, DEFAULT_DENTAL_HABITS)
+    : input.dentalHabits;
 
   return {
     id,
@@ -107,11 +210,11 @@ export function createPatient(input) {
     registeredAt: input.registeredAt ?? '',
     lastVisit: input.lastVisit ?? '',
     nextVisit: input.nextVisit ?? '',
-    medicalBackground: cloneBackgroundItems(input.medicalBackground, DEFAULT_MEDICAL_BACKGROUND),
+    medicalBackground: isDraftPatient ? cloneBackgroundItemsStrict(medicalBackground) : cloneBackgroundItems(medicalBackground, DEFAULT_MEDICAL_BACKGROUND),
     medicalBackgroundComment: input.medicalBackgroundComment ?? '',
-    allergies: cloneBackgroundItems(input.allergies, DEFAULT_ALLERGIES),
+    allergies: isDraftPatient ? cloneBackgroundItemsStrict(allergies) : cloneBackgroundItems(allergies, DEFAULT_ALLERGIES),
     allergiesComment: input.allergiesComment ?? '',
-    dentalHabits: cloneBackgroundItems(input.dentalHabits, DEFAULT_DENTAL_HABITS),
+    dentalHabits: isDraftPatient ? cloneBackgroundItemsStrict(dentalHabits) : cloneBackgroundItems(dentalHabits, DEFAULT_DENTAL_HABITS),
     dentalHabitsComment: input.dentalHabitsComment ?? '',
     alerts: alerts.map((alert, index) => ({
       id: alert.id ?? `alert-${index + 1}`,
@@ -124,7 +227,17 @@ export function createPatient(input) {
 export function createPatientDraft(patient) {
   const shouldUseBlankName =
     patient?.id?.startsWith('patient-new-') &&
-    patient?.fullName === 'Paciente nuevo';
+    (patient?.fullName === 'Paciente nuevo' || !patient?.fullName);
+  const isDraftPatient = Boolean(patient?.id?.startsWith('patient-new-'));
+  const medicalBackground = isDraftPatient
+    ? buildDraftBackgroundItems(patient?.medicalBackground, DEFAULT_MEDICAL_BACKGROUND)
+    : patient?.medicalBackground;
+  const allergies = isDraftPatient
+    ? buildDraftBackgroundItems(patient?.allergies, DEFAULT_ALLERGIES)
+    : patient?.allergies;
+  const dentalHabits = isDraftPatient
+    ? buildDraftBackgroundItems(patient?.dentalHabits, DEFAULT_DENTAL_HABITS)
+    : patient?.dentalHabits;
 
   return {
     id: patient?.id ?? '',
@@ -137,11 +250,11 @@ export function createPatientDraft(patient) {
     address: patient?.address ?? '',
     insurance: patient?.insurance ?? '',
     registeredAt: patient?.registeredAt ?? '',
-    medicalBackground: cloneBackgroundItems(patient?.medicalBackground, DEFAULT_MEDICAL_BACKGROUND),
+    medicalBackground: isDraftPatient ? cloneBackgroundItemsStrict(medicalBackground) : cloneBackgroundItems(medicalBackground, DEFAULT_MEDICAL_BACKGROUND),
     medicalBackgroundComment: patient?.medicalBackgroundComment ?? '',
-    allergies: cloneBackgroundItems(patient?.allergies, DEFAULT_ALLERGIES),
+    allergies: isDraftPatient ? cloneBackgroundItemsStrict(allergies) : cloneBackgroundItems(allergies, DEFAULT_ALLERGIES),
     allergiesComment: patient?.allergiesComment ?? '',
-    dentalHabits: cloneBackgroundItems(patient?.dentalHabits, DEFAULT_DENTAL_HABITS),
+    dentalHabits: isDraftPatient ? cloneBackgroundItemsStrict(dentalHabits) : cloneBackgroundItems(dentalHabits, DEFAULT_DENTAL_HABITS),
     dentalHabitsComment: patient?.dentalHabitsComment ?? '',
   };
 }
@@ -149,7 +262,7 @@ export function createPatientDraft(patient) {
 export function isEmptyDraftPatient(patient) {
   return Boolean(
     patient?.id?.startsWith('patient-new-') &&
-    patient?.fullName === 'Paciente nuevo' &&
+    (!patient?.fullName || patient?.fullName === 'Paciente nuevo') &&
     !patient?.rut &&
     !patient?.birthDate &&
     !patient?.phone &&
@@ -166,6 +279,9 @@ export function createEmptyPatient(sequence = 1) {
     id: `patient-new-${Date.now()}`,
     fullName: 'Paciente nuevo',
     recordNumber: `DC-2026-${padded}`,
+    medicalBackground: createBlankBackgroundItems(DEFAULT_MEDICAL_BACKGROUND),
+    allergies: createBlankBackgroundItems(DEFAULT_ALLERGIES),
+    dentalHabits: createBlankBackgroundItems(DEFAULT_DENTAL_HABITS),
   });
 }
 

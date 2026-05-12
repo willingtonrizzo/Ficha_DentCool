@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPatientInitials, calculateAge, createPatient, createPatientDraft, validatePatientDraft } from '../patients';
+import { buildPatientInitials, calculateAge, createEmptyPatient, createPatient, createPatientDraft, validatePatientDraft } from '../patients';
 
 describe('patients helpers', () => {
   it('normalizes patient entities with derived fields', () => {
@@ -32,6 +32,15 @@ describe('patients helpers', () => {
     expect(draft.medicalBackground.length).toBeGreaterThan(0);
     expect(draft.allergies.length).toBeGreaterThan(0);
     expect(draft.dentalHabits.length).toBeGreaterThan(0);
+  });
+
+  it('creates a blank draft for a new patient', () => {
+    const draft = createPatientDraft(createEmptyPatient(7));
+
+    expect(draft.fullName).toBe('');
+    expect(draft.medicalBackground.every((item) => !item.active && item.comment === '')).toBe(true);
+    expect(draft.allergies.every((item) => !item.active && item.comment === '')).toBe(true);
+    expect(draft.dentalHabits.every((item) => !item.active && item.comment === '')).toBe(true);
   });
 
   it('builds initials and age safely', () => {

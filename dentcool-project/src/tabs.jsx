@@ -26,6 +26,9 @@ export function Antecedentes({ patient, onEditPatient }) {
   const medicalBackground = patient?.medicalBackground ?? [];
   const allergies = patient?.allergies ?? [];
   const dentalHabits = patient?.dentalHabits ?? [];
+  const medicalBackgroundComment = patient?.medicalBackgroundComment ?? '';
+  const allergiesComment = patient?.allergiesComment ?? '';
+  const dentalHabitsComment = patient?.dentalHabitsComment ?? '';
 
   return (
     <div className="ant-shell">
@@ -53,6 +56,10 @@ export function Antecedentes({ patient, onEditPatient }) {
               <div className="ant-row no"><span className="check" /><span>Sin antecedentes medicos registrados</span></div>
             )}
           </div>
+          <div className="ant-comment">
+            <span className="ant-comment-label">Comentario</span>
+            <p>{medicalBackgroundComment || 'Sin comentario registrado.'}</p>
+          </div>
         </div>
         <div className="ant-block">
           <h4>Alergias y medicamentos</h4>
@@ -71,6 +78,10 @@ export function Antecedentes({ patient, onEditPatient }) {
               <div className="ant-row no"><span className="check" /><span>Sin alergias ni medicamentos registrados</span></div>
             )}
           </div>
+          <div className="ant-comment">
+            <span className="ant-comment-label">Comentario</span>
+            <p>{allergiesComment || 'Sin comentario registrado.'}</p>
+          </div>
         </div>
         <div className="ant-block">
           <h4>Habitos y antecedentes dentales</h4>
@@ -84,6 +95,10 @@ export function Antecedentes({ patient, onEditPatient }) {
             )) : (
               <div className="ant-row no"><span className="check" /><span>Sin habitos dentales registrados</span></div>
             )}
+          </div>
+          <div className="ant-comment">
+            <span className="ant-comment-label">Comentario</span>
+            <p>{dentalHabitsComment || 'Sin comentario registrado.'}</p>
           </div>
         </div>
       </div>
