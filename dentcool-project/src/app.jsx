@@ -11,6 +11,118 @@ import {
 import { createPatientDraft, getPatientDisplayName } from './patients';
 import { Tooth } from './tooth';
 
+const VISIT_MONTHS = {
+  ene: 0,
+  enero: 0,
+  feb: 1,
+  febrero: 1,
+  mar: 2,
+  marzo: 2,
+  abr: 3,
+  abril: 3,
+  may: 4,
+  mayo: 4,
+  jun: 5,
+  junio: 5,
+  jul: 6,
+  julio: 6,
+  ago: 7,
+  agosto: 7,
+  sep: 8,
+  sept: 8,
+  septiembre: 8,
+  oct: 9,
+  octubre: 9,
+  nov: 10,
+  noviembre: 10,
+  dic: 11,
+  diciembre: 11,
+};
+
+function normalizeText(value) {
+  return (value ?? '')
+    .toString()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function parseVisitDate(value) {
+  const match = normalizeText(value).match(/^(\d{1,2})\s+([a-z]+)\s+(\d{4})$/);
+  if (!match) return null;
+
+  const day = Number(match[1]);
+  const month = VISIT_MONTHS[match[2]];
+  const year = Number(match[3]);
+
+  if (!month && month !== 0) return null;
+
+  const date = new Date(year, month, day);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return date;
+}
+
+function getVisitFollowUp(nextVisit) {
+  const visitDate = parseVisitDate(nextVisit);
+  if (!visitDate) {
+    return {
+      tone: 'neutral',
+      state: 'Seguimiento',
+      reminder: 'Confirmar fecha registrada en agenda.',
+      daysLabel: '',
+      daysUntil: Number.POSITIVE_INFINITY,
+    };
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const visitDay = new Date(visitDate);
+  visitDay.setHours(0, 0, 0, 0);
+
+  const daysUntil = Math.round((visitDay.getTime() - today.getTime()) / 86400000);
+
+  if (daysUntil <= 0) {
+    return {
+      tone: 'urgent',
+      state: daysUntil < 0 ? 'Vencida' : 'En 24 horas',
+      reminder: daysUntil < 0 ? 'Llamar y reagendar cuanto antes.' : 'Llamar para confirmar asistencia.',
+      daysLabel: daysUntil < 0 ? `Hace ${Math.abs(daysUntil)} dias` : 'En 24 horas',
+      daysUntil,
+    };
+  }
+
+  if (daysUntil <= 1) {
+    return {
+      tone: 'urgent',
+      state: 'En 24 horas',
+      reminder: 'Preparar materiales y dar seguimiento.',
+      daysLabel: 'En 24 horas',
+      daysUntil,
+    };
+  }
+
+  if (daysUntil <= 3) {
+    return {
+      tone: 'soon',
+      state: `En ${daysUntil} dias`,
+      reminder: 'Preparar materiales y dar seguimiento.',
+      daysLabel: `En ${daysUntil} dias`,
+      daysUntil,
+    };
+  }
+
+  return {
+    tone: 'watch',
+    state: `En ${daysUntil} dias`,
+    reminder: 'Preparar materiales y dar seguimiento.',
+    daysLabel: `En ${daysUntil} dias`,
+    daysUntil,
+  };
+}
+
 export const Icon = {
   search: (p) => <svg className={p?.cls || "icon"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>,
   bell: (p) => <svg className={p?.cls || "icon"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10 21a2 2 0 0 0 4 0" /></svg>,
@@ -141,18 +253,35 @@ export function TopbarInner({ patientName, activeView = 'patients' }) {
 }
 
 export function HomeDashboard({ patients, activePatient }) {
+  const [showFinance, setShowFinance] = useState(false);
   const pendingAlerts = patients.reduce((total, patient) => total + patient.alerts.length, 0);
-  const upcoming = patients.filter(
-    (patient) => patient.nextVisit && patient.nextVisit !== 'Sin cita' && patient.nextVisit !== 'Sin agendar'
-  ).length;
-  const visibleFollowUps = patients
+  const upcomingPatients = patients
     .filter((patient) => patient.nextVisit && patient.nextVisit !== 'Sin cita' && patient.nextVisit !== 'Sin agendar')
-    .slice(0, 4)
-    .map((patient) => ({
+    .map((patient) => {
+      const followUp = getVisitFollowUp(patient.nextVisit);
+      return {
+        id: patient.id,
+        patient: getPatientDisplayName(patient),
+        schedule: patient.nextVisit,
+        detail: `${patient.recordNumber} · ${patient.phone || 'Sin telefono registrado'}`,
+        tone: followUp.tone,
+        state: followUp.state,
+        reminder: followUp.reminder,
+        daysUntil: followUp.daysUntil,
+        daysLabel: followUp.daysLabel,
+      };
+    })
+    .sort((a, b) => a.daysUntil - b.daysUntil);
+  const upcoming = upcomingPatients.length;
+  const visibleFollowUps = upcomingPatients.slice(0, 4).map((patient) => ({
       id: patient.id,
-      patient: getPatientDisplayName(patient),
-      schedule: patient.nextVisit,
-      detail: `${patient.recordNumber} · ${patient.phone || 'Sin telefono registrado'}`,
+      patient: patient.patient,
+      schedule: patient.schedule,
+      detail: patient.detail,
+      tone: patient.tone,
+      state: patient.state,
+      reminder: patient.reminder,
+      daysLabel: patient.daysLabel,
     }));
   const quickActions = ['Nuevo paciente', 'Nueva cita', 'Abrir ficha activa', 'Registrar pago'];
   const alerts = [
@@ -161,10 +290,10 @@ export function HomeDashboard({ patients, activePatient }) {
     { tone: 'info', title: 'Presupuestos abiertos', detail: '3 planes preventivos siguen pendientes de cierre financiero.' },
   ];
   const kpis = [
-    { label: 'Pacientes hoy', value: '12', detail: '4 ya atendidos', tone: 'teal' },
-    { label: 'Pagos recibidos', value: '$184.000', detail: '2 abonos + 1 cierre', tone: 'blue' },
-    { label: 'Pendientes por confirmar', value: '5', detail: 'agenda vespertina', tone: 'amber' },
-    { label: 'Controles post-op', value: '3', detail: 'requieren seguimiento', tone: 'violet' },
+    { label: 'Pacientes locales', value: String(patients.length), detail: 'directorio activo', tone: 'teal' },
+    { label: 'Seguimientos visibles', value: String(visibleFollowUps.length), detail: 'citas con fecha registrada', tone: 'blue' },
+    { label: 'Citas proximas', value: String(upcoming), detail: 'agenda visible', tone: 'amber' },
+    { label: 'Alertas registradas', value: String(pendingAlerts), detail: 'alertas clinicas activas', tone: 'violet' },
   ];
   const finance = [
     { label: 'Presupuesto activo', value: '$1.240.000' },
@@ -177,7 +306,7 @@ export function HomeDashboard({ patients, activePatient }) {
       <div className="home-hero card">
         <div className="home-hero-copy">
           <div className="patients-eyebrow">Bienvenida</div>
-          <h2>Bienvenida al panel operativo de la clinica</h2>
+          <h2>Bienvenida, Dra. Fereshteh Khorramian</h2>
           <p>Vista rapida para abrir la jornada, revisar agenda, detectar alertas y volver a la ficha clinica sin perder el hilo.</p>
           <div className="home-hero-tags">
             <span className="patient-chip">{patients.length} pacientes locales</span>
@@ -187,7 +316,7 @@ export function HomeDashboard({ patients, activePatient }) {
         </div>
         <div className="home-hero-side">
           <div className="home-focus-card">
-            <div className="home-focus-label">Turno en foco</div>
+            <div className="home-focus-label">Paciente activo</div>
             <div className="home-focus-name">{getPatientDisplayName(activePatient, 'Sin paciente')}</div>
             <div className="home-focus-meta">{activePatient?.recordNumber ?? 'Sin ficha'} · {activePatient?.nextVisit || 'Sin cita agendada'}</div>
             <div className="home-focus-divider" />
@@ -215,11 +344,15 @@ export function HomeDashboard({ patients, activePatient }) {
             </div>
             <div className="home-agenda-list">
               {visibleFollowUps.length > 0 ? visibleFollowUps.map((item) => (
-                <div key={item.id} className="home-agenda-row neutral">
+                <div key={item.id} className={`home-agenda-row ${item.tone}`}>
                   <div className="home-agenda-time">{item.schedule}</div>
                   <div className="home-agenda-copy">
-                    <div className="home-agenda-title">{item.patient}</div>
+                    <div className="home-agenda-head">
+                      <div className="home-agenda-title">{item.patient}</div>
+                      <span className={`home-agenda-state ${item.tone}`}>{item.state}</span>
+                    </div>
                     <div className="home-agenda-meta">{item.detail}</div>
+                    <div className={`home-agenda-note ${item.tone}`}>{item.reminder}</div>
                   </div>
                 </div>
               )) : (
@@ -279,15 +412,28 @@ export function HomeDashboard({ patients, activePatient }) {
           <div className="card home-finance-card">
             <div className="card-head">
               <h3>Estado financiero</h3>
+              <button
+                type="button"
+                className="home-finance-toggle"
+                onClick={() => setShowFinance((current) => !current)}
+              >
+                {showFinance ? 'Ocultar' : 'Ver estado financiero'}
+              </button>
             </div>
-            <div className="home-finance-summary">
-              {finance.map((item) => (
-                <div key={item.label} className="home-finance-row">
-                  <span>{item.label}</span>
-                  <strong>{item.value}</strong>
-                </div>
-              ))}
-            </div>
+            {showFinance ? (
+              <div className="home-finance-summary">
+                {finance.map((item) => (
+                  <div key={item.label} className="home-finance-row">
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="home-finance-locked">
+                Resumen financiero oculto por defecto.
+              </div>
+            )}
           </div>
 
           <div className="card home-stats-card">
