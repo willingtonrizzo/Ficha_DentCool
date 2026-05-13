@@ -198,7 +198,7 @@ export function createPatient(input) {
     email: input.email ?? '',
     address: input.address ?? '',
     insurance: input.insurance ?? '',
-    initials: input.initials ?? buildPatientInitials(fullName),
+    initials: isDraftPatient ? buildPatientInitials(fullName) : (input.initials ?? buildPatientInitials(fullName)),
     status: input.status ?? 'active',
     recordNumber: input.recordNumber ?? 'DC-2026-0000',
     registeredAt: input.registeredAt ?? '',

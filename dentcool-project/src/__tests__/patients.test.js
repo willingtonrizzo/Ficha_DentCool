@@ -43,6 +43,20 @@ describe('patients helpers', () => {
     expect(draft.dentalHabits.every((item) => !item.active && item.comment === '')).toBe(true);
   });
 
+  it('recomputes initials for draft patients from the edited name', () => {
+    const juan = createPatient({
+      ...createEmptyPatient(9),
+      fullName: 'Juan Arias',
+    });
+    const maria = createPatient({
+      ...createEmptyPatient(10),
+      fullName: 'Maria Cruz',
+    });
+
+    expect(juan.initials).toBe('JA');
+    expect(maria.initials).toBe('MC');
+  });
+
   it('preserves deleted antecedent rows on draft patients', () => {
     const draftPatient = createEmptyPatient(8);
     const withoutPregnancy = createPatient({
