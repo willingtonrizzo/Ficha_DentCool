@@ -39,14 +39,35 @@
 - [x] Dejar `Inicio` como pantalla de entrada
 - [x] Convertir `Pacientes` en directorio general en filas
 - [x] Separar `Ver ficha` de `Editar ficha`
+- [x] Refinar `Inicio` con seguimiento visible por cercania de cita y acento visual del saludo
+- [x] Abrir base de pricing y finanzas dentro de `Presupuesto`
+- [x] Crear `PricingSettings` persistente
+- [x] Crear catalogo editable de tratamientos de pricing
+- [x] Persistir snapshots financieros por paciente
+- [x] Crear vista financiera general por dia, semana y mes
+- [x] Volver editable el objetivo financiero general
+- [x] Preparar exportacion y reportes financieros
+- [x] Refinar estados financieros (`sent`, `rejected`, `expired`)
+- [x] Agregar filtros financieros por rango y estado
+- [x] Agregar filtros financieros por paciente y tratamiento
+- [x] Revisar columnas finales del reporte financiero
+- [x] Preparar exportacion Excel financiera
+- [x] Optimizar carga de `xlsx` con importacion diferida
+- [x] Refinar reportes financieros avanzados
+- [x] Conectar reportes financieros a tratamientos reales y citas visibles
+- [x] Separar entidad formal de citas
+- [x] Separar entidad formal de cobros y abonos
+- [x] Revisar `dentcool_pricing_codex_skill.md` y dejar registradas las decisiones financieras y su motivo
 
 ## En curso / siguiente
 
 - [ ] Decidir e implementar primera integracion real de `SQLite`
+- [ ] Profundizar reportes financieros con datos mas operativos
 - [ ] Refinar componentes UX/UI uno por uno
 - [ ] Ajustar funcionalidades de negocio vivas
 - [ ] Preparar deploy demo en `Vercel`
 - [ ] Preparar deploy demo en `Render`
+- [ ] Subir el estado actual para prueba de la doctora
 
 ## Mas adelante
 

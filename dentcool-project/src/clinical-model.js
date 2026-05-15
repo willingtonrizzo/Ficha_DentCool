@@ -1,5 +1,6 @@
 import { createPatient } from './patients';
 import { cloneInitialTeeth } from './odontogram';
+import { createPatientPricingBudget } from './pricing';
 
 export const RECORD_STATUS = {
   active: 'active',
@@ -302,6 +303,59 @@ function normalizePriority(value) {
   return allowed.includes(value) ? value : 'baja';
 }
 
+function buildAppointmentId(input, index) {
+  if (input.id) return input.id;
+  const date = (input.dateLabel ?? 'sin-fecha').replace(/[^0-9a-z]+/gi, '-').toLowerCase();
+  const reason = (input.reason ?? 'cita').replace(/[^0-9a-z]+/gi, '-').toLowerCase();
+  return `apt-${date}-${reason || 'cita'}-${index + 1}`;
+}
+
+function normalizeAppointmentStatus(value) {
+  const allowed = ['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show'];
+  return allowed.includes(value) ? value : 'scheduled';
+}
+
+export function createAppointmentEntry(input = {}, index = 0) {
+  return {
+    id: buildAppointmentId(input, index),
+    patientId: input.patientId ?? null,
+    dateLabel: input.dateLabel ?? '',
+    timeLabel: input.timeLabel ?? '',
+    reason: input.reason ?? '',
+    clinician: input.clinician ?? '',
+    status: normalizeAppointmentStatus(input.status),
+    notes: input.notes ?? '',
+    source: input.source ?? 'manual',
+  };
+}
+
+function buildPaymentId(input, index) {
+  if (input.id) return input.id;
+  const date = (input.dateLabel ?? 'sin-fecha').replace(/[^0-9a-z]+/gi, '-').toLowerCase();
+  const concept = (input.concept ?? 'abono').replace(/[^0-9a-z]+/gi, '-').toLowerCase();
+  return `pay-${date}-${concept || 'abono'}-${index + 1}`;
+}
+
+function normalizePaymentMethod(value) {
+  const allowed = ['cash', 'card', 'transfer', 'mixed', 'other'];
+  return allowed.includes(value) ? value : 'cash';
+}
+
+export function createPaymentEntry(input = {}, index = 0) {
+  return {
+    id: buildPaymentId(input, index),
+    patientId: input.patientId ?? null,
+    treatmentId: input.treatmentId ?? null,
+    dateLabel: input.dateLabel ?? '',
+    amount: Number.isFinite(Number(input.amount)) ? Number(input.amount) : 0,
+    method: normalizePaymentMethod(input.method),
+    concept: input.concept ?? '',
+    notes: input.notes ?? '',
+    status: input.status ?? 'received',
+    source: input.source ?? 'manual',
+  };
+}
+
 export function createTreatmentEntry(input = {}, index = 0) {
   return {
     id: input.id ?? `tx-${index + 1}`,
@@ -319,12 +373,51 @@ export function createTreatmentEntry(input = {}, index = 0) {
   };
 }
 
+export function buildPaymentTotalsByTreatment(paymentEntries = []) {
+  return paymentEntries.reduce((acc, entry) => {
+    if (!entry?.treatmentId) return acc;
+    const current = acc.get(entry.treatmentId) ?? 0;
+    acc.set(entry.treatmentId, current + (Number.isFinite(Number(entry.amount)) ? Number(entry.amount) : 0));
+    return acc;
+  }, new Map());
+}
+
+export function syncTreatmentPaidWithPayments(treatments = [], paymentEntries = []) {
+  const totals = buildPaymentTotalsByTreatment(paymentEntries);
+
+  return treatments.map((treatment) => {
+    if (!treatment?.id) return treatment;
+    if (!totals.has(treatment.id)) return treatment;
+    return {
+      ...treatment,
+      paid: totals.get(treatment.id),
+    };
+  });
+}
+
 export function createBudgetRecord(input = {}) {
   return {
     planTitle: input.planTitle ?? 'Plan sin titulo',
     coverageLabel: input.coverageLabel ?? 'Sin cobertura',
     dueDateLabel: input.dueDateLabel ?? 'Sin vencimiento',
+    pricingReferenceTreatmentId: input.pricingReferenceTreatmentId ?? '',
+    pricingReferenceSuppliesCostByTreatmentId: input.pricingReferenceSuppliesCostByTreatmentId ?? {},
+    pricingReferenceMarketingCostByTreatmentId: input.pricingReferenceMarketingCostByTreatmentId ?? {},
+    pricingReferencePaymentFeePercentByTreatmentId: input.pricingReferencePaymentFeePercentByTreatmentId ?? {},
   };
+}
+
+function buildPricingBudgetId(input, index) {
+  if (input.id) return input.id;
+  const treatmentId = (input.treatmentId ?? 'pricing').replace(/[^0-9a-z-]+/gi, '-').toLowerCase();
+  return `pricing-budget-${treatmentId}-${index + 1}`;
+}
+
+export function createPricingBudgetEntry(input = {}, index = 0) {
+  return createPatientPricingBudget({
+    ...input,
+    id: buildPricingBudgetId(input, index),
+  });
 }
 
 function buildDocumentId(input, index) {
@@ -398,6 +491,15 @@ export function resolveBudgetRecord(patient, storedRecord) {
   return createBudgetRecord(storedRecord ?? createSeedBudgetRecord(patient));
 }
 
+export function resolvePricingBudgets(patient, storedBudgets) {
+  if (Array.isArray(storedBudgets)) {
+    return storedBudgets.map((budget, index) =>
+      createPricingBudgetEntry({ ...budget, patientId: patient?.id ?? budget?.patientId ?? null }, index)
+    );
+  }
+  return [];
+}
+
 export function createSeedTreatments(patient) {
   const seed = (patient?.id && DEFAULT_BUDGET_BY_PATIENT[patient.id]?.treatments) || [];
   return seed.map((treatment, index) => createTreatmentEntry({ ...treatment, patientId: patient?.id ?? null }, index));
@@ -408,6 +510,64 @@ export function resolveTreatments(patient, storedTreatments) {
     return storedTreatments.map((treatment, index) => createTreatmentEntry({ ...treatment, patientId: patient?.id ?? null }, index));
   }
   return createSeedTreatments(patient);
+}
+
+export function createSeedAppointments(patient) {
+  const nextVisit = patient?.nextVisit ?? '';
+  if (!nextVisit || nextVisit === 'Sin cita' || nextVisit === 'Sin agendar') {
+    return [];
+  }
+
+  return [
+    createAppointmentEntry({
+      patientId: patient?.id ?? null,
+      dateLabel: nextVisit,
+      reason: 'Seguimiento clinico',
+      clinician: '',
+      status: 'scheduled',
+      source: 'legacy',
+    }),
+  ];
+}
+
+export function resolveAppointments(patient, storedAppointments) {
+  if (Array.isArray(storedAppointments)) {
+    return storedAppointments.map((appointment, index) =>
+      createAppointmentEntry({ ...appointment, patientId: patient?.id ?? null }, index)
+    );
+  }
+  return createSeedAppointments(patient);
+}
+
+export function createSeedPayments(patient, sourceTreatments = null) {
+  const treatments = Array.isArray(sourceTreatments) && sourceTreatments.length > 0
+    ? sourceTreatments.map((treatment, index) => createTreatmentEntry({ ...treatment, patientId: patient?.id ?? null }, index))
+    : createSeedTreatments(patient);
+  return treatments
+    .filter((treatment) => treatment.paid > 0)
+    .map((treatment, index) =>
+      createPaymentEntry({
+        id: `pay-legacy-${treatment.id}`,
+        patientId: patient?.id ?? null,
+        treatmentId: treatment.id,
+        dateLabel: treatment.dateLabel ?? patient?.nextVisit ?? '',
+        amount: treatment.paid,
+        method: 'other',
+        concept: treatment.procedure || 'Abono legado',
+        notes: 'Migrado desde treatment.paid',
+        status: 'received',
+        source: 'legacy',
+      }, index)
+    );
+}
+
+export function resolvePayments(patient, storedPayments, sourceTreatments = null) {
+  if (Array.isArray(storedPayments)) {
+    return storedPayments.map((payment, index) =>
+      createPaymentEntry({ ...payment, patientId: patient?.id ?? null }, index)
+    );
+  }
+  return createSeedPayments(patient, sourceTreatments);
 }
 
 export function createSeedDocuments(patient) {
@@ -423,6 +583,10 @@ export function resolveDocuments(patient, storedDocuments) {
 }
 
 export function createClinicalPatientRecord(input = {}, patient) {
+  const appointments = resolveAppointments(patient, input.appointments);
+  const paymentEntries = resolvePayments(patient, input.paymentEntries, input.treatments);
+  const treatments = syncTreatmentPaidWithPayments(resolveTreatments(patient, input.treatments), paymentEntries);
+
   return {
     selectedTooth: Number.isInteger(input.selectedTooth) ? input.selectedTooth : null,
     selectedSurface: typeof input.selectedSurface === 'string' ? input.selectedSurface : null,
@@ -432,7 +596,10 @@ export function createClinicalPatientRecord(input = {}, patient) {
     evolutionNotes: resolveEvolutionNotes(patient, input.evolutionNotes),
     historyEntries: resolveHistoryEntries(patient, input.historyEntries),
     budget: resolveBudgetRecord(patient, input.budget),
-    treatments: resolveTreatments(patient, input.treatments),
+    pricingBudgets: resolvePricingBudgets(patient, input.pricingBudgets),
+    treatments,
+    appointments,
+    paymentEntries,
     documents: resolveDocuments(patient, input.documents),
   };
 }
@@ -458,6 +625,19 @@ export function resolveMotivoDiagnosticoRecord(patient, storedRecord) {
 }
 
 export function createClinicalRecord(input) {
+  const appointments = Array.isArray(input.appointments)
+    ? input.appointments.map((appointment, index) => createAppointmentEntry(appointment, index))
+    : [];
+  const paymentEntries = Array.isArray(input.paymentEntries)
+    ? input.paymentEntries.map((payment, index) => createPaymentEntry(payment, index))
+    : createSeedPayments({ id: input.patientId ?? null }, input.treatments);
+  const treatments = syncTreatmentPaidWithPayments(
+    Array.isArray(input.treatments)
+      ? input.treatments.map((treatment, index) => createTreatmentEntry(treatment, index))
+      : [],
+    paymentEntries
+  );
+
   return {
     id: input.id,
     patientId: input.patientId,
@@ -466,9 +646,7 @@ export function createClinicalRecord(input) {
     selectedSurface: input.selectedSurface ?? null,
     activeTab: input.activeTab ?? 'antecedentes',
     odontogram: createOdontogramRecord(input.odontogram),
-    treatments: Array.isArray(input.treatments)
-      ? input.treatments.map((treatment, index) => createTreatmentEntry(treatment, index))
-      : [],
+    treatments,
     evolutionNotes: Array.isArray(input.evolutionNotes)
       ? input.evolutionNotes.map((note, index) => createEvolutionNote(note, index))
       : [],
@@ -477,10 +655,14 @@ export function createClinicalRecord(input) {
       : [],
     motivoDiagnostico: createMotivoDiagnosticoRecord(input.motivoDiagnostico),
     budget: createBudgetRecord(input.budget),
+    pricingBudgets: Array.isArray(input.pricingBudgets)
+      ? input.pricingBudgets.map((budget, index) => createPricingBudgetEntry(budget, index))
+      : [],
     documents: Array.isArray(input.documents)
       ? input.documents.map((document, index) => createDocumentEntry(document, index))
       : [],
-    appointments: input.appointments ?? [],
+    appointments,
+    paymentEntries,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
   };
@@ -594,6 +776,9 @@ export function buildClinicalRecordFromMocks({
           : mapMockHistory(history, mappedPatient.id),
       motivoDiagnostico: resolveMotivoDiagnosticoRecord(mappedPatient, patientClinicalRecord.motivoDiagnostico),
       budget: resolveBudgetRecord(mappedPatient, patientClinicalRecord.budget),
+      pricingBudgets: resolvePricingBudgets(mappedPatient, patientClinicalRecord.pricingBudgets),
+      appointments: resolveAppointments(mappedPatient, patientClinicalRecord.appointments),
+      paymentEntries: resolvePayments(mappedPatient, patientClinicalRecord.paymentEntries, patientClinicalRecord.treatments),
       documents: resolveDocuments(mappedPatient, patientClinicalRecord.documents),
       createdAt: now,
       updatedAt: now,

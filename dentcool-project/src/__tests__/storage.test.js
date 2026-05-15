@@ -1,17 +1,23 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   loadActivePatientId,
+  loadPricingCatalog,
   loadClinicalRecords,
   loadPatientDirectory,
+  loadPricingSettings,
   loadTeethState,
   loadUiContext,
   resetClinicalRecords,
   resetPatientDirectory,
+  resetPricingCatalog,
+  resetPricingSettings,
   resetTeethState,
   resetUiContext,
   saveActivePatientId,
   saveClinicalRecords,
   savePatientDirectory,
+  savePricingCatalog,
+  savePricingSettings,
   saveTeethState,
   saveUiContext,
 } from '../storage';
@@ -98,6 +104,80 @@ describe('storage', () => {
     expect(loadActivePatientId()).toBe(updated[1].id);
   });
 
+  it('persists and restores pricing settings', () => {
+    savePricingSettings({
+      boxHourlyCost: 12000,
+      paymentFeePercent: 4,
+      taxPercent: 16,
+      defaultMarketingCost: 6500,
+      monthlyAvailableObjective: 950000,
+    });
+
+    const restored = loadPricingSettings();
+
+    expect(restored.boxHourlyCost).toBe(12000);
+    expect(restored.paymentFeePercent).toBe(4);
+    expect(restored.taxPercent).toBe(16);
+    expect(restored.defaultMarketingCost).toBe(6500);
+    expect(restored.monthlyAvailableObjective).toBe(950000);
+    expect(restored.defaultAdminCost).toBe(2000);
+  });
+
+  it('persists and restores pricing catalog', () => {
+    savePricingCatalog([
+      {
+        id: 'custom-limpieza',
+        name: 'Limpieza prueba',
+        category: 'limpieza',
+        aliases: ['profilaxis premium'],
+        basePrice: 51000,
+        durationHours: 1.1,
+        suppliesCost: 4800,
+        minPrice: 42000,
+        healthyPrice: 51000,
+        idealPrice: 60000,
+        maxRecommendedDiscountPercent: 7,
+        defaultLaborCost: 17000,
+        active: true,
+        notes: 'Demo',
+      },
+    ]);
+
+    const restored = loadPricingCatalog();
+
+    expect(restored).toHaveLength(1);
+    expect(restored[0].name).toBe('Limpieza prueba');
+    expect(restored[0].aliases[0]).toBe('profilaxis premium');
+    expect(restored[0].basePrice).toBe(51000);
+  });
+
+  it('falls back safely when pricing settings storage is malformed', () => {
+    window.localStorage.setItem(STORAGE_KEYS.pricingSettings, '{bad-json');
+
+    const restored = loadPricingSettings();
+
+    expect(restored.boxHourlyCost).toBe(10000);
+    expect(restored.taxPercent).toBe(15.25);
+    expect(restored.monthlyAvailableObjective).toBe(800000);
+  });
+
+  it('falls back safely when pricing catalog storage is malformed', () => {
+    window.localStorage.setItem(STORAGE_KEYS.pricingCatalog, '{bad-json');
+
+    const restored = loadPricingCatalog();
+
+    expect(restored.length).toBeGreaterThan(0);
+    expect(restored[0].name.length).toBeGreaterThan(0);
+  });
+
+  it('restores an intentionally empty pricing catalog', () => {
+    window.localStorage.setItem(STORAGE_KEYS.pricingCatalog, JSON.stringify([]));
+
+    const restored = loadPricingCatalog();
+
+    expect(restored).toEqual([]);
+  });
+
   it('preserves deleted draft antecedents on load', () => {
     window.localStorage.setItem(
       STORAGE_KEYS.patients,
@@ -164,6 +244,20 @@ describe('storage', () => {
           coverageLabel: 'Seguro Demo',
           dueDateLabel: '20-jun',
         },
+        pricingBudgets: [
+          {
+            treatmentId: 'limpieza-vip',
+            treatmentNameSnapshot: 'Limpieza VIP',
+            status: 'draft',
+            calculationSnapshot: {
+              finalPrice: 60000,
+              availableBeforeLabor: 21050,
+              clinicProfit: 3050,
+            },
+            createdAt: '2026-05-14T10:00:00.000Z',
+            updatedAt: '2026-05-14T10:00:00.000Z',
+          },
+        ],
         treatments: [
           {
             toothFdi: 16,
@@ -200,8 +294,56 @@ describe('storage', () => {
     expect(restored['patient-maria-soto'].evolutionNotes[0].author).toBe('Dra. Test');
     expect(restored['patient-maria-soto'].historyEntries[0].category).toBe('control');
     expect(restored['patient-maria-soto'].budget.planTitle).toBe('Plan demo');
+    expect(restored['patient-maria-soto'].pricingBudgets).toHaveLength(1);
+    expect(restored['patient-maria-soto'].pricingBudgets[0].treatmentNameSnapshot).toBe('Limpieza VIP');
     expect(restored['patient-maria-soto'].treatments[0].cost).toBe(30000);
     expect(restored['patient-maria-soto'].documents[0].kind).toBe('radiografia');
+  });
+
+  it('migrates appointments and payment entries inside clinical records', () => {
+    saveClinicalRecords({
+      'patient-maria-soto': {
+        treatments: [
+          {
+            id: 'tx-1',
+            procedure: 'Limpieza VIP',
+            dateLabel: '12 may 2026',
+            cost: 60000,
+            paid: 0,
+            coveragePercent: 0,
+          },
+        ],
+        appointments: [
+          {
+            id: 'apt-1',
+            dateLabel: '18 may 2026',
+            timeLabel: '09:00',
+            reason: 'Control',
+            clinician: 'Dra. Test',
+            status: 'confirmed',
+            notes: '',
+          },
+        ],
+        paymentEntries: [
+          {
+            id: 'pay-1',
+            treatmentId: 'tx-1',
+            dateLabel: '12 may 2026',
+            amount: 20000,
+            method: 'card',
+            concept: 'Abono inicial',
+            notes: '',
+            status: 'received',
+          },
+        ],
+      },
+    });
+
+    const restored = loadClinicalRecords();
+
+    expect(restored['patient-maria-soto'].appointments).toHaveLength(1);
+    expect(restored['patient-maria-soto'].paymentEntries).toHaveLength(1);
+    expect(restored['patient-maria-soto'].treatments[0].paid).toBe(20000);
   });
 
   it('migrates legacy motivo-only clinical records safely', () => {
@@ -258,6 +400,33 @@ describe('storage', () => {
 
     expect(reset).toEqual({});
     expect(window.localStorage.getItem(STORAGE_KEYS.clinicalRecords)).toBeNull();
+  });
+
+  it('resets pricing settings storage', () => {
+    savePricingSettings({
+      boxHourlyCost: 14000,
+      defaultReservePercent: 8,
+    });
+
+    const reset = resetPricingSettings();
+
+    expect(reset.boxHourlyCost).toBe(10000);
+    expect(reset.defaultReservePercent).toBe(5);
+    expect(window.localStorage.getItem(STORAGE_KEYS.pricingSettings)).toBeNull();
+  });
+
+  it('resets pricing catalog storage', () => {
+    savePricingCatalog([
+      {
+        id: 'custom',
+        name: 'Custom',
+      },
+    ]);
+
+    const reset = resetPricingCatalog();
+
+    expect(reset.length).toBeGreaterThan(0);
+    expect(window.localStorage.getItem(STORAGE_KEYS.pricingCatalog)).toBeNull();
   });
 
   it('resets patient directory storage to the seeded list', () => {

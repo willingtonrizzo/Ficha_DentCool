@@ -10,10 +10,11 @@ Objetivo inmediato:
 - consolidar la nueva vista `Inicio` como entrada operativa sin romper la vista clinica
 - abrir el directorio local de pacientes sin romper el flujo clinico
 - cerrar la ficha lateral con secciones clinicas reales por `patientId`
+- afinar `Inicio` para que los seguimientos visibles funcionen como recordatorio clinico por cercania de cita
 
 ## Ultimo avance realizado
 
-Fecha de referencia: `2026-05-11`
+Fecha de referencia: `2026-05-15`
 
 Hecho:
 
@@ -83,15 +84,98 @@ Hecho:
 - la app ahora abre en `Inicio` como pantalla inicial
 - `Pacientes` paso a ser un directorio general en filas
 - desde el directorio se puede entrar a `Ver ficha` para abrir odontograma y tabs clinicos, o `Editar ficha` para abrir la hoja lateral
+- `Inicio` ahora muestra seguimientos visibles con semaforo clinico y texto de preparacion segun cercania de la cita
+- el saludo principal de `Inicio` quedo con acento visual del logo para reforzar identidad
 - se agrego `CONTEXTO-ACTIVO-FICHA-DENTCOOL.md` como handoff persistente de sesion
 - se agrego la skill local `dentcool-contexto` para reconstruir estado del proyecto al retomar
 - `AGENTS.md` ahora define protocolo obligatorio de retoma y cierre de sesion
+- se abrio un nuevo `Bloque Funcionalidades` para pricing y finanzas dentro de `Presupuesto`
+- se creo el motor financiero puro en `src/pricing.js` con formulas de margen, mano de obra, alertas y precios sugeridos
+- se agrego un catalogo base de pricing local para evaluacion, limpiezas, blanqueamiento, restauracion y sellantes
+- se agregaron tests unitarios del modulo de pricing para casos base, descuento, alertas, mano de obra, precio recomendado y snapshot
+- `Presupuesto` ahora muestra una lectura financiera estimada para tratamientos mapeados al catalogo base
+- `PricingSettings` ya carga y guarda en `localStorage`
+- `Presupuesto` ahora permite editar costos base de pricing desde la UI y reiniciarlos al valor por defecto
+- el catalogo de tratamientos de pricing ya carga y guarda en `localStorage`
+- `Presupuesto` ahora permite editar alias, precios, tiempos, descuentos y mano de obra del catalogo sin tocar `pricing.js`
+- el `clinicalRecord` ya guarda `pricingBudgets` por paciente
+- `Presupuesto` ahora puede guardar snapshots financieros historicos del paciente activo y marcar uno como `accepted`
+- la navegacion lateral ahora abre una vista general de finanzas desde `Facturacion` y `Reportes`
+- la nueva vista financiera agrega snapshots `accepted` por dia, semana y mes
+- la vista financiera ya muestra objetivo operativo mensual, recientes aceptados y tratamientos con mayor aporte
+- el objetivo financiero mensual ya es editable y persistente desde la vista general
+- la vista financiera ya exporta CSV de snapshots `accepted`
+- la vista financiera ya exporta CSV de resumen dia/semana/mes
+- los snapshots financieros ahora soportan estados `sent`, `accepted`, `rejected` y `expired`
+- `Presupuesto` ya permite cambiar estado del snapshot desde la ficha del paciente
+- la vista general ya refleja conteos de `sent`, `draft`, `rejected` y `expired`
+- la vista financiera general ahora filtra por rango (`todo`, `hoy`, `semana`, `mes`)
+- la vista financiera general ahora filtra por estado (`all`, `draft`, `sent`, `accepted`, `rejected`, `expired`)
+- la vista financiera general ahora filtra por paciente
+- la vista financiera general ahora filtra por tratamiento
+- se definieron columnas finales para reporte `SnapshotsAccepted` y `FinanceSummary`
+- la vista financiera ya exporta un archivo `xlsx` con hojas `SnapshotsAccepted` y `FinanceSummary`
+- `xlsx` ahora se carga de forma diferida solo al exportar Excel para no inflar el bundle principal
+- la vista financiera general ahora compara periodo actual vs periodo anterior segun rango activo
+- la vista financiera general ahora muestra totales agrupados por paciente
+- la vista financiera general ahora muestra totales agrupados por tratamiento
+- la vista financiera general ahora muestra una tabla detallada de snapshots segun filtros activos
+- la vista financiera general ahora cruza snapshots con tratamientos reales y citas visibles del paciente
+- la vista financiera general ahora muestra cobranza pendiente por paciente, pipeline clinico operativo y proximas atenciones segun filtros
+- se verifico este bloque con `npm test` y `npm run build`
+- se separaron entidades reales de `agenda` y `cobros/abonos` dentro del `clinicalRecord`
+- `nextVisit` y `paid` quedaron como puente de compatibilidad, no como fuente final
+- la ficha del paciente ahora tiene secciones propias para `Agenda` y `Cobros y abonos`
+- los reportes financieros ahora priorizan `appointments` y `paymentEntries`, con fallback a datos legados
+- se agregaron pruebas para migracion y reporte del nuevo modelo financiero
+- el catalogo de pricing ahora muestra 5 tarjetas de lectura por tratamiento: `Costos`, `Gastos`, `Impuestos`, `Mano de obra` y `Utilidad neta`
+- cada tarjeta del catalogo de pricing tiene una accion de `Restaurar` por tratamiento
+- la ayuda contextual de `Gestion interna` ya abre explicacion clicable en la tarjeta
+- los valores canonicos del catalogo base ya no deben arrastrarse entre tratamientos
+- se volvio a verificar el bloque completo con `npm test` y `npm run build`
+
+## Como se hizo este bloque
+
+- se extendio `src/pricing.js` como motor puro para armar el panel financiero y sus reportes
+- se reutilizaron snapshots `accepted` como base historica, sin recalcular presupuestos ya cerrados
+- se derivaron lecturas operativas reales desde tratamientos existentes con `cost`, `paid`, `coveragePercent` y `status`
+- se reutilizo `patient.nextVisit` como agenda visible temporal, solo para lectura operativa
+- se conecto la UI en `src/app.jsx` para mostrar comparativo de periodos, totales por paciente, totales por tratamiento y detalle filtrado
+- se ajustaron estilos en `styles.css` para sostener la nueva vista sin romper la navegacion actual
+- se agregaron pruebas en `src/__tests__/pricing.test.js` para cubrir reportes, snapshots y exportaciones
+
+## Que tenemos ahora
+
+- un motor financiero local estable para estimacion, snapshots y reportes avanzados
+- una vista financiera general con filtros por rango, estado, paciente y tratamiento
+- comparativo entre periodo actual y periodo anterior
+- totales agrupados por paciente
+- totales agrupados por tratamiento
+- tabla detallada de snapshots segun filtros activos
+- lectura operativa real apoyada en tratamientos y citas visibles
+- entidades separadas para citas y cobros/abonos dentro del modelo local
+- cobertura automatizada que valida el bloque financiero sin romper lo anterior
+
+## Que falta antes de seguir
+
+- revisar el `md` financiero `dentcool_pricing_codex_skill.md`
+- documentar explicitamente las decisiones tomadas en ese `md` y por que se tomaron
+- preparar la siguiente capa de persistencia para que esto deje de vivir solo en `localStorage`
+- seguir afinando la sincronizacion entre agenda, cobros, tratamientos y resumen financiero
+- preparar la migracion de esta capa separada a `SQLite`
+
+## Como se va a proceder
+
+1. revisar y cerrar el `md` financiero con las decisiones y su justificacion
+2. mantener el puente operativo solo mientras no rompa compatibilidad
+3. pasar la persistencia de este flujo a `SQLite` cuando el modelo ya este separado
+4. volver a verificar con tests despues de cada cambio relevante
 
 ## Estado actual del proyecto
 
 - UI: funcional
 - UI: en refinamiento activo
-- inicio operativo: funcional como maqueta conectada a datos locales parciales
+- inicio operativo: funcional como entrada clinica con seguimiento visible por cercania de cita
 - pacientes: funcional a nivel local base
 - motivo y diagnostico: funcional por paciente con persistencia local
 - evolucion clinica: funcional por paciente con persistencia local
@@ -102,27 +186,51 @@ Hecho:
 - odontograma por paciente: funcional
 - persistencia local: funcional
 - modelo clinico base: funcional
+- pricing financiero base: funcional en modo estimacion local
+- pricing settings persistente: funcional
+- pricing catalogo editable persistente: funcional
+- snapshots financieros por paciente: funcional
+- vista financiera general dia/semana/mes: funcional
+- objetivo financiero general persistente: funcional
+- exportacion CSV financiera: funcional
+- estados financieros refinados: funcional
+- filtros financieros por rango y estado: funcional
+- filtros financieros por paciente y tratamiento: funcional
+- exportacion Excel financiera: funcional
+- carga diferida de `xlsx`: funcional
+- comparativo financiero entre periodos: funcional
+- totales financieros por paciente: funcional
+- totales financieros por tratamiento: funcional
+- tabla detallada de snapshots filtrados: funcional
+- lectura operativa desde tratamientos reales: funcional
+- lectura operativa desde citas visibles: funcional
+- cobranza pendiente por paciente: funcional
+- pipeline clinico operativo: funcional
 - UI conectada parcialmente al modelo clinico: si
 - backend: no
 - SQLite runtime: no
-- Excel: no
+- Excel exportacion financiera: si
 - Tauri: no
 - tests base odontograma: si
 
 ## Siguiente bloque recomendado
 
-1. revisar una por una las secciones internas ya conectadas
+1. separar una entidad real de citas y otra de cobros para no depender solo de `nextVisit` y `paid`
 2. limpiar el rol residual de `uiContext` global
-3. preparar deploy demo para `Vercel` y `Render`
-4. despues preparar la transicion a `SQLite` runtime
+3. despues preparar la transicion a `SQLite` runtime
+4. evaluar cierre de caja, abonos y conciliacion con snapshots aceptados
 
 ## Riesgos abiertos
 
 - la persistencia actual cubre directorio, odontograma y ficha clinica lateral por paciente, pero aun convive con un `uiContext` global residual
 - la vista `Inicio` todavia mezcla datos reales locales con KPIs mock, por lo que todavia no debe asumirse como panel operativo real
+- `Inicio` ya tiene seguimiento por cercania de cita, pero todavia conserva KPIs mock y conviene seguir afinando el peso visual de cada bloque
 - aunque la ficha lateral ya concentra casi toda la edicion del paciente, el flujo general aun necesita pulido de UX para escritorio clinico
 - el directorio de pacientes ya cambio a filas y aun falta validar ese comportamiento en Render con datos reales del navegador
 - aun no hay validacion automatica del flujo clinico
 - el alta de paciente ya tiene validaciones base, pero todavia faltan reglas de negocio mas profundas para agenda, documentos reales y trazabilidad clinica
 - `Antecedentes` ya es real por paciente, pero conviene seguir revisando el resto de tabs una por una para quitar cualquier mock remanente
 - aunque ya existe handoff persistente, sigue siendo necesario mantenerlo actualizado al cerrar cada bloque
+- la exportacion Excel ya existe y `xlsx` ya no infla el bundle principal porque se carga bajo demanda, pero el chunk separado sigue siendo pesado al momento de exportar
+- la agenda y los cobros ya dejaron de vivir solo en `nextVisit` y `paid`, pero aun conviven con ese puente para no romper los datos anteriores
+- el `md` financiero pendiente de revision es `dentcool_pricing_codex_skill.md`, y ahi deben quedar registradas las decisiones tomadas y el motivo de cada una

@@ -1,5 +1,43 @@
+import { useEffect, useState } from 'react';
 import { fmtCLP } from './data';
 import { Icon } from './app';
+import {
+  DEFAULT_PRICING_SETTINGS,
+  calculatePricingResult,
+  findPricingTreatmentForProcedure,
+} from './pricing';
+
+function fmtPercent(value) {
+  return `${new Intl.NumberFormat('es-CL', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(value)}%`;
+}
+
+function getPricingTone(status) {
+  if (status === 'Peligroso' || status === 'No soporta boleta') return 'danger';
+  if (status === 'Bajo' || status === 'Ajustado') return 'warn';
+  if (status === 'Aceptable inicio' || status === 'Sano con boleta') return 'ok';
+  return 'good';
+}
+
+function PricingHelpButton({ label, text, compact = false, open, onToggle, placement = 'right' }) {
+  return (
+    <div className={`pricing-help-wrap${compact ? ' compact' : ''} placement-${placement}`}>
+      <button
+        type="button"
+        className="pricing-help-button"
+        aria-expanded={open}
+        aria-label={`Ayuda sobre ${label}`}
+        title={`Ayuda sobre ${label}`}
+        onClick={onToggle}
+      >
+        ?
+      </button>
+      {open && <div className="pricing-help-popover">{text}</div>}
+    </div>
+  );
+}
 
 export function Tabs({ active, onChange, counts }) {
   const tabs = [
@@ -395,12 +433,25 @@ export function Evolucion({
 export function Presupuesto({
   budget,
   treatments,
+  pricingSettings,
+  pricingCatalog,
+  pricingBudgets,
   saveState = 'loaded',
   lastSavedAt,
   onBudgetFieldChange,
   onTreatmentChange,
   onAddTreatment,
   onRemoveTreatment,
+  onPricingSettingChange,
+  onResetPricingSettings,
+  onPricingCatalogChange,
+  onAddPricingTreatment,
+  onResetPricingTreatment,
+  onRemovePricingTreatment,
+  onResetPricingCatalog,
+  onSavePricingSnapshot,
+  onAcceptPricingSnapshot,
+  onSetPricingSnapshotStatus,
   onOpenSection,
   mirror = false,
 }) {
@@ -411,12 +462,242 @@ export function Presupuesto({
   const planned = treatments.filter((t) => t.status === 'planned').length;
   const completed = treatments.filter((t) => t.status === 'completed').length;
   const topItems = treatments.slice(0, 4);
+  const editablePricingCatalog = pricingCatalog ?? [];
+  const pricingReferenceTreatment =
+    treatments.find((item) => item.id === budget?.pricingReferenceTreatmentId) ??
+    treatments.find((item) => item.procedure && item.cost > 0 && findPricingTreatmentForProcedure(item.procedure, editablePricingCatalog)) ??
+    treatments.find((item) => item.procedure && findPricingTreatmentForProcedure(item.procedure, editablePricingCatalog)) ??
+    null;
+  const pricingCatalogTreatment = pricingReferenceTreatment
+    ? findPricingTreatmentForProcedure(pricingReferenceTreatment.procedure, editablePricingCatalog)
+    : null;
+  const pricingReferenceSuppliesCostByTreatmentId = budget?.pricingReferenceSuppliesCostByTreatmentId ?? {};
+  const pricingReferenceMarketingCostByTreatmentId = budget?.pricingReferenceMarketingCostByTreatmentId ?? {};
+  const pricingReferencePaymentFeePercentByTreatmentId = budget?.pricingReferencePaymentFeePercentByTreatmentId ?? {};
+  const pricingReferenceId = pricingReferenceTreatment?.id ?? budget?.pricingReferenceTreatmentId ?? '';
+  const pricingReferenceSuppliesCost =
+    pricingReferenceId && pricingReferenceSuppliesCostByTreatmentId[pricingReferenceId] != null
+      ? pricingReferenceSuppliesCostByTreatmentId[pricingReferenceId]
+      : pricingCatalogTreatment?.suppliesCost ?? pricingReferenceTreatment?.cost ?? 0;
+  const pricingReferenceMarketingCost =
+    pricingReferenceId && pricingReferenceMarketingCostByTreatmentId[pricingReferenceId] != null
+      ? pricingReferenceMarketingCostByTreatmentId[pricingReferenceId]
+      : pricingCatalogTreatment?.marketingCost ?? DEFAULT_PRICING_SETTINGS.defaultMarketingCost;
+  const pricingReferencePaymentFeePercent =
+    pricingReferenceId && pricingReferencePaymentFeePercentByTreatmentId[pricingReferenceId] != null
+      ? pricingReferencePaymentFeePercentByTreatmentId[pricingReferenceId]
+      : pricingCatalogTreatment?.paymentFeePercent ?? DEFAULT_PRICING_SETTINGS.paymentFeePercent;
+  useEffect(() => {
+    if (mirror || !pricingReferenceId) return;
+
+    if (pricingReferenceSuppliesCostByTreatmentId[pricingReferenceId] == null) {
+      onBudgetFieldChange?.('pricingReferenceSuppliesCostByTreatmentId', {
+        ...pricingReferenceSuppliesCostByTreatmentId,
+        [pricingReferenceId]: pricingCatalogTreatment?.suppliesCost ?? pricingReferenceTreatment?.cost ?? 0,
+      });
+    }
+
+    if (pricingReferenceMarketingCostByTreatmentId[pricingReferenceId] == null) {
+      onBudgetFieldChange?.('pricingReferenceMarketingCostByTreatmentId', {
+        ...pricingReferenceMarketingCostByTreatmentId,
+        [pricingReferenceId]: pricingCatalogTreatment?.marketingCost ?? DEFAULT_PRICING_SETTINGS.defaultMarketingCost,
+      });
+    }
+
+    if (pricingReferencePaymentFeePercentByTreatmentId[pricingReferenceId] == null) {
+      onBudgetFieldChange?.('pricingReferencePaymentFeePercentByTreatmentId', {
+        ...pricingReferencePaymentFeePercentByTreatmentId,
+        [pricingReferenceId]: pricingCatalogTreatment?.paymentFeePercent ?? DEFAULT_PRICING_SETTINGS.paymentFeePercent,
+      });
+    }
+  }, [
+    mirror,
+    pricingReferenceId,
+    pricingReferenceTreatment,
+    pricingCatalogTreatment,
+    pricingReferenceSuppliesCostByTreatmentId,
+    pricingReferenceMarketingCostByTreatmentId,
+    pricingReferencePaymentFeePercentByTreatmentId,
+    onBudgetFieldChange,
+  ]);
+  const pricingResult = pricingCatalogTreatment
+    ? calculatePricingResult({
+        treatment: pricingCatalogTreatment,
+        settings: pricingSettings ?? DEFAULT_PRICING_SETTINGS,
+        input: {
+          customPrice: pricingReferenceTreatment.cost > 0 ? pricingReferenceTreatment.cost : pricingCatalogTreatment.basePrice,
+          customSuppliesCost: pricingReferenceSuppliesCost,
+          customMarketingCost: pricingReferenceMarketingCost,
+          customPaymentFeePercent: pricingReferencePaymentFeePercent,
+          customAdminCost: pricingCatalogTreatment.adminCost,
+          customTransportCost: pricingCatalogTreatment.transportCost,
+          customReservePercent: pricingCatalogTreatment.reservePercent,
+          paymentMethod: 'card',
+          applyPaymentFee: true,
+          applyTax: true,
+          applyReserve: true,
+          laborCostMode: 'fixed',
+          laborCostValue: pricingCatalogTreatment.defaultLaborCost,
+        },
+      })
+    : null;
+  const [openPricingHelp, setOpenPricingHelp] = useState(null);
+  const buildPlanItemPricing = (item) => {
+    const catalogItem = findPricingTreatmentForProcedure(item.procedure, editablePricingCatalog);
+    if (!catalogItem) return null;
+
+    return calculatePricingResult({
+        treatment: catalogItem,
+        settings: pricingSettings ?? DEFAULT_PRICING_SETTINGS,
+        input: {
+          customPrice: catalogItem.basePrice,
+          customSuppliesCost: catalogItem.suppliesCost,
+          customMarketingCost: catalogItem.marketingCost,
+          customAdminCost: catalogItem.adminCost,
+          customTransportCost: catalogItem.transportCost,
+          customPaymentFeePercent: catalogItem.paymentFeePercent,
+          customReservePercent: catalogItem.reservePercent,
+          paymentMethod: 'card',
+          applyPaymentFee: true,
+          applyTax: true,
+        applyReserve: true,
+        laborCostMode: 'fixed',
+        laborCostValue: catalogItem.defaultLaborCost,
+      },
+    });
+  };
+  const buildCatalogPreview = (item) =>
+    calculatePricingResult({
+      treatment: item,
+      settings: pricingSettings ?? DEFAULT_PRICING_SETTINGS,
+      input: {
+        customPrice: item.basePrice,
+        customSuppliesCost: item.suppliesCost,
+        customMarketingCost: item.marketingCost,
+        customAdminCost: item.adminCost,
+        customTransportCost: item.transportCost,
+        customPaymentFeePercent: item.paymentFeePercent,
+        customReservePercent: item.reservePercent,
+        paymentMethod: 'card',
+        applyPaymentFee: true,
+        applyTax: true,
+        applyReserve: true,
+        laborCostMode: 'fixed',
+        laborCostValue: item.defaultLaborCost,
+      },
+    });
+  const getCatalogSummaryCards = (preview) => [
+    {
+      key: 'directCosts',
+      label: 'Costos',
+      value: preview ? preview.boxCost + preview.suppliesCost : 0,
+      percent: preview?.finalPrice > 0 ? ((preview.boxCost + preview.suppliesCost) / preview.finalPrice) * 100 : 0,
+      help: pricingHelpText.directCosts,
+    },
+    {
+      key: 'expenses',
+      label: 'Gastos',
+      value: preview ? preview.marketingCost + preview.adminCost + preview.transportCost + preview.paymentFeeAmount + preview.reserveAmount : 0,
+      percent: preview?.finalPrice > 0
+        ? ((preview.marketingCost + preview.adminCost + preview.transportCost + preview.paymentFeeAmount + preview.reserveAmount) / preview.finalPrice) * 100
+        : 0,
+      help: pricingHelpText.expenses,
+    },
+    {
+      key: 'tax',
+      label: 'Impuestos',
+      value: preview ? preview.taxAmount : 0,
+      percent: preview?.finalPrice > 0 ? (preview.taxAmount / preview.finalPrice) * 100 : 0,
+      help: pricingHelpText.tax,
+      tone: 'warn',
+    },
+    {
+      key: 'labor',
+      label: 'Mano de obra',
+      value: preview ? preview.laborCost : 0,
+      percent: preview?.finalPrice > 0 ? (preview.laborCost / preview.finalPrice) * 100 : 0,
+      help: pricingHelpText.labor,
+      tone: 'good',
+    },
+    {
+      key: 'netProfit',
+      label: 'Utilidad neta',
+      value: preview ? preview.clinicProfit : 0,
+      percent: preview?.finalPrice > 0 ? (preview.clinicProfit / preview.finalPrice) * 100 : 0,
+      help: pricingHelpText.netProfit,
+      tone: preview && preview.clinicProfit >= 0 ? 'good' : 'danger',
+    },
+  ];
   const saveLabel =
     saveState === 'dirty'
       ? 'Guardando presupuesto…'
       : saveState === 'saved'
         ? `Presupuesto guardado${lastSavedAt ? ` · ${lastSavedAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}` : ''}`
-        : 'Presupuesto listo para edicion por paciente.';
+      : 'Presupuesto listo para edicion por paciente.';
+  const pricingHelpText = {
+    availableBeforeLabor:
+      'Dinero que queda antes de pagar la mano de obra. Se obtiene restando box, insumos, captacion, administracion, traslado, comision, reserva e impuesto al precio final.',
+    clinicProfit:
+      'Ganancia final de la clinica despues de restar tambien la mano de obra profesional. Es el disponible antes de mano de obra menos la mano de obra.',
+    pricingStatus:
+      'Semaforo del margen antes de mano de obra. Indica si el precio esta demasiado justo, en zona aceptable o en zona sana.',
+    externalClinicianStatus:
+      'Indica si este precio sigue siendo rentable cuando la atencion la hace una odontologa externa con boleta.',
+    box:
+      'Costo del uso de silla o box clinico por el tiempo que ocupa este tratamiento. Se calcula como horas del tratamiento por tarifa por hora. No incluye pasaje del paciente. Ejemplo: 0.75 h x $10.000 = $7.500.',
+    supplies:
+      'Materiales que se consumen en el tratamiento y no se reutilizan: anestesia, resina, adhesivos, guantes, etc.',
+    marketing:
+      'Gasto para traer ese paciente o ese tratamiento: publicidad, anuncios, promociones, referidos pagados o campañas.',
+    admin:
+      'Tiempo operativo de la doctora o del consultorio: hacer presupuesto, registrar el caso, confirmar agenda, cobrar, cerrar caja y hacer seguimiento. Se separa como costo porque no está produciendo tratamiento directo.',
+    transport:
+      'Costo por mover al profesional o al material entre lugares cuando este caso lo necesita. No es el pasaje del paciente.',
+    fee:
+      'Comisión del medio de pago, por ejemplo Transbank o Mercado Pago. Se calcula sobre el precio final.',
+    reserve:
+      'Parte del precio que se deja aparte para imprevistos, meses bajos o reposición.',
+    tax:
+      'Retención o impuesto estimado. Hoy está configurado en 15,25% y se aplica sobre el precio final.',
+    directCosts:
+      'Suma de costos directos del tratamiento: uso de box y materiales/insumos clínicos.',
+    expenses:
+      'Suma de gastos operativos del caso: marketing, administración interna, comisión de pago, reserva y traslado.',
+    netProfit:
+      'Utilidad neta estimada después de costos, gastos, impuestos y mano de obra profesional.',
+    labor:
+      'Pago o costo profesional del tratamiento. Solo aparece cuando existe atención que requiere trabajo clínico.',
+  };
+  const pricingLineLabelMap = {
+    Box: 'Box / silla',
+    Insumos: 'Insumos clinicos',
+    Marketing: 'Captacion por paciente',
+    Administracion: 'Gestion interna',
+    Traslado: 'Traslado profesional',
+    Comision: 'Comision de pago',
+    Reserva: 'Reserva operativa',
+    'Impuesto o retencion': 'Impuesto / retencion',
+  };
+  const pricingLineHelpKeyMap = {
+    'Box / silla': 'box',
+    'Insumos clinicos': 'supplies',
+    'Captacion por paciente': 'marketing',
+    'Gestion interna': 'admin',
+    'Traslado profesional': 'transport',
+    'Comision de pago': 'fee',
+    'Reserva operativa': 'reserve',
+    'Impuesto / retencion': 'tax',
+  };
+  const referenceOptions = treatments.filter((item) => item.procedure || item.cost > 0);
+  const operationalFiscalLoad =
+    (pricingResult?.adminCost ?? 0) +
+    (pricingResult?.reserveAmount ?? 0) +
+    (pricingResult?.taxAmount ?? 0);
+  const operationalFiscalLoadPercent =
+    pricingResult && pricingResult.finalPrice > 0
+      ? Math.round((operationalFiscalLoad / pricingResult.finalPrice) * 1000) / 10
+      : 0;
+  const softGreenLineLabels = new Set(['Insumos clinicos', 'Administracion', 'Reserva', 'Impuesto o retencion']);
   return (
     <div className="budget-layout">
       <div className="budget-plan-card">
@@ -452,32 +733,48 @@ export function Presupuesto({
           </div>
         ) : (
           <div className="budget-plan-list">
-          {topItems.map((item) => (
-            <div key={item.id} className="budget-plan-item">
-              <div className="budget-plan-item-main">
-                <input
-                  className="budget-inline-input"
-                  value={item.procedure}
-                  onChange={(event) => onTreatmentChange(item.id, 'procedure', event.target.value)}
-                  placeholder="Procedimiento"
-                />
-                <span className={`status ${legacyStatusClass(item.status)}`}><span className="dot" />{labelForStatus(item.status)}</span>
-              </div>
-              <div className="budget-plan-item-sub">
-                <input
-                  className="budget-inline-mini"
-                  value={item.toothFdi}
-                  onChange={(event) => onTreatmentChange(item.id, 'toothFdi', event.target.value)}
-                />
-                <input
-                  className="budget-inline-mini amount"
-                  value={item.cost}
-                  onChange={(event) => onTreatmentChange(item.id, 'cost', event.target.value)}
-                />
-                <button className="btn btn-ghost" onClick={() => onRemoveTreatment(item.id)}><Icon.trash /></button>
-              </div>
-            </div>
-          ))}
+            {topItems.map((item) => {
+              const itemPricing = buildPlanItemPricing(item);
+              const itemPriceLabel = itemPricing ? fmtCLP(itemPricing.finalPrice) : fmtCLP(item.cost);
+
+              return (
+                <div key={item.id} className="budget-plan-item">
+                  <div className="budget-plan-item-main">
+                    <input
+                      className="budget-inline-input"
+                      value={item.procedure}
+                      onChange={(event) => onTreatmentChange(item.id, 'procedure', event.target.value)}
+                      placeholder="Procedimiento"
+                    />
+                    <span className={`status ${legacyStatusClass(item.status)}`}>
+                      <span className="dot" />
+                      {labelForStatus(item.status)}
+                    </span>
+                  </div>
+                  <div className="budget-plan-item-sub">
+                    <input
+                      className="budget-inline-mini"
+                      value={item.toothFdi}
+                      onChange={(event) => onTreatmentChange(item.id, 'toothFdi', event.target.value)}
+                    />
+                    <input
+                      className="budget-inline-mini amount"
+                      value={item.cost}
+                      onChange={(event) => onTreatmentChange(item.id, 'cost', event.target.value)}
+                    />
+                    <span
+                      className="budget-plan-price-chip"
+                      title={itemPricing ? 'Precio coordinado con pricing' : 'Sin tratamiento mapeado a pricing'}
+                    >
+                      {itemPriceLabel}
+                    </span>
+                    <button className="btn btn-ghost" onClick={() => onRemoveTreatment(item.id)}>
+                      <Icon.trash />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -485,11 +782,526 @@ export function Presupuesto({
       <div>
       <div className="budget-summary">
         <div className="bs-card"><div className="bs-label">Total presupuesto</div><div className="bs-value">{fmtCLP(total)}</div><div className="bs-sub">{treatments.length} tratamientos</div></div>
-        <div className="bs-card t"><div className="bs-label">Cobertura prevision</div><div className="bs-value">{fmtCLP(Math.round(cobertura))}</div><input className="bs-edit-input" value={budget.coverageLabel} onChange={(event) => onBudgetFieldChange('coverageLabel', event.target.value)} /></div>
         <div className="bs-card g"><div className="bs-label">Pagado</div><div className="bs-value">{fmtCLP(pagado)}</div><div className="bs-sub">2 cuotas</div></div>
         <div className="bs-card a"><div className="bs-label">Saldo paciente</div><div className="bs-value">{fmtCLP(Math.round(aPagar))}</div><input className="bs-edit-input" value={budget.dueDateLabel} onChange={(event) => onBudgetFieldChange('dueDateLabel', event.target.value)} /></div>
       </div>
+      <div className="budget-pricing-panel">
+        <div className="budget-pricing-head">
+          <div>
+            <div className="bs-label">Lectura financiera estimada</div>
+            <div className="budget-pricing-title">
+              {pricingReferenceTreatment?.procedure ?? 'Sin tratamiento mapeado a pricing'}
+            </div>
+            <div className="budget-pricing-mapped">
+              <span>Tratamiento de referencia</span>
+              <strong>{pricingReferenceTreatment?.procedure ?? 'Sin referencia'}</strong>
+              <span>Mapeado a pricing</span>
+              <strong>{pricingCatalogTreatment?.name ?? 'Sin tratamiento mapeado'}</strong>
+            </div>
+            {!mirror && (
+              <label className="budget-pricing-reference">
+                <span>Referencia manual del calculo</span>
+                <select
+                  value={budget?.pricingReferenceTreatmentId ?? ''}
+                  onChange={(event) => onBudgetFieldChange('pricingReferenceTreatmentId', event.target.value)}
+                >
+                  <option value="">Automatico</option>
+                  {referenceOptions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.procedure || 'Sin procedimiento'}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+          {pricingCatalogTreatment ? (
+            <span className="budget-pricing-note">Base financiera local DentCool</span>
+          ) : (
+            <span className="budget-pricing-note">Pendiente de mapear catalogo</span>
+          )}
+        </div>
+
+        {!mirror && pricingSettings && (
+          <div className="budget-pricing-settings">
+            <div className="budget-pricing-settings-head">
+              <div className="bs-label">PricingSettings persistente</div>
+              <button className="btn btn-secondary" type="button" onClick={onResetPricingSettings}>
+                Reiniciar valores
+              </button>
+            </div>
+            <div className="budget-pricing-settings-grid">
+              <PricingSettingField
+                label="Box por hora"
+                value={pricingSettings.boxHourlyCost}
+                onChange={(value) => onPricingSettingChange?.('boxHourlyCost', value)}
+              />
+              <PricingSettingField
+                label="Traslado por sesion"
+                value={pricingSettings.transportCostPerSession}
+                onChange={(value) => onPricingSettingChange?.('transportCostPerSession', value)}
+              />
+              <PricingSettingField
+                label="Comision pago %"
+                value={pricingReferencePaymentFeePercent}
+                step="0.01"
+                onChange={(value) =>
+                  onBudgetFieldChange(
+                    'pricingReferencePaymentFeePercentByTreatmentId',
+                    {
+                      ...pricingReferencePaymentFeePercentByTreatmentId,
+                      [pricingReferenceId]: Number(value) || 0,
+                    }
+                  )
+                }
+              />
+              <PricingSettingField
+                label="Retencion estimada %"
+                value={pricingSettings.taxPercent}
+                step="0.01"
+                onChange={(value) => onPricingSettingChange?.('taxPercent', value)}
+              />
+              <PricingSettingField
+                label="Insumos por paciente"
+                value={pricingReferenceSuppliesCost}
+                onChange={(value) =>
+                  onBudgetFieldChange(
+                    'pricingReferenceSuppliesCostByTreatmentId',
+                    {
+                      ...pricingReferenceSuppliesCostByTreatmentId,
+                      [pricingReferenceId]: Number(value) || 0,
+                    }
+                  )
+                }
+              />
+              <PricingSettingField
+                label="Marketing por paciente"
+                value={pricingReferenceMarketingCost}
+                onChange={(value) =>
+                  onBudgetFieldChange(
+                    'pricingReferenceMarketingCostByTreatmentId',
+                    {
+                      ...pricingReferenceMarketingCostByTreatmentId,
+                      [pricingReferenceId]: Number(value) || 0,
+                    }
+                  )
+                }
+              />
+              <PricingSettingField
+                label="Administracion"
+                value={pricingSettings.defaultAdminCost}
+                onChange={(value) => onPricingSettingChange?.('defaultAdminCost', value)}
+              />
+              <PricingSettingField
+                label="Reserva %"
+                value={pricingSettings.defaultReservePercent}
+                step="0.01"
+                onChange={(value) => onPricingSettingChange?.('defaultReservePercent', value)}
+              />
+            </div>
+          </div>
+        )}
+
+        {!mirror && (
+          <div className="budget-pricing-settings budget-pricing-catalog">
+            <div className="budget-pricing-settings-head">
+              <div>
+                <div className="bs-label">Catalogo editable de pricing</div>
+                <div className="budget-catalog-caption">
+                  Ajusta nombres, alias, precios base y margenes sin tocar `pricing.js`.
+                </div>
+              </div>
+              <div className="budget-catalog-actions">
+                <button className="btn btn-secondary" type="button" onClick={onResetPricingCatalog}>
+                  Reiniciar catalogo
+                </button>
+                <button className="btn btn-primary" type="button" onClick={onAddPricingTreatment}>
+                  <Icon.plus />
+                  Agregar item
+                </button>
+              </div>
+            </div>
+            <div className="budget-catalog-list">
+              {editablePricingCatalog.map((item) => {
+                const catalogPreview = buildCatalogPreview(item);
+
+                return (
+                  <div key={item.id} className="budget-catalog-card">
+                  <div className="budget-catalog-card-head">
+                    <div className="budget-catalog-title">
+                      <strong>{item.name || 'Tratamiento sin nombre'}</strong>
+                      <span>{item.category || 'otro'}</span>
+                    </div>
+                    <label className="budget-catalog-toggle">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(item.active)}
+                        onChange={(event) => onPricingCatalogChange?.(item.id, 'active', event.target.checked)}
+                      />
+                      <span title="Mantiene este tratamiento disponible dentro del catalogo de pricing">Activo</span>
+                    </label>
+                    <button
+                      className="btn btn-secondary budget-catalog-reset"
+                      type="button"
+                      onClick={() => onResetPricingTreatment?.(item.id)}
+                      title="Restaurar este tratamiento a su valor base original"
+                    >
+                      Restaurar
+                    </button>
+                    <button className="btn btn-ghost" type="button" onClick={() => onRemovePricingTreatment?.(item.id)}>
+                      <Icon.trash />
+                    </button>
+                  </div>
+                  <div className="budget-catalog-summary">
+                    {getCatalogSummaryCards(catalogPreview).map((metric, index) => (
+                      <div key={metric.key} className={`budget-catalog-metric${metric.tone ? ` tone-${metric.tone}` : ''}`}>
+                        <div className="budget-catalog-metric-head">
+                          <span>{metric.label}</span>
+                          <PricingHelpButton
+                            label={metric.label}
+                            text={metric.help}
+                            compact
+                            open={openPricingHelp === `catalog-${item.id}-${metric.key}`}
+                            placement={index < 2 ? 'right' : 'left'}
+                            onToggle={() =>
+                              setOpenPricingHelp((current) =>
+                                current === `catalog-${item.id}-${metric.key}` ? null : `catalog-${item.id}-${metric.key}`
+                              )
+                            }
+                          />
+                        </div>
+                        <strong>{fmtCLP(metric.value)}</strong>
+                        <small>{fmtPercent(metric.percent)}</small>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="budget-catalog-grid">
+                    <PricingCatalogField
+                      label="Nombre"
+                      value={item.name}
+                      onChange={(value) => onPricingCatalogChange?.(item.id, 'name', value)}
+                    />
+                    <PricingCatalogField
+                      label="Categoria"
+                      value={item.category}
+                      onChange={(value) => onPricingCatalogChange?.(item.id, 'category', value)}
+                    />
+                    <PricingCatalogField
+                      label="Alias"
+                      value={item.aliases.join(', ')}
+                      onChange={(value) => onPricingCatalogChange?.(item.id, 'aliases', value)}
+                    />
+                    <PricingCatalogField
+                      label="Precio base"
+                      type="number"
+                      value={item.basePrice}
+                      onChange={(value) => onPricingCatalogChange?.(item.id, 'basePrice', value)}
+                    />
+                    <PricingCatalogField
+                      label="Horas"
+                      type="number"
+                      step="0.01"
+                      value={item.durationHours}
+                      onChange={(value) => onPricingCatalogChange?.(item.id, 'durationHours', value)}
+                    />
+                    <PricingCatalogField
+                      label="Insumos"
+                      type="number"
+                      value={item.suppliesCost}
+                      onChange={(value) => onPricingCatalogChange?.(item.id, 'suppliesCost', value)}
+                    />
+                    <PricingCatalogField
+                      label="Marketing por paciente"
+                      type="number"
+                      value={item.marketingCost}
+                      onChange={(value) => onPricingCatalogChange?.(item.id, 'marketingCost', value)}
+                    />
+                    <PricingCatalogField
+                      label="Gestion interna"
+                      helpText={pricingHelpText.admin}
+                      helpOpen={openPricingHelp === `catalog-${item.id}-admin`}
+                      onHelpToggle={() =>
+                        setOpenPricingHelp((current) => (current === `catalog-${item.id}-admin` ? null : `catalog-${item.id}-admin`))
+                      }
+                      type="number"
+                      value={item.adminCost}
+                      onChange={(value) => onPricingCatalogChange?.(item.id, 'adminCost', value)}
+                    />
+                    <PricingCatalogField
+                      label="Traslado por sesion"
+                      type="number"
+                      value={item.transportCost}
+                      onChange={(value) => onPricingCatalogChange?.(item.id, 'transportCost', value)}
+                    />
+                    <PricingCatalogField
+                      label="Comision pago %"
+                      type="number"
+                      step="0.01"
+                      value={item.paymentFeePercent}
+                      onChange={(value) => onPricingCatalogChange?.(item.id, 'paymentFeePercent', value)}
+                    />
+                    <PricingCatalogField
+                      label="Reserva %"
+                      type="number"
+                      step="0.01"
+                      value={item.reservePercent}
+                      onChange={(value) => onPricingCatalogChange?.(item.id, 'reservePercent', value)}
+                    />
+                    <PricingCatalogField
+                      label="Precio minimo"
+                      type="number"
+                      value={item.minPrice}
+                      onChange={(value) => onPricingCatalogChange?.(item.id, 'minPrice', value)}
+                    />
+                    <PricingCatalogField
+                      label="Precio sano"
+                      type="number"
+                      value={item.healthyPrice}
+                      onChange={(value) => onPricingCatalogChange?.(item.id, 'healthyPrice', value)}
+                    />
+                    <PricingCatalogField
+                      label="Precio ideal"
+                      type="number"
+                      value={item.idealPrice}
+                      onChange={(value) => onPricingCatalogChange?.(item.id, 'idealPrice', value)}
+                    />
+                    <PricingCatalogField
+                      label="Descuento max %"
+                      type="number"
+                      step="0.01"
+                      value={item.maxRecommendedDiscountPercent}
+                      onChange={(value) => onPricingCatalogChange?.(item.id, 'maxRecommendedDiscountPercent', value)}
+                    />
+                    <PricingCatalogField
+                      label="Mano de obra"
+                      type="number"
+                      value={item.defaultLaborCost}
+                      onChange={(value) => onPricingCatalogChange?.(item.id, 'defaultLaborCost', value)}
+                    />
+                    <PricingCatalogField
+                      label="Nota"
+                      value={item.notes}
+                      onChange={(value) => onPricingCatalogChange?.(item.id, 'notes', value)}
+                    />
+                  </div>
+                  </div>
+                );
+              })}
+              {editablePricingCatalog.length === 0 && (
+                <div className="budget-pricing-empty">
+                  No hay tratamientos en el catalogo persistente. Agrega uno nuevo para volver a mapear pricing.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {pricingResult ? (
+          <>
+            {!mirror && (
+              <div className="budget-pricing-history-head">
+                <div>
+                  <div className="bs-label">Registro financiero por paciente</div>
+                  <div className="budget-catalog-caption">
+                    Guarda un registro historico del calculo actual antes de que cambien costos o settings.
+                  </div>
+                </div>
+                <button className="btn btn-primary" type="button" onClick={onSavePricingSnapshot}>
+                  <Icon.plus />
+                  Guardar registro
+                </button>
+              </div>
+            )}
+
+            <div className="budget-pricing-grid">
+              <div className="budget-pricing-kpi budget-pricing-kpi-wide tone-good">
+                <div className="budget-pricing-kpi-head">
+                  <span>Gestion + reserva + fiscal</span>
+                  <PricingHelpButton
+                    label="Gestion + reserva + fiscal"
+                    text="Suma de gestion interna, reserva operativa e impuesto estimado para este tratamiento."
+                    open={openPricingHelp === 'operationalFiscalLoad'}
+                    placement="right"
+                    onToggle={() => setOpenPricingHelp((current) => (current === 'operationalFiscalLoad' ? null : 'operationalFiscalLoad'))}
+                  />
+                </div>
+                <strong>{fmtCLP(operationalFiscalLoad)}</strong>
+                <small>{fmtPercent(operationalFiscalLoadPercent)}</small>
+              </div>
+              <div className="budget-pricing-kpi budget-pricing-kpi-small">
+                <div className="budget-pricing-kpi-head">
+                  <span>Disponible profesional + clinica</span>
+                  <PricingHelpButton
+                    label="Disponible profesional + clinica"
+                    text={pricingHelpText.availableBeforeLabor}
+                    open={openPricingHelp === 'availableBeforeLabor'}
+                    placement="right"
+                    onToggle={() => setOpenPricingHelp((current) => (current === 'availableBeforeLabor' ? null : 'availableBeforeLabor'))}
+                  />
+                </div>
+                <strong>{fmtCLP(pricingResult.availableBeforeLabor)}</strong>
+                <small>{fmtPercent(pricingResult.availableBeforeLaborPercent)}</small>
+              </div>
+              <div className="budget-pricing-kpi budget-pricing-kpi-small">
+                <div className="budget-pricing-kpi-head">
+                  <span>Utilidad clinica</span>
+                  <PricingHelpButton
+                    label="Utilidad clinica"
+                    text={pricingHelpText.clinicProfit}
+                    open={openPricingHelp === 'clinicProfit'}
+                    placement="right"
+                    onToggle={() => setOpenPricingHelp((current) => (current === 'clinicProfit' ? null : 'clinicProfit'))}
+                  />
+                </div>
+                <strong>{fmtCLP(pricingResult.clinicProfit)}</strong>
+                <small>{fmtPercent(pricingResult.clinicProfitPercent)}</small>
+              </div>
+              <div className={`budget-pricing-kpi budget-pricing-kpi-small tone-${getPricingTone(pricingResult.pricingStatus)}`}>
+                <div className="budget-pricing-kpi-head">
+                  <span>Estado pricing</span>
+                  <PricingHelpButton
+                    label="Estado pricing"
+                    text={pricingHelpText.pricingStatus}
+                    open={openPricingHelp === 'pricingStatus'}
+                    placement="left"
+                    onToggle={() => setOpenPricingHelp((current) => (current === 'pricingStatus' ? null : 'pricingStatus'))}
+                  />
+                </div>
+                <strong>{pricingResult.pricingStatus}</strong>
+                <small>Meta sana desde 45%</small>
+              </div>
+              <div className={`budget-pricing-kpi budget-pricing-kpi-small tone-${getPricingTone(pricingResult.externalClinicianStatus)}`}>
+                <div className="budget-pricing-kpi-head">
+                  <span>Escala con boleta</span>
+                  <PricingHelpButton
+                    label="Escala con boleta"
+                    text={pricingHelpText.externalClinicianStatus}
+                    open={openPricingHelp === 'externalClinicianStatus'}
+                    placement="left"
+                    onToggle={() => setOpenPricingHelp((current) => (current === 'externalClinicianStatus' ? null : 'externalClinicianStatus'))}
+                  />
+                </div>
+                <strong>{pricingResult.externalClinicianStatus}</strong>
+                <small>Despues de mano de obra</small>
+              </div>
+            </div>
+
+            <div className="budget-pricing-lines">
+              {pricingResult.lines.slice(1, 9).map((line) => (
+                <div key={line.label} className={`budget-pricing-line ${softGreenLineLabels.has(line.label) ? 'tone-green' : ''}`}>
+                  <div className="budget-pricing-line-label">
+                    <span>{pricingLineLabelMap[line.label] ?? line.label}</span>
+                    {pricingLineHelpKeyMap[pricingLineLabelMap[line.label] ?? line.label] && (
+                      <PricingHelpButton
+                        label={pricingLineLabelMap[line.label] ?? line.label}
+                        text={pricingHelpText[pricingLineHelpKeyMap[pricingLineLabelMap[line.label] ?? line.label]]}
+                        compact
+                        open={openPricingHelp === `line-${line.label}`}
+                        placement="right"
+                        onToggle={() => setOpenPricingHelp((current) => (current === `line-${line.label}` ? null : `line-${line.label}`))}
+                      />
+                    )}
+                  </div>
+                  <span>{fmtCLP(line.amount)}</span>
+                  <span>{fmtPercent(line.percentOfFinalPrice)}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="budget-pricing-targets">
+              <span>Meta 40: {pricingResult.recommendedPriceFor40 ? fmtCLP(pricingResult.recommendedPriceFor40) : 'No aplica'}</span>
+              <span>Meta 45: {pricingResult.recommendedPriceFor45 ? fmtCLP(pricingResult.recommendedPriceFor45) : 'No aplica'}</span>
+              <span>Meta 50: {pricingResult.recommendedPriceFor50 ? fmtCLP(pricingResult.recommendedPriceFor50) : 'No aplica'}</span>
+            </div>
+
+            {pricingResult.warnings.length > 0 && (
+              <div className="budget-pricing-alerts">
+                {pricingResult.warnings.slice(0, 3).map((warning) => (
+                  <div key={warning} className="budget-pricing-alert">
+                    <Icon.alert />
+                    <span>{warning}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="budget-snapshot-list">
+              {(pricingBudgets ?? []).length > 0 ? (
+                (pricingBudgets ?? []).map((snapshot) => (
+                  <div key={snapshot.id} className="budget-snapshot-card">
+                    <div className="budget-snapshot-head">
+                      <div>
+                        <strong>{snapshot.treatmentNameSnapshot || 'Registro sin tratamiento'}</strong>
+                        <div className="budget-snapshot-meta">
+                          Estado: {snapshot.status} ·
+                          {' '}
+                          {snapshot.createdAt
+                            ? new Date(snapshot.createdAt).toLocaleString('es-CL', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : 'Sin fecha'}
+                        </div>
+                      </div>
+                      <span className={`budget-snapshot-status tone-${snapshot.status}`}>{snapshot.status}</span>
+                    </div>
+                    <div className="budget-snapshot-grid">
+                      <div><span>Precio final</span><strong>{fmtCLP(snapshot.calculationSnapshot?.finalPrice ?? 0)}</strong></div>
+                      <div><span>Disponible</span><strong>{fmtCLP(snapshot.calculationSnapshot?.availableBeforeLabor ?? 0)}</strong></div>
+                      <div><span>Utilidad clinica</span><strong>{fmtCLP(snapshot.calculationSnapshot?.clinicProfit ?? 0)}</strong></div>
+                      <div><span>Estado</span><strong>{snapshot.calculationSnapshot?.pricingStatus ?? 'Sin estado'}</strong></div>
+                    </div>
+                    {!mirror && snapshot.status !== 'accepted' && (
+                      <div className="budget-snapshot-actions">
+                        {snapshot.status !== 'sent' && (
+                          <button className="btn btn-secondary" type="button" onClick={() => onSetPricingSnapshotStatus?.(snapshot.id, 'sent')}>
+                            Enviar
+                          </button>
+                        )}
+                        <button className="btn btn-secondary" type="button" onClick={() => onAcceptPricingSnapshot?.(snapshot.id)}>
+                          <Icon.check />
+                          Aceptar
+                        </button>
+                        {snapshot.status !== 'rejected' && (
+                          <button className="btn btn-secondary" type="button" onClick={() => onSetPricingSnapshotStatus?.(snapshot.id, 'rejected')}>
+                            Rechazar
+                          </button>
+                        )}
+                        {snapshot.status !== 'expired' && (
+                          <button className="btn btn-secondary" type="button" onClick={() => onSetPricingSnapshotStatus?.(snapshot.id, 'expired')}>
+                            Vencer
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="budget-pricing-empty">
+                  Aun no hay registros financieros guardados para este paciente.
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="budget-pricing-empty">
+            Aun no hay un tratamiento del plan que coincida con el catalogo base de pricing. El siguiente paso es
+            mapear o normalizar nombres como limpieza, blanqueamiento, restauracion o sellantes.
+          </div>
+        )}
+      </div>
       <div className="budget-edit-list">
+        <div className="budget-edit-header">
+          <span>Procedimiento</span>
+          <span>Profesional</span>
+          <span>Estado</span>
+          <span>Costo</span>
+          <span>Pagado</span>
+          <span>% cobertura</span>
+        </div>
         {treatments.map((item) => (
           <div key={item.id} className="budget-edit-row">
             <input value={item.procedure} onChange={(event) => onTreatmentChange(item.id, 'procedure', event.target.value)} placeholder="Procedimiento" />
@@ -518,6 +1330,51 @@ export function Presupuesto({
       </div>
       </div>
     </div>
+  );
+}
+
+function PricingSettingField({ label, value, onChange, step = '1' }) {
+  return (
+    <label className="pricing-setting-field">
+      <span>{label}</span>
+      <input type="number" inputMode="decimal" step={step} value={value} onChange={(event) => onChange?.(event.target.value)} />
+    </label>
+  );
+}
+
+function PricingCatalogField({
+  label,
+  value,
+  onChange,
+  type = 'text',
+  step = '1',
+  helpText = null,
+  helpOpen = false,
+  onHelpToggle = null,
+}) {
+  return (
+    <label className="pricing-setting-field">
+      <span className="pricing-setting-label-row">
+        <span className="pricing-setting-label-text">{label}</span>
+        {helpText && (
+          <PricingHelpButton
+            label={label}
+            text={helpText}
+            compact
+            open={helpOpen}
+            placement="right"
+            onToggle={onHelpToggle}
+          />
+        )}
+      </span>
+      <input
+        type={type}
+        inputMode={type === 'number' ? 'decimal' : undefined}
+        step={type === 'number' ? step : undefined}
+        value={value}
+        onChange={(event) => onChange?.(event.target.value)}
+      />
+    </label>
   );
 }
 
@@ -710,6 +1567,235 @@ export function Historial({
   );
 }
 
+export function AgendaClinica({
+  appointments,
+  saveState = 'loaded',
+  lastSavedAt,
+  onAppointmentChange,
+  onAddAppointment,
+  onRemoveAppointment,
+  mirror = false,
+  onOpenSection,
+}) {
+  const saveLabel =
+    saveState === 'dirty'
+      ? 'Guardando agenda clinica…'
+      : saveState === 'saved'
+        ? `Agenda clinica guardada${lastSavedAt ? ` · ${lastSavedAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}` : ''}`
+        : 'Citas listas para edicion por paciente.';
+
+  return (
+    <div className="documents-editor">
+      <div className="documents-toolbar">
+        <div>
+          <div className="muted" style={{ fontSize: 12.5 }}>{appointments.length} citas registradas</div>
+          <div className="documents-save-note">{saveLabel}</div>
+        </div>
+        {mirror ? (
+          <button className="btn btn-secondary" type="button" onClick={() => onOpenSection?.('agenda')}>
+            <Icon.edit />
+            Editar ficha
+          </button>
+        ) : (
+          <button className="btn btn-primary" onClick={onAddAppointment}><Icon.plus />Nueva cita</button>
+        )}
+      </div>
+      <div className="documents-list">
+        {appointments.map((appointment) => (
+          <div key={appointment.id} className="document-row">
+            <div className="document-main">
+              <div className="document-head">
+                <div className="document-title">{appointment.reason || 'Seguimiento clinico'}</div>
+                {!mirror && <button className="btn btn-ghost" onClick={() => onRemoveAppointment(appointment.id)}><Icon.trash /></button>}
+              </div>
+              {mirror ? (
+                <>
+                  <div className="document-fields">
+                    <div className="document-field">
+                      <span>Fecha</span>
+                      <div className="document-value">{appointment.dateLabel || 'Sin fecha'}</div>
+                    </div>
+                    <div className="document-field">
+                      <span>Hora</span>
+                      <div className="document-value">{appointment.timeLabel || 'Sin hora'}</div>
+                    </div>
+                    <div className="document-field">
+                      <span>Estado</span>
+                      <div className="document-value">{appointment.status || 'scheduled'}</div>
+                    </div>
+                  </div>
+                  <div className="document-meta-line">
+                    <span className="document-kind">{appointment.clinician || 'Sin profesional'}</span>
+                    <span>{appointment.notes || 'Sin notas registradas.'}</span>
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+                    <label className="document-field">
+                      <span>Fecha</span>
+                      <input value={appointment.dateLabel} onChange={(event) => onAppointmentChange(appointment.id, 'dateLabel', event.target.value)} placeholder="14 may 2026" />
+                    </label>
+                    <label className="document-field">
+                      <span>Hora</span>
+                      <input value={appointment.timeLabel} onChange={(event) => onAppointmentChange(appointment.id, 'timeLabel', event.target.value)} placeholder="10:00" />
+                    </label>
+                    <label className="document-field">
+                      <span>Estado</span>
+                      <select value={appointment.status} onChange={(event) => onAppointmentChange(appointment.id, 'status', event.target.value)}>
+                        <option value="scheduled">Programada</option>
+                        <option value="confirmed">Confirmada</option>
+                        <option value="completed">Realizada</option>
+                        <option value="cancelled">Cancelada</option>
+                        <option value="no_show">No asiste</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <label className="document-field">
+                      <span>Profesional</span>
+                      <input value={appointment.clinician} onChange={(event) => onAppointmentChange(appointment.id, 'clinician', event.target.value)} placeholder="Dra. responsable" />
+                    </label>
+                    <label className="document-field">
+                      <span>Motivo</span>
+                      <input value={appointment.reason} onChange={(event) => onAppointmentChange(appointment.id, 'reason', event.target.value)} placeholder="Control / seguimiento" />
+                    </label>
+                  </div>
+                  <label className="document-field">
+                    <span>Notas</span>
+                    <textarea value={appointment.notes} onChange={(event) => onAppointmentChange(appointment.id, 'notes', event.target.value)} placeholder="Confirmacion, indicaciones, reagendamiento o contexto." />
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      {!appointments.length && (
+        <div className="finance-empty">Aun no hay citas separadas como entidad formal para este paciente.</div>
+      )}
+    </div>
+  );
+}
+
+export function CobrosAbonos({
+  payments,
+  treatments,
+  saveState = 'loaded',
+  lastSavedAt,
+  onPaymentChange,
+  onAddPayment,
+  onRemovePayment,
+  mirror = false,
+  onOpenSection,
+}) {
+  const treatmentOptions = treatments ?? [];
+  const saveLabel =
+    saveState === 'dirty'
+      ? 'Guardando cobros y abonos…'
+      : saveState === 'saved'
+        ? `Cobros y abonos guardados${lastSavedAt ? ` · ${lastSavedAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}` : ''}`
+        : 'Pagos listos para edicion por paciente.';
+
+  return (
+    <div className="documents-editor">
+      <div className="documents-toolbar">
+        <div>
+          <div className="muted" style={{ fontSize: 12.5 }}>{payments.length} abonos registrados</div>
+          <div className="documents-save-note">{saveLabel}</div>
+        </div>
+        {mirror ? (
+          <button className="btn btn-secondary" type="button" onClick={() => onOpenSection?.('cobros')}>
+            <Icon.edit />
+            Editar ficha
+          </button>
+        ) : (
+          <button className="btn btn-primary" onClick={onAddPayment}><Icon.plus />Nuevo abono</button>
+        )}
+      </div>
+      <div className="documents-list">
+        {payments.map((payment) => (
+          <div key={payment.id} className="document-row">
+            <div className="document-main">
+              <div className="document-head">
+                <div className="document-title">{payment.concept || 'Abono'}</div>
+                {!mirror && <button className="btn btn-ghost" onClick={() => onRemovePayment(payment.id)}><Icon.trash /></button>}
+              </div>
+              {mirror ? (
+                <>
+                  <div className="document-fields">
+                    <div className="document-field">
+                      <span>Fecha</span>
+                      <div className="document-value">{payment.dateLabel || 'Sin fecha'}</div>
+                    </div>
+                    <div className="document-field">
+                      <span>Monto</span>
+                      <div className="document-value">{fmtCLP(payment.amount || 0)}</div>
+                    </div>
+                    <div className="document-field">
+                      <span>Metodo</span>
+                      <div className="document-value">{payment.method || 'cash'}</div>
+                    </div>
+                  </div>
+                  <div className="document-meta-line">
+                    <span className="document-kind">{treatmentOptions.find((item) => item.id === payment.treatmentId)?.procedure || 'Sin tratamiento asociado'}</span>
+                    <span>{payment.notes || 'Sin notas registradas.'}</span>
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+                    <label className="document-field">
+                      <span>Fecha</span>
+                      <input value={payment.dateLabel} onChange={(event) => onPaymentChange(payment.id, 'dateLabel', event.target.value)} placeholder="14 may 2026" />
+                    </label>
+                    <label className="document-field">
+                      <span>Monto</span>
+                      <input type="number" inputMode="decimal" value={payment.amount} onChange={(event) => onPaymentChange(payment.id, 'amount', event.target.value)} placeholder="0" />
+                    </label>
+                    <label className="document-field">
+                      <span>Metodo</span>
+                      <select value={payment.method} onChange={(event) => onPaymentChange(payment.id, 'method', event.target.value)}>
+                        <option value="cash">Efectivo</option>
+                        <option value="card">Tarjeta</option>
+                        <option value="transfer">Transferencia</option>
+                        <option value="mixed">Mixto</option>
+                        <option value="other">Otro</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <label className="document-field">
+                      <span>Tratamiento</span>
+                      <select value={payment.treatmentId || ''} onChange={(event) => onPaymentChange(payment.id, 'treatmentId', event.target.value)}>
+                        <option value="">Sin asociar</option>
+                        {treatmentOptions.map((treatment) => (
+                          <option key={treatment.id} value={treatment.id}>{treatment.procedure || treatment.id}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="document-field">
+                      <span>Concepto</span>
+                      <input value={payment.concept} onChange={(event) => onPaymentChange(payment.id, 'concept', event.target.value)} placeholder="Abono inicial / cuota / saldo" />
+                    </label>
+                  </div>
+                  <label className="document-field">
+                    <span>Notas</span>
+                    <textarea value={payment.notes} onChange={(event) => onPaymentChange(payment.id, 'notes', event.target.value)} placeholder="Medio de pago, referencia o detalle del abono." />
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      {!payments.length && (
+        <div className="finance-empty">Aun no hay cobros o abonos separados como entidad formal para este paciente.</div>
+      )}
+    </div>
+  );
+}
+
 export function TreatmentsTable({ selectedTooth, treatments, onAddTreatment, onRemoveTreatment }) {
   const total = treatments.reduce((s, t) => s + t.cost, 0);
   const pagado = treatments.reduce((s, t) => s + t.paid, 0);
@@ -742,7 +1828,7 @@ export function TreatmentsTable({ selectedTooth, treatments, onAddTreatment, onR
         <table className="tx">
           <thead>
             <tr>
-              <th>Diente</th><th>Procedimiento</th><th>Profesional</th><th>Estado</th><th>Prioridad</th><th>Fecha</th><th style={{ textAlign: 'right' }}>Cobertura</th><th style={{ textAlign: 'right' }}>Costo</th><th style={{ textAlign: 'right' }}>Saldo</th><th></th>
+              <th>Diente</th><th>Procedimiento</th><th>Profesional</th><th>Estado</th><th>Prioridad</th><th>Fecha</th><th style={{ textAlign: 'right' }}>Cobertura</th><th style={{ textAlign: 'right' }}>Abonado</th><th style={{ textAlign: 'right' }}>Saldo</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -758,7 +1844,7 @@ export function TreatmentsTable({ selectedTooth, treatments, onAddTreatment, onR
                   <td><span className={`priority ${t.priority}`}>● {t.priority.charAt(0).toUpperCase() + t.priority.slice(1)}</span></td>
                   <td>{t.dateLabel}</td>
                   <td style={{ textAlign: 'right' }} className="amount">{t.coveragePercent}%</td>
-                  <td style={{ textAlign: 'right' }} className="amount">{fmtCLP(t.cost)}</td>
+                  <td style={{ textAlign: 'right' }} className="amount">{fmtCLP(t.paid)}</td>
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: saldo > 0 ? 'var(--amber)' : 'var(--green)' }} className="amount">{saldo > 0 ? fmtCLP(saldo) : '✓ pagado'}</td>
                   <td><div className="row-actions"><button className="row-action"><Icon.edit /></button><button className="row-action" onClick={() => onRemoveTreatment?.(t.id)}><Icon.trash /></button></div></td>
                 </tr>
@@ -767,8 +1853,9 @@ export function TreatmentsTable({ selectedTooth, treatments, onAddTreatment, onR
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan="7" style={{ textAlign: 'right', color: 'var(--muted)' }}>Totales</td>
+              <td colSpan="6" style={{ textAlign: 'right', color: 'var(--muted)' }}>Totales</td>
               <td style={{ textAlign: 'right' }} className="amount">{fmtCLP(total)}</td>
+              <td style={{ textAlign: 'right' }} className="amount">{fmtCLP(pagado)}</td>
               <td style={{ textAlign: 'right', color: 'var(--blue-600)' }} className="amount">{fmtCLP(total - pagado)}</td>
               <td />
             </tr>

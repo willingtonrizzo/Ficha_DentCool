@@ -7,7 +7,12 @@ import {
   LOWER_RIGHT,
   LOWER_LEFT,
   toothName,
+  fmtCLP,
 } from './data';
+import {
+  ACCEPTED_SNAPSHOTS_REPORT_COLUMNS,
+  FINANCE_SUMMARY_REPORT_COLUMNS,
+} from './pricing';
 import { createPatientDraft, getPatientDisplayName } from './patients';
 import { Tooth } from './tooth';
 
@@ -157,8 +162,8 @@ export function Sidebar({ activeView = 'patients', onNavigate, patientCount = 0,
     { ic: 'tooth', label: 'Tratamientos' },
   ];
   const items2 = [
-    { ic: 'chart', label: 'Reportes' },
-    { ic: 'cash', label: 'Facturacion' },
+    { ic: 'chart', label: 'Reportes', view: 'finance' },
+    { ic: 'cash', label: 'Facturacion', view: 'finance' },
     { ic: 'doc', label: 'Documentos' },
     { ic: 'cog', label: 'Configuracion' },
   ];
@@ -191,8 +196,9 @@ export function Sidebar({ activeView = 'patients', onNavigate, patientCount = 0,
       <div className="nav-section">Gestion</div>
       {items2.map((it, i) => {
         const I = Icon[it.ic];
+        const isActive = it.view === activeView;
         return (
-          <button key={i} className="nav-item">
+          <button key={i} className={`nav-item ${isActive ? 'active' : ''}`} onClick={() => it.view && onNavigate?.(it.view)}>
             <I cls="ic" />
             <span>{it.label}</span>
           </button>
@@ -231,6 +237,12 @@ export function TopbarInner({ patientName, activeView = 'patients' }) {
             <span className="sep">/</span>
             <strong>Directorio general</strong>
           </>
+        ) : activeView === 'finance' ? (
+          <>
+            <span>Gestion</span>
+            <span className="sep">/</span>
+            <strong>Finanzas</strong>
+          </>
         ) : (
           <>
             <span>Pacientes</span>
@@ -249,6 +261,507 @@ export function TopbarInner({ patientName, activeView = 'patients' }) {
       <button className="topbar-btn"><Icon.msg /></button>
       <button className="topbar-btn"><Icon.bell /><span className="dot" /></button>
     </div>
+  );
+}
+
+function fmtPercentCompact(value) {
+  return `${new Intl.NumberFormat('es-CL', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value)}%`;
+}
+
+function labelForOperationalStatus(status) {
+  const map = {
+    planned: 'Planificado',
+    in_progress: 'En curso',
+    completed: 'Realizado',
+    pending_review: 'Por evaluar',
+  };
+  return map[status] ?? 'Planificado';
+}
+
+export function FinanceDashboard({
+  financeDashboard,
+  pricingSettings,
+  onPricingSettingChange,
+  onResetPricingSettings,
+  onExportAcceptedSnapshots,
+  onExportFinanceSummary,
+  onExportFinanceWorkbook,
+  onFinanceFilterChange,
+}) {
+  const filters = financeDashboard?.filters ?? { range: 'all', status: 'all', patientId: 'all', treatmentId: 'all' };
+  const filterOptions = financeDashboard?.filterOptions ?? { patients: [], treatments: [] };
+  const periods = financeDashboard?.periods ?? {};
+  const objectives = financeDashboard?.objectives ?? {};
+  const comparison = financeDashboard?.comparison;
+  const recentAccepted = financeDashboard?.recentAccepted ?? [];
+  const topTreatments = financeDashboard?.topTreatments ?? [];
+  const totalsByPatient = financeDashboard?.totalsByPatient ?? [];
+  const totalsByTreatment = financeDashboard?.totalsByTreatment ?? [];
+  const statusCounts = financeDashboard?.statusCounts ?? {};
+  const filteredSnapshots = financeDashboard?.filteredSnapshots ?? [];
+  const operationalSummary = financeDashboard?.operationalSummary ?? {};
+  const pendingCollectionsByPatient = financeDashboard?.pendingCollectionsByPatient ?? [];
+  const operationalTreatments = financeDashboard?.operationalTreatments ?? [];
+  const upcomingAppointments = financeDashboard?.upcomingAppointments ?? [];
+
+  const periodCards = [
+    { key: 'day', label: 'Hoy', accent: 'day', objective: objectives.dailyAvailableObjective },
+    { key: 'week', label: 'Semana', accent: 'week', objective: objectives.weeklyAvailableObjective },
+    { key: 'month', label: 'Mes', accent: 'month', objective: objectives.monthlyAvailableObjective },
+  ];
+
+  return (
+    <section className="finance-shell">
+      <div className="finance-hero">
+        <div className="finance-hero-copy">
+          <div className="finance-kicker">Gestion financiera local</div>
+          <h1>Flujo aceptado, margen disponible y objetivo operativo en una sola vista.</h1>
+          <p>
+            Esta pantalla toma solo snapshots financieros `accepted` para no mezclar proyecciones con montos ya comprometidos.
+          </p>
+        </div>
+        <div className="finance-hero-band">
+          <div className="finance-band-card">
+            <span>Objetivo mensual disponible</span>
+            <strong>{fmtCLP(objectives.monthlyAvailableObjective ?? 0)}</strong>
+          </div>
+          <div className="finance-band-card">
+            <span>Snapshots aceptados</span>
+            <strong>{recentAccepted.length}</strong>
+          </div>
+          <div className="finance-band-card">
+            <span>Enviados</span>
+            <strong>{statusCounts.sent ?? 0}</strong>
+          </div>
+          <div className="finance-band-card">
+            <span>Borradores</span>
+            <strong>{statusCounts.draft ?? 0}</strong>
+          </div>
+          <div className="finance-band-card">
+            <span>Rechazados / vencidos</span>
+            <strong>{(statusCounts.rejected ?? 0) + (statusCounts.expired ?? 0)}</strong>
+          </div>
+          <div className="finance-band-card">
+            <span>Cobranza pendiente</span>
+            <strong>{fmtCLP(operationalSummary.totalPendingBalance ?? 0)}</strong>
+          </div>
+          <div className="finance-band-card">
+            <span>Citas visibles</span>
+            <strong>{operationalSummary.upcomingAppointmentsCount ?? 0}</strong>
+          </div>
+        </div>
+        <div className="finance-objective-panel">
+          <div className="finance-objective-copy">
+            <div className="finance-panel-kicker">Objetivo financiero</div>
+            <h3>Meta mensual editable para disponible profesional + clinica</h3>
+            <p>
+              La semana y el dia se derivan automaticamente desde este objetivo mensual. El panel general mide avance solo con snapshots aceptados.
+            </p>
+          </div>
+          <div className="finance-objective-controls">
+            <label className="finance-objective-field">
+              <span>Objetivo mensual</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={pricingSettings?.monthlyAvailableObjective ?? 0}
+                onChange={(event) => onPricingSettingChange?.('monthlyAvailableObjective', event.target.value)}
+              />
+            </label>
+            <button className="btn btn-secondary" type="button" onClick={onResetPricingSettings}>
+              Reiniciar objetivos
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="finance-filter-bar">
+        <label className="finance-filter-field">
+          <span>Rango</span>
+          <select value={filters.range} onChange={(event) => onFinanceFilterChange?.('range', event.target.value)}>
+            <option value="all">Todo</option>
+            <option value="today">Hoy</option>
+            <option value="week">Semana actual</option>
+            <option value="month">Mes actual</option>
+          </select>
+        </label>
+        <label className="finance-filter-field">
+          <span>Estado</span>
+          <select value={filters.status} onChange={(event) => onFinanceFilterChange?.('status', event.target.value)}>
+            <option value="all">Todos</option>
+            <option value="draft">Draft</option>
+            <option value="sent">Sent</option>
+            <option value="accepted">Accepted</option>
+            <option value="rejected">Rejected</option>
+            <option value="expired">Expired</option>
+          </select>
+        </label>
+        <label className="finance-filter-field">
+          <span>Paciente</span>
+          <select value={filters.patientId} onChange={(event) => onFinanceFilterChange?.('patientId', event.target.value)}>
+            <option value="all">Todos</option>
+            {filterOptions.patients.map((patient) => (
+              <option key={patient.value} value={patient.value}>{patient.label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="finance-filter-field">
+          <span>Tratamiento</span>
+          <select value={filters.treatmentId} onChange={(event) => onFinanceFilterChange?.('treatmentId', event.target.value)}>
+            <option value="all">Todos</option>
+            {filterOptions.treatments.map((treatment) => (
+              <option key={treatment.value} value={treatment.value}>{treatment.label}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="finance-period-grid">
+        {periodCards.map((card) => {
+          const period = periods[card.key] ?? {
+            acceptedCount: 0,
+            finalPrice: 0,
+            availableBeforeLabor: 0,
+            clinicProfit: 0,
+            objectiveProgressPercent: 0,
+          };
+
+          return (
+            <article key={card.key} className={`finance-period-card accent-${card.accent}`}>
+              <div className="finance-period-head">
+                <span>{card.label}</span>
+                <strong>{fmtPercentCompact(period.objectiveProgressPercent ?? 0)}</strong>
+              </div>
+              <div className="finance-period-main">{fmtCLP(period.availableBeforeLabor ?? 0)}</div>
+              <div className="finance-period-sub">Disponible profesional + clinica</div>
+              <div className="finance-period-rail">
+                <span style={{ width: `${Math.min(100, Math.max(8, period.objectiveProgressPercent ?? 0))}%` }} />
+              </div>
+              <div className="finance-period-meta">
+                <div>
+                  <small>Facturado</small>
+                  <strong>{fmtCLP(period.finalPrice ?? 0)}</strong>
+                </div>
+                <div>
+                  <small>Utilidad clinica</small>
+                  <strong>{fmtCLP(period.clinicProfit ?? 0)}</strong>
+                </div>
+                <div>
+                  <small>Aceptados</small>
+                  <strong>{period.acceptedCount ?? 0}</strong>
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      <div className="finance-lower-grid">
+        <div className="finance-panel">
+          <div className="finance-panel-head">
+            <div>
+              <div className="finance-panel-kicker">Operacion real</div>
+              <h3>Agenda visible, cobranza y pipeline clinico</h3>
+            </div>
+          </div>
+          <div className="finance-comparison-grid finance-operational-grid">
+            <div className="finance-comparison-card">
+              <span>Tratamientos filtrados</span>
+              <strong>{fmtCLP(operationalSummary.totalTreatmentValue ?? 0)}</strong>
+              <small>{fmtPercentCompact(operationalSummary.collectionRatePercent ?? 0)} recuperado</small>
+            </div>
+            <div className="finance-comparison-card">
+              <span>Cobrado + cobertura</span>
+              <strong>{fmtCLP((operationalSummary.totalCollected ?? 0) + (operationalSummary.totalCoverage ?? 0))}</strong>
+              <small>{operationalSummary.patientsWithBalance ?? 0} pacientes con saldo</small>
+            </div>
+            <div className="finance-comparison-card emphasis">
+              <span>Cobranza pendiente</span>
+              <strong>{fmtCLP(operationalSummary.totalPendingBalance ?? 0)}</strong>
+              <small>{operationalSummary.appointmentsNext7Days ?? 0} citas en 7 dias</small>
+            </div>
+          </div>
+          <div className="finance-period-meta finance-operational-meta">
+            <div>
+              <small>Planificado</small>
+              <strong>{fmtCLP(operationalSummary.plannedValue ?? 0)}</strong>
+            </div>
+            <div>
+              <small>En curso</small>
+              <strong>{fmtCLP(operationalSummary.inProgressValue ?? 0)}</strong>
+            </div>
+            <div>
+              <small>Realizado</small>
+              <strong>{fmtCLP(operationalSummary.completedValue ?? 0)}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="finance-panel">
+          <div className="finance-panel-head">
+            <div>
+              <div className="finance-panel-kicker">Citas visibles</div>
+              <h3>Proximas atenciones del filtro activo</h3>
+            </div>
+          </div>
+          <div className="finance-accepted-list">
+            {upcomingAppointments.length > 0 ? upcomingAppointments.map((appointment) => (
+              <div key={`${appointment.patientId}-${appointment.dateLabel}-${appointment.timeLabel ?? ''}`} className="finance-accepted-row">
+                <div>
+                  <div className="finance-row-title">{appointment.patientName}</div>
+                  <div className="finance-row-meta">{appointment.recordNumber || 'Sin ficha'} · {appointment.dateLabel}{appointment.timeLabel ? ` · ${appointment.timeLabel}` : ''}</div>
+                </div>
+                <div className="finance-row-amounts">
+                  <strong>{appointment.visitDate ? appointment.visitDate.toLocaleDateString('es-CL') : appointment.dateLabel || 'Sin fecha'}</strong>
+                  <span>Agenda visible</span>
+                </div>
+              </div>
+            )) : (
+              <div className="finance-empty">No hay citas visibles para el rango y paciente seleccionado.</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="finance-lower-grid">
+        <div className="finance-panel">
+          <div className="finance-panel-head">
+            <div>
+              <div className="finance-panel-kicker">Comparativo</div>
+              <h3>{comparison?.label ?? 'Periodo actual vs anterior'}</h3>
+            </div>
+          </div>
+          <div className="finance-comparison-grid">
+            <div className="finance-comparison-card">
+              <span>Actual</span>
+              <strong>{fmtCLP(comparison?.current?.availableBeforeLabor ?? 0)}</strong>
+              <small>{comparison?.current?.acceptedCount ?? 0} aceptados</small>
+            </div>
+            <div className="finance-comparison-card">
+              <span>Anterior</span>
+              <strong>{fmtCLP(comparison?.previous?.availableBeforeLabor ?? 0)}</strong>
+              <small>{comparison?.previous?.acceptedCount ?? 0} aceptados</small>
+            </div>
+            <div className="finance-comparison-card emphasis">
+              <span>Diferencia</span>
+              <strong>{fmtCLP(comparison?.difference ?? 0)}</strong>
+              <small>{fmtPercentCompact(comparison?.differencePercent ?? 0)}</small>
+            </div>
+          </div>
+        </div>
+
+        <div className="finance-panel">
+          <div className="finance-panel-head">
+            <div>
+              <div className="finance-panel-kicker">Totales agrupados</div>
+              <h3>Pacientes y tratamientos</h3>
+            </div>
+          </div>
+          <div className="finance-dual-stack">
+            <div>
+              <div className="finance-mini-head">Por paciente</div>
+              <div className="finance-mini-list">
+                {totalsByPatient.length > 0 ? totalsByPatient.map((item) => (
+                  <div key={item.key} className="finance-mini-row">
+                    <span>{item.label}</span>
+                    <strong>{fmtCLP(item.availableBeforeLabor)}</strong>
+                  </div>
+                )) : <div className="finance-empty">Sin pacientes para este filtro.</div>}
+              </div>
+            </div>
+            <div>
+              <div className="finance-mini-head">Por tratamiento</div>
+              <div className="finance-mini-list">
+                {totalsByTreatment.length > 0 ? totalsByTreatment.map((item) => (
+                  <div key={item.key} className="finance-mini-row">
+                    <span>{item.label}</span>
+                    <strong>{fmtCLP(item.availableBeforeLabor)}</strong>
+                  </div>
+                )) : <div className="finance-empty">Sin tratamientos para este filtro.</div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="finance-lower-grid">
+        <div className="finance-panel">
+          <div className="finance-panel-head">
+            <div>
+              <div className="finance-panel-kicker">Cobranza pendiente</div>
+              <h3>Pacientes con saldo operativo</h3>
+            </div>
+          </div>
+          <div className="finance-mini-list">
+            {pendingCollectionsByPatient.length > 0 ? pendingCollectionsByPatient.map((item) => (
+              <div key={item.key} className="finance-mini-row">
+                <span>{item.label} · {item.treatmentCount} items</span>
+                <strong>{fmtCLP(item.pendingBalance)}</strong>
+              </div>
+            )) : <div className="finance-empty">No hay cobranza pendiente para el filtro actual.</div>}
+          </div>
+        </div>
+
+        <div className="finance-panel">
+          <div className="finance-panel-head">
+            <div>
+              <div className="finance-panel-kicker">Pipeline clinico</div>
+              <h3>Tratamientos activos y seguimiento</h3>
+            </div>
+          </div>
+          <div className="finance-mini-list">
+            {operationalTreatments.length > 0 ? operationalTreatments.map((item) => (
+              <div key={item.id} className={`finance-mini-row finance-treatment-mini-row ${item.isDelayed ? 'is-delayed' : ''}`}>
+                <span>{item.patientName} · {item.procedure || 'Sin procedimiento'} · {labelForOperationalStatus(item.status)}</span>
+                <strong>{Math.max(0, item.pendingBalance) > 0 ? fmtCLP(item.pendingBalance) : fmtCLP(item.cost)}</strong>
+              </div>
+            )) : <div className="finance-empty">No hay tratamientos operativos para este filtro.</div>}
+          </div>
+        </div>
+      </div>
+
+      <div className="finance-lower-grid">
+        <div className="finance-panel">
+          <div className="finance-panel-head">
+            <div>
+              <div className="finance-panel-kicker">Ultimos aceptados</div>
+              <h3>Presupuestos comprometidos</h3>
+            </div>
+            <button className="btn btn-secondary" type="button" onClick={onExportAcceptedSnapshots}>
+              <Icon.download />
+              Exportar aceptados
+            </button>
+          </div>
+          <div className="finance-accepted-list">
+            {recentAccepted.length > 0 ? recentAccepted.map((snapshot) => (
+              <div key={snapshot.id} className="finance-accepted-row">
+                <div>
+                  <div className="finance-row-title">{snapshot.treatmentNameSnapshot}</div>
+                  <div className="finance-row-meta">
+                    {snapshot.patientName} · {snapshot.acceptedAt ? new Date(snapshot.acceptedAt).toLocaleDateString('es-CL') : 'Sin fecha'}
+                  </div>
+                </div>
+                <div className="finance-row-amounts">
+                  <strong>{fmtCLP(snapshot.calculationSnapshot?.availableBeforeLabor ?? 0)}</strong>
+                  <span>{fmtCLP(snapshot.calculationSnapshot?.finalPrice ?? 0)}</span>
+                </div>
+              </div>
+            )) : (
+              <div className="finance-empty">Aun no hay snapshots aceptados para consolidar gestion diaria, semanal o mensual.</div>
+            )}
+          </div>
+        </div>
+
+        <div className="finance-panel">
+          <div className="finance-panel-head">
+            <div>
+              <div className="finance-panel-kicker">Mix rentable</div>
+              <h3>Tratamientos con mayor aporte</h3>
+            </div>
+            <div className="finance-panel-actions">
+              <button className="btn btn-secondary" type="button" onClick={onExportFinanceSummary}>
+                <Icon.download />
+                Exportar resumen
+              </button>
+              <button className="btn btn-primary" type="button" onClick={onExportFinanceWorkbook}>
+                <Icon.download />
+                Exportar Excel
+              </button>
+            </div>
+          </div>
+          <div className="finance-treatment-list">
+            {topTreatments.length > 0 ? topTreatments.map((treatment) => (
+              <div key={treatment.treatmentName} className="finance-treatment-row">
+                <div>
+                  <div className="finance-row-title">{treatment.treatmentName}</div>
+                  <div className="finance-row-meta">{treatment.count} aceptados</div>
+                </div>
+                <div className="finance-treatment-metrics">
+                  <span>{fmtCLP(treatment.finalPrice)}</span>
+                  <strong>{fmtCLP(treatment.availableBeforeLabor)}</strong>
+                </div>
+              </div>
+            )) : (
+              <div className="finance-empty">Cuando aceptes snapshots por paciente, aqui apareceran los tratamientos con mejor aporte.</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="finance-lower-grid">
+        <div className="finance-panel">
+          <div className="finance-panel-head">
+            <div>
+              <div className="finance-panel-kicker">Columnas finales</div>
+              <h3>Snapshots accepted</h3>
+            </div>
+          </div>
+          <div className="finance-column-list">
+            {ACCEPTED_SNAPSHOTS_REPORT_COLUMNS.map((column) => (
+              <span key={column.key} className="finance-column-chip">{column.label}</span>
+            ))}
+          </div>
+        </div>
+
+        <div className="finance-panel">
+          <div className="finance-panel-head">
+            <div>
+              <div className="finance-panel-kicker">Columnas finales</div>
+              <h3>Finance summary</h3>
+            </div>
+          </div>
+          <div className="finance-column-list">
+            {FINANCE_SUMMARY_REPORT_COLUMNS.map((column) => (
+              <span key={column.key} className="finance-column-chip">{column.label}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="finance-panel">
+        <div className="finance-panel-head">
+          <div>
+            <div className="finance-panel-kicker">Detalle filtrado</div>
+            <h3>Snapshots visibles segun filtros activos</h3>
+          </div>
+        </div>
+        <div className="finance-table-wrap">
+          <table className="finance-table">
+            <thead>
+              <tr>
+                <th>Paciente</th>
+                <th>Tratamiento</th>
+                <th>Estado</th>
+                <th>Fecha</th>
+                <th>Precio final</th>
+                <th>Disponible</th>
+                <th>Utilidad</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredSnapshots.length > 0 ? filteredSnapshots.map((snapshot) => (
+                <tr key={snapshot.id}>
+                  <td>{snapshot.patientName}</td>
+                  <td>{snapshot.treatmentNameSnapshot || 'Sin tratamiento'}</td>
+                  <td>{snapshot.status}</td>
+                  <td>{snapshot.snapshotDate ? snapshot.snapshotDate.toLocaleDateString('es-CL') : 'Sin fecha'}</td>
+                  <td>{fmtCLP(snapshot.calculationSnapshot?.finalPrice ?? 0)}</td>
+                  <td>{fmtCLP(snapshot.calculationSnapshot?.availableBeforeLabor ?? 0)}</td>
+                  <td>{fmtCLP(snapshot.calculationSnapshot?.clinicProfit ?? 0)}</td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan="7" className="finance-table-empty">No hay snapshots que coincidan con los filtros activos.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -816,6 +1329,8 @@ export function PatientsSheet({
     { id: 'antecedentes', label: 'Antecedentes', status: 'ready' },
     { id: 'motivo', label: 'Motivo y diagnostico', status: 'ready' },
     { id: 'evolucion', label: 'Evolucion clinica', status: 'ready' },
+    { id: 'agenda', label: 'Agenda', status: 'ready' },
+    { id: 'cobros', label: 'Cobros y abonos', status: 'ready' },
     { id: 'presupuesto', label: 'Presupuesto', status: 'ready' },
     { id: 'documentos', label: 'Documentos', status: 'ready' },
     { id: 'historial', label: 'Historial', status: 'ready' },

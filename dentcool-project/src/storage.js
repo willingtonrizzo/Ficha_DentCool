@@ -1,5 +1,6 @@
 import { STORAGE_KEYS } from './data';
 import { cloneInitialTeeth } from './odontogram';
+import { createPricingCatalog, createPricingSettings } from './pricing';
 import {
   createPatient,
   createSeedPatients,
@@ -199,4 +200,74 @@ export function resetPatientDirectory() {
     patients: fallback,
     activePatientId: fallback[0]?.id ?? null,
   };
+}
+
+export function loadPricingSettings() {
+  const fallback = createPricingSettings();
+
+  if (typeof window === 'undefined') {
+    return fallback;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.pricingSettings);
+    if (!raw) return fallback;
+
+    const parsed = JSON.parse(raw);
+    if (!isPlainObject(parsed)) return fallback;
+
+    return createPricingSettings(parsed);
+  } catch {
+    return fallback;
+  }
+}
+
+export function savePricingSettings(settings) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(STORAGE_KEYS.pricingSettings, JSON.stringify(createPricingSettings(settings)));
+}
+
+export function resetPricingSettings() {
+  const fallback = createPricingSettings();
+
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem(STORAGE_KEYS.pricingSettings);
+  }
+
+  return fallback;
+}
+
+export function loadPricingCatalog() {
+  const fallback = createPricingCatalog();
+
+  if (typeof window === 'undefined') {
+    return fallback;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.pricingCatalog);
+    if (!raw) return fallback;
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return fallback;
+
+    return createPricingCatalog(parsed);
+  } catch {
+    return fallback;
+  }
+}
+
+export function savePricingCatalog(catalog) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(STORAGE_KEYS.pricingCatalog, JSON.stringify(createPricingCatalog(catalog)));
+}
+
+export function resetPricingCatalog() {
+  const fallback = createPricingCatalog();
+
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem(STORAGE_KEYS.pricingCatalog);
+  }
+
+  return fallback;
 }

@@ -1,24 +1,121 @@
 import { useEffect, useRef, useState } from 'react';
 import { EVOLUTION, HISTORY, STORAGE_KEYS, TREATMENTS } from './data';
-import { FloatingNewPatientButton, HomeDashboard, PatientsDirectoryView, Sidebar, TopbarInner, PatientHeader, PatientsSheet, Odontogram, ToothPanel } from './app';
-import { Tabs, Antecedentes, Motivo, Evolucion, Presupuesto, Documentos, Historial, TreatmentsTable, NextAppointments } from './tabs';
+import { FinanceDashboard, FloatingNewPatientButton, HomeDashboard, PatientsDirectoryView, Sidebar, TopbarInner, PatientHeader, PatientsSheet, Odontogram, ToothPanel } from './app';
+import { Tabs, Antecedentes, Motivo, Evolucion, Presupuesto, Documentos, Historial, AgendaClinica, CobrosAbonos, TreatmentsTable, NextAppointments } from './tabs';
 import { updateToothSurfaceState } from './odontogram';
-import { buildClinicalRecordFromMocks, createClinicalPatientRecord, createDiagnosis, createDocumentEntry, createEvolutionNote, createHistoryEntry, createTreatmentEntry, TREATMENT_STATUS, resolveMotivoDiagnosticoRecord } from './clinical-model';
+import {
+  buildClinicalRecordFromMocks,
+  createAppointmentEntry,
+  createClinicalPatientRecord,
+  createDiagnosis,
+  createDocumentEntry,
+  createEvolutionNote,
+  createHistoryEntry,
+  createPaymentEntry,
+  createPricingBudgetEntry,
+  createTreatmentEntry,
+  syncTreatmentPaidWithPayments,
+  TREATMENT_STATUS,
+  resolveMotivoDiagnosticoRecord,
+} from './clinical-model';
 import { createEmptyPatient, createPatient, getPatientDisplayName, isEmptyDraftPatient, normalizeRut, validatePatientDraft } from './patients';
 import {
+  buildFinanceDashboard,
+  buildAcceptedSnapshotsReportRows,
+  buildFinanceSummaryReportRows,
+  DEFAULT_PRICING_TREATMENTS,
+  calculatePricingResult,
+  createEmptyPricingTreatment,
+  createPricingCatalog,
+  exportAcceptedSnapshotsCsv,
+  exportFinanceSummaryCsv,
+  findPricingTreatmentForProcedure,
+} from './pricing';
+import {
   loadActivePatientId,
+  loadPricingCatalog,
   loadClinicalRecords,
   loadPatientDirectory,
+  loadPricingSettings,
   loadTeethState,
   loadUiContext,
   saveClinicalRecords,
   resetPatientDirectory,
+  resetPricingCatalog,
+  resetPricingSettings,
   resetTeethState,
   resetUiContext,
   saveActivePatientId,
   savePatientDirectory,
+  savePricingCatalog,
+  savePricingSettings,
   saveUiContext,
 } from './storage';
+
+function formatShortDateLabel(date = new Date()) {
+  return new Intl.DateTimeFormat('es-CL', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
+}
+
+function parseVisitDate(value) {
+  const months = {
+    ene: 0,
+    enero: 0,
+    feb: 1,
+    febrero: 1,
+    mar: 2,
+    marzo: 2,
+    abr: 3,
+    abril: 3,
+    may: 4,
+    mayo: 4,
+    jun: 5,
+    junio: 5,
+    jul: 6,
+    julio: 6,
+    ago: 7,
+    agosto: 7,
+    sep: 8,
+    sept: 8,
+    septiembre: 8,
+    oct: 9,
+    octubre: 9,
+    nov: 10,
+    noviembre: 10,
+    dic: 11,
+    diciembre: 11,
+  };
+  const match = (value ?? '')
+    .toString()
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .match(/^(\d{1,2})\s+([a-z]+)\s+(\d{4})$/);
+  if (!match) return null;
+  const day = Number(match[1]);
+  const month = months[match[2]];
+  const year = Number(match[3]);
+  if (!Number.isInteger(day) || !Number.isInteger(year) || month == null) return null;
+  const date = new Date(year, month, day);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getNextVisitFromAppointments(appointments = []) {
+  const next = appointments
+    .filter((appointment) => appointment?.status !== 'cancelled' && appointment?.dateLabel && appointment.dateLabel !== 'Sin cita')
+    .map((appointment) => ({
+      ...appointment,
+      visitDate: parseVisitDate(appointment.dateLabel),
+    }))
+    .filter((appointment) => appointment.visitDate)
+    .sort((a, b) => a.visitDate.getTime() - b.visitDate.getTime())[0];
+
+  return next?.dateLabel ?? 'Sin cita';
+}
 
 export default function App() {
   const defaultPatientContext = {
@@ -38,6 +135,14 @@ export default function App() {
   const hasLegacyTeethState =
     typeof window !== 'undefined' && window.localStorage.getItem(STORAGE_KEYS.odontogram) != null;
   const [activeView, setActiveView] = useState('home');
+  const [financeFilters, setFinanceFilters] = useState({
+    range: 'all',
+    status: 'all',
+    patientId: 'all',
+    treatmentId: 'all',
+  });
+  const [pricingSettings, setPricingSettings] = useState(() => loadPricingSettings());
+  const [pricingCatalog, setPricingCatalog] = useState(() => loadPricingCatalog());
   const [teeth, setTeeth] = useState(() =>
     hasLegacyTeethState ? loadTeethState() : initialPatientRecord?.odontogram ?? loadTeethState()
   );
@@ -63,6 +168,8 @@ export default function App() {
   const didMountUiRef = useRef(false);
   const didMountPatientsRef = useRef(false);
   const didMountClinicalRef = useRef(false);
+  const didMountPricingRef = useRef(false);
+  const didMountPricingCatalogRef = useRef(false);
   const didMigrateLegacyTeethRef = useRef(false);
   const didHydratePatientOdontogramRef = useRef(false);
   const skipNextOdontogramPersistRef = useRef(false);
@@ -345,6 +452,171 @@ export default function App() {
     }));
   };
 
+  const handleAppointmentChange = (appointmentId, field, value) => {
+    if (!activePatient) return;
+    const activeRecord = createClinicalPatientRecord(clinicalRecords[activePatient.id], activePatient);
+    const nextAppointments = activeRecord.appointments.map((appointment) =>
+      appointment.id === appointmentId
+        ? {
+            ...appointment,
+            [field]: value,
+          }
+        : appointment
+    );
+    const nextVisit = getNextVisitFromAppointments(nextAppointments);
+
+    setClinicalSaveState('dirty');
+    setClinicalRecords((current) => ({
+      ...current,
+      [activePatient.id]: {
+        ...activeRecord,
+        appointments: nextAppointments,
+      },
+    }));
+    setPatients((current) =>
+      current.map((patient) =>
+        patient.id === activePatient.id
+          ? { ...patient, nextVisit }
+          : patient
+      )
+    );
+  };
+
+  const handleAddAppointment = () => {
+    if (!activePatient) return;
+    const activeRecord = createClinicalPatientRecord(clinicalRecords[activePatient.id], activePatient);
+    const nextAppointments = [
+      createAppointmentEntry(
+        {
+          patientId: activePatient.id,
+          dateLabel: formatShortDateLabel(new Date()),
+          timeLabel: '10:00',
+          reason: 'Seguimiento clinico',
+          clinician: 'Dra. responsable',
+          status: 'scheduled',
+          notes: '',
+          source: 'manual',
+        },
+        activeRecord.appointments.length
+      ),
+      ...activeRecord.appointments,
+    ];
+    const nextVisit = getNextVisitFromAppointments(nextAppointments);
+
+    setClinicalSaveState('dirty');
+    setClinicalRecords((current) => ({
+      ...current,
+      [activePatient.id]: {
+        ...activeRecord,
+        appointments: nextAppointments,
+      },
+    }));
+    setPatients((current) =>
+      current.map((patient) =>
+        patient.id === activePatient.id
+          ? { ...patient, nextVisit }
+          : patient
+      )
+    );
+  };
+
+  const handleRemoveAppointment = (appointmentId) => {
+    if (!activePatient) return;
+    const activeRecord = createClinicalPatientRecord(clinicalRecords[activePatient.id], activePatient);
+    const nextAppointments = activeRecord.appointments.filter((appointment) => appointment.id !== appointmentId);
+    const nextVisit = getNextVisitFromAppointments(nextAppointments);
+
+    setClinicalSaveState('dirty');
+    setClinicalRecords((current) => ({
+      ...current,
+      [activePatient.id]: {
+        ...activeRecord,
+        appointments: nextAppointments,
+      },
+    }));
+    setPatients((current) =>
+      current.map((patient) =>
+        patient.id === activePatient.id
+          ? { ...patient, nextVisit }
+          : patient
+      )
+    );
+  };
+
+  const handlePaymentChange = (paymentId, field, value) => {
+    if (!activePatient) return;
+    const activeRecord = createClinicalPatientRecord(clinicalRecords[activePatient.id], activePatient);
+    const nextPayments = activeRecord.paymentEntries.map((payment) =>
+      payment.id === paymentId
+        ? {
+            ...payment,
+            [field]: field === 'amount' ? Number(value) || 0 : value,
+          }
+        : payment
+    );
+    const nextTreatments = syncTreatmentPaidWithPayments(activeRecord.treatments, nextPayments);
+
+    setClinicalSaveState('dirty');
+    setClinicalRecords((current) => ({
+      ...current,
+      [activePatient.id]: {
+        ...activeRecord,
+        paymentEntries: nextPayments,
+        treatments: nextTreatments,
+      },
+    }));
+  };
+
+  const handleAddPayment = () => {
+    if (!activePatient) return;
+    const activeRecord = createClinicalPatientRecord(clinicalRecords[activePatient.id], activePatient);
+    const nextPayments = [
+      createPaymentEntry(
+        {
+          patientId: activePatient.id,
+          treatmentId: activeRecord.treatments[0]?.id ?? null,
+          dateLabel: formatShortDateLabel(new Date()),
+          amount: 0,
+          method: 'cash',
+          concept: activeRecord.treatments[0]?.procedure ? `Abono ${activeRecord.treatments[0].procedure}` : 'Nuevo abono',
+          notes: '',
+          status: 'received',
+          source: 'manual',
+        },
+        activeRecord.paymentEntries.length
+      ),
+      ...activeRecord.paymentEntries,
+    ];
+    const nextTreatments = syncTreatmentPaidWithPayments(activeRecord.treatments, nextPayments);
+
+    setClinicalSaveState('dirty');
+    setClinicalRecords((current) => ({
+      ...current,
+      [activePatient.id]: {
+        ...activeRecord,
+        paymentEntries: nextPayments,
+        treatments: nextTreatments,
+      },
+    }));
+  };
+
+  const handleRemovePayment = (paymentId) => {
+    if (!activePatient) return;
+    const activeRecord = createClinicalPatientRecord(clinicalRecords[activePatient.id], activePatient);
+    const nextPayments = activeRecord.paymentEntries.filter((payment) => payment.id !== paymentId);
+    const nextTreatments = syncTreatmentPaidWithPayments(activeRecord.treatments, nextPayments);
+
+    setClinicalSaveState('dirty');
+    setClinicalRecords((current) => ({
+      ...current,
+      [activePatient.id]: {
+        ...activeRecord,
+        paymentEntries: nextPayments,
+        treatments: nextTreatments,
+      },
+    }));
+  };
+
   const handleBudgetFieldChange = (field, value) => {
     updateActiveClinicalRecord((activeRecord) => ({
       ...activeRecord,
@@ -360,7 +632,7 @@ export default function App() {
       ...activeRecord,
       treatments: activeRecord.treatments.map((treatment) => {
         if (treatment.id !== treatmentId) return treatment;
-        const numericFields = ['toothFdi', 'cost', 'paid', 'coveragePercent'];
+        const numericFields = ['toothFdi', 'cost', 'coveragePercent'];
         return {
           ...treatment,
           [field]: numericFields.includes(field) ? Number(value) || 0 : value,
@@ -401,6 +673,7 @@ export default function App() {
     updateActiveClinicalRecord((activeRecord) => ({
       ...activeRecord,
       treatments: activeRecord.treatments.filter((treatment) => treatment.id !== treatmentId),
+      paymentEntries: activeRecord.paymentEntries.filter((payment) => payment.treatmentId !== treatmentId),
     }));
   };
 
@@ -439,6 +712,225 @@ export default function App() {
     updateActiveClinicalRecord((activeRecord) => ({
       ...activeRecord,
       documents: activeRecord.documents.filter((document) => document.id !== documentId),
+    }));
+  };
+
+  const handlePricingSettingChange = (field, value) => {
+    setPricingSettings((current) => ({
+      ...current,
+      [field]: Number(value) || 0,
+    }));
+  };
+
+  const handleResetPricingSettings = () => {
+    setPricingSettings(resetPricingSettings());
+  };
+
+  const handlePricingCatalogChange = (treatmentId, field, value) => {
+    setPricingCatalog((current) =>
+      current.map((treatment) => {
+        if (treatment.id !== treatmentId) return treatment;
+
+        const numericFields = [
+          'basePrice',
+          'durationHours',
+          'suppliesCost',
+          'marketingCost',
+          'adminCost',
+          'transportCost',
+          'paymentFeePercent',
+          'reservePercent',
+          'minPrice',
+          'healthyPrice',
+          'idealPrice',
+          'maxRecommendedDiscountPercent',
+          'defaultLaborCost',
+          'defaultLaborPercent',
+        ];
+
+        const updated = {
+          ...treatment,
+          pricingSource: 'custom',
+          [field]:
+            field === 'active'
+              ? Boolean(value)
+              : numericFields.includes(field)
+                ? Number(value) || 0
+                : value,
+        };
+
+        return createPricingCatalog([updated])[0];
+      })
+    );
+  };
+
+  const handleAddPricingTreatment = () => {
+    setPricingCatalog((current) => [
+      ...current,
+      createEmptyPricingTreatment(current.length),
+    ]);
+  };
+
+  const handleResetPricingTreatment = (treatmentId) => {
+    setPricingCatalog((current) =>
+      current.map((treatment, index) => {
+        if (treatment.id !== treatmentId) return treatment;
+
+        const defaultTreatment = DEFAULT_PRICING_TREATMENTS.find((item) => item.id === treatmentId);
+        if (defaultTreatment) {
+          return createPricingCatalog([defaultTreatment])[0];
+        }
+
+        return createEmptyPricingTreatment(index);
+      })
+    );
+  };
+
+  const handleRemovePricingTreatment = (treatmentId) => {
+    setPricingCatalog((current) => current.filter((treatment) => treatment.id !== treatmentId));
+  };
+
+  const handleResetPricingCatalog = () => {
+    setPricingCatalog(resetPricingCatalog());
+  };
+
+  const handleSavePricingSnapshot = () => {
+    if (!activePatient) return;
+
+    updateActiveClinicalRecord((activeRecord) => {
+      const selectedReferenceId = activeRecord.budget?.pricingReferenceTreatmentId ?? '';
+      const manualSourceTreatment =
+        selectedReferenceId && activeRecord.treatments.find((item) => item.id === selectedReferenceId);
+      const sourceTreatment =
+        manualSourceTreatment ??
+        activeRecord.treatments.find(
+          (item) => item.procedure && item.cost > 0 && findPricingTreatmentForProcedure(item.procedure, pricingCatalog)
+        ) ??
+        activeRecord.treatments.find(
+          (item) => item.procedure && findPricingTreatmentForProcedure(item.procedure, pricingCatalog)
+        ) ??
+        null;
+
+      if (!sourceTreatment) {
+        return activeRecord;
+      }
+
+      const catalogTreatment = findPricingTreatmentForProcedure(sourceTreatment.procedure, pricingCatalog);
+      if (!catalogTreatment) {
+        return activeRecord;
+      }
+
+      const calculationSnapshot = calculatePricingResult({
+        treatment: catalogTreatment,
+        settings: pricingSettings,
+        input: {
+          customPrice: sourceTreatment.cost > 0 ? sourceTreatment.cost : catalogTreatment.basePrice,
+          paymentMethod: 'card',
+          applyPaymentFee: true,
+          applyTax: true,
+          applyReserve: true,
+          laborCostMode: 'fixed',
+          laborCostValue: catalogTreatment.defaultLaborCost,
+        },
+      });
+
+      const now = new Date().toISOString();
+
+      return {
+        ...activeRecord,
+        pricingBudgets: [
+          createPricingBudgetEntry(
+            {
+              patientId: activePatient.id,
+              treatmentId: catalogTreatment.id,
+              treatmentNameSnapshot: catalogTreatment.name,
+              status: 'draft',
+              calculationSnapshot,
+              notes: sourceTreatment.procedure ?? '',
+              createdAt: now,
+              updatedAt: now,
+            },
+            activeRecord.pricingBudgets.length
+          ),
+          ...activeRecord.pricingBudgets,
+        ],
+      };
+    });
+  };
+
+  const handleAcceptPricingSnapshot = (snapshotId) => {
+    handleSetPricingSnapshotStatus(snapshotId, 'accepted');
+  };
+
+  const handleSetPricingSnapshotStatus = (snapshotId, nextStatus) => {
+    updateActiveClinicalRecord((activeRecord) => {
+      const now = new Date().toISOString();
+      return {
+        ...activeRecord,
+        pricingBudgets: activeRecord.pricingBudgets.map((budget) => {
+          if (budget.id !== snapshotId) return budget;
+
+          const nextBudget = {
+            ...budget,
+            status: nextStatus,
+            updatedAt: now,
+          };
+
+          if (nextStatus === 'sent') nextBudget.sentAt = now;
+          if (nextStatus === 'accepted') nextBudget.acceptedAt = now;
+          if (nextStatus === 'rejected') nextBudget.rejectedAt = now;
+          if (nextStatus === 'expired') nextBudget.expiredAt = now;
+
+          return nextBudget;
+        }),
+      };
+    });
+  };
+
+  const downloadCsv = (filename, content) => {
+    if (typeof window === 'undefined') return;
+
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = window.document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    window.document.body.appendChild(link);
+    link.click();
+    window.document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleExportAcceptedSnapshots = () => {
+    const csv = exportAcceptedSnapshotsCsv(financeDashboard);
+    downloadCsv('dentcool-snapshots-accepted.csv', csv);
+  };
+
+  const handleExportFinanceSummary = () => {
+    const csv = exportFinanceSummaryCsv(financeDashboard);
+    downloadCsv('dentcool-finance-summary.csv', csv);
+  };
+
+  const handleExportFinanceWorkbook = () => {
+    import('xlsx').then((XLSX) => {
+      const snapshotsRows = buildAcceptedSnapshotsReportRows(financeDashboard);
+      const summaryRows = buildFinanceSummaryReportRows(financeDashboard);
+
+      const workbook = XLSX.utils.book_new();
+      const snapshotsSheet = XLSX.utils.json_to_sheet(snapshotsRows);
+      const summarySheet = XLSX.utils.json_to_sheet(summaryRows);
+
+      XLSX.utils.book_append_sheet(workbook, snapshotsSheet, 'SnapshotsAccepted');
+      XLSX.utils.book_append_sheet(workbook, summarySheet, 'FinanceSummary');
+
+      XLSX.writeFile(workbook, 'dentcool-finance-report.xlsx');
+    });
+  };
+
+  const handleFinanceFilterChange = (field, value) => {
+    setFinanceFilters((current) => ({
+      ...current,
+      [field]: value,
     }));
   };
 
@@ -499,6 +991,22 @@ export default function App() {
     setClinicalSaveState('saved');
     setLastClinicalSavedAt(new Date());
   }, [clinicalRecords]);
+
+  useEffect(() => {
+    if (!didMountPricingRef.current) {
+      didMountPricingRef.current = true;
+      return;
+    }
+    savePricingSettings(pricingSettings);
+  }, [pricingSettings]);
+
+  useEffect(() => {
+    if (!didMountPricingCatalogRef.current) {
+      didMountPricingCatalogRef.current = true;
+      return;
+    }
+    savePricingCatalog(pricingCatalog);
+  }, [pricingCatalog]);
 
   useEffect(() => {
     if (!activePatientId) return;
@@ -582,6 +1090,8 @@ export default function App() {
     tx: 0,
     docs: 0,
     hist: 0,
+    agenda: 0,
+    cobros: 0,
   };
 
   const clinicalData = buildClinicalRecordFromMocks({
@@ -609,6 +1119,9 @@ export default function App() {
   counts.tx = record.treatments.length;
   counts.docs = record.documents.length;
   counts.hist = record.historyEntries.length;
+  counts.agenda = record.appointments.length;
+  counts.cobros = record.paymentEntries.length;
+  const financeDashboard = buildFinanceDashboard(clinicalRecords, patients, pricingSettings, financeFilters);
 
   const renderSheetClinicalSection = (sectionId) => {
     if (sectionId === 'motivo') {
@@ -645,12 +1158,25 @@ export default function App() {
         <Presupuesto
           budget={record.budget}
           treatments={record.treatments}
+          pricingSettings={pricingSettings}
+          pricingCatalog={pricingCatalog}
+          pricingBudgets={record.pricingBudgets}
           saveState={clinicalSaveState}
           lastSavedAt={lastClinicalSavedAt}
           onBudgetFieldChange={handleBudgetFieldChange}
           onTreatmentChange={handleTreatmentChange}
           onAddTreatment={handleAddTreatment}
           onRemoveTreatment={handleRemoveTreatment}
+          onPricingSettingChange={handlePricingSettingChange}
+          onResetPricingSettings={handleResetPricingSettings}
+          onPricingCatalogChange={handlePricingCatalogChange}
+          onAddPricingTreatment={handleAddPricingTreatment}
+          onResetPricingTreatment={handleResetPricingTreatment}
+          onRemovePricingTreatment={handleRemovePricingTreatment}
+          onResetPricingCatalog={handleResetPricingCatalog}
+          onSavePricingSnapshot={handleSavePricingSnapshot}
+          onAcceptPricingSnapshot={handleAcceptPricingSnapshot}
+          onSetPricingSnapshotStatus={handleSetPricingSnapshotStatus}
           onOpenSection={handleOpenPatientSheet}
         />
       );
@@ -679,6 +1205,35 @@ export default function App() {
           onEntryChange={handleHistoryEntryChange}
           onAddEntry={handleAddHistoryEntry}
           onRemoveEntry={handleRemoveHistoryEntry}
+          onOpenSection={handleOpenPatientSheet}
+        />
+      );
+    }
+
+    if (sectionId === 'agenda') {
+      return (
+        <AgendaClinica
+          appointments={record.appointments}
+          saveState={clinicalSaveState}
+          lastSavedAt={lastClinicalSavedAt}
+          onAppointmentChange={handleAppointmentChange}
+          onAddAppointment={handleAddAppointment}
+          onRemoveAppointment={handleRemoveAppointment}
+          onOpenSection={handleOpenPatientSheet}
+        />
+      );
+    }
+
+    if (sectionId === 'cobros') {
+      return (
+        <CobrosAbonos
+          payments={record.paymentEntries}
+          treatments={record.treatments}
+          saveState={clinicalSaveState}
+          lastSavedAt={lastClinicalSavedAt}
+          onPaymentChange={handlePaymentChange}
+          onAddPayment={handleAddPayment}
+          onRemovePayment={handleRemovePayment}
           onOpenSection={handleOpenPatientSheet}
         />
       );
@@ -730,6 +1285,17 @@ export default function App() {
                 onClose={handleClosePatientSheet}
               />
             </>
+          ) : activeView === 'finance' ? (
+            <FinanceDashboard
+              financeDashboard={financeDashboard}
+              pricingSettings={pricingSettings}
+              onPricingSettingChange={handlePricingSettingChange}
+              onResetPricingSettings={handleResetPricingSettings}
+              onExportAcceptedSnapshots={handleExportAcceptedSnapshots}
+              onExportFinanceSummary={handleExportFinanceSummary}
+              onExportFinanceWorkbook={handleExportFinanceWorkbook}
+              onFinanceFilterChange={handleFinanceFilterChange}
+            />
           ) : (
             <>
               <FloatingNewPatientButton onClick={handleCreatePatient} />
@@ -797,12 +1363,25 @@ export default function App() {
                         <Presupuesto
                           budget={record.budget}
                           treatments={record.treatments}
+                          pricingSettings={pricingSettings}
+                          pricingCatalog={pricingCatalog}
+                          pricingBudgets={record.pricingBudgets}
                           saveState={clinicalSaveState}
                           lastSavedAt={lastClinicalSavedAt}
                           onBudgetFieldChange={handleBudgetFieldChange}
                           onTreatmentChange={handleTreatmentChange}
                           onAddTreatment={handleAddTreatment}
                           onRemoveTreatment={handleRemoveTreatment}
+                          onPricingSettingChange={handlePricingSettingChange}
+                          onResetPricingSettings={handleResetPricingSettings}
+                          onPricingCatalogChange={handlePricingCatalogChange}
+                          onAddPricingTreatment={handleAddPricingTreatment}
+                          onResetPricingTreatment={handleResetPricingTreatment}
+                          onRemovePricingTreatment={handleRemovePricingTreatment}
+                          onResetPricingCatalog={handleResetPricingCatalog}
+                          onSavePricingSnapshot={handleSavePricingSnapshot}
+                          onAcceptPricingSnapshot={handleAcceptPricingSnapshot}
+                          onSetPricingSnapshotStatus={handleSetPricingSnapshotStatus}
                           onOpenSection={handleOpenPatientSheet}
                           mirror
                         />

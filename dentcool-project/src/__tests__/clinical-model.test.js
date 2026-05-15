@@ -77,6 +77,21 @@ describe('clinical model', () => {
           coverageLabel: 'Seguro Demo',
           dueDateLabel: '15-jun',
         },
+        pricingBudgets: [
+          {
+            treatmentId: 'limpieza-vip',
+            treatmentNameSnapshot: 'Limpieza VIP',
+            status: 'accepted',
+            calculationSnapshot: {
+              finalPrice: 60000,
+              availableBeforeLabor: 21050,
+              clinicProfit: 3050,
+            },
+            createdAt: '2026-05-14T10:00:00.000Z',
+            updatedAt: '2026-05-14T10:00:00.000Z',
+            acceptedAt: '2026-05-14T10:05:00.000Z',
+          },
+        ],
         treatments: [
           {
             toothFdi: 16,
@@ -89,6 +104,27 @@ describe('clinical model', () => {
             cost: 45000,
             paid: 10000,
             coveragePercent: 10,
+          },
+        ],
+        appointments: [
+          {
+            dateLabel: '18 may 2026',
+            timeLabel: '09:30',
+            reason: 'Control',
+            clinician: 'Dra. Test',
+            status: 'confirmed',
+            notes: 'Confirmada por telefono',
+          },
+        ],
+        paymentEntries: [
+          {
+            treatmentId: 'tx-1',
+            dateLabel: '12-05-2026',
+            amount: 10000,
+            method: 'transfer',
+            concept: 'Abono inicial',
+            notes: 'Migrado a entidad de cobros',
+            status: 'received',
           },
         ],
         documents: [
@@ -111,8 +147,16 @@ describe('clinical model', () => {
     expect(result.record.historyEntries).toHaveLength(1);
     expect(result.record.historyEntries[0].category).toBe('control');
     expect(result.record.budget.planTitle).toBe('Plan restaurador acotado');
+    expect(result.record.pricingBudgets).toHaveLength(1);
+    expect(result.record.pricingBudgets[0].status).toBe('accepted');
+    expect(result.record.pricingBudgets[0].calculationSnapshot.finalPrice).toBe(60000);
     expect(result.record.treatments).toHaveLength(1);
     expect(result.record.treatments[0].cost).toBe(45000);
+    expect(result.record.treatments[0].paid).toBe(10000);
+    expect(result.record.appointments).toHaveLength(1);
+    expect(result.record.appointments[0].status).toBe('confirmed');
+    expect(result.record.paymentEntries).toHaveLength(1);
+    expect(result.record.paymentEntries[0].amount).toBe(10000);
     expect(result.record.documents).toHaveLength(1);
     expect(result.record.documents[0].kind).toBe('consentimiento');
   });

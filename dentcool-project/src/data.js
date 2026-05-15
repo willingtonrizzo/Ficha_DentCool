@@ -209,4 +209,6 @@ export const STORAGE_KEYS = {
   patients: 'ficha-dentcool.patients.v1',
   activePatientId: 'ficha-dentcool.active-patient.v1',
   clinicalRecords: 'ficha-dentcool.clinical-records.v1',
+  pricingSettings: 'ficha-dentcool.pricing-settings.v1',
+  pricingCatalog: 'ficha-dentcool.pricing-catalog.v1',
 };
