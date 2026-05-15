@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { EVOLUTION, HISTORY, STORAGE_KEYS, TREATMENTS } from './data';
 import { FinanceDashboard, FloatingNewPatientButton, HomeDashboard, PatientsDirectoryView, Sidebar, TopbarInner, PatientHeader, PatientsSheet, Odontogram, ToothPanel } from './app';
-import { Tabs, Antecedentes, Motivo, Evolucion, Presupuesto, Documentos, Historial, AgendaClinica, CobrosAbonos, TreatmentsTable, NextAppointments } from './tabs';
+import { Tabs, Antecedentes, Motivo, Evolucion, Presupuesto, Insumos, Documentos, Historial, AgendaClinica, CobrosAbonos, TreatmentsTable, NextAppointments } from './tabs';
 import { updateToothSurfaceState } from './odontogram';
 import {
   buildClinicalRecordFromMocks,
@@ -1384,6 +1384,17 @@ export default function App() {
                           onSetPricingSnapshotStatus={handleSetPricingSnapshotStatus}
                           onOpenSection={handleOpenPatientSheet}
                           mirror
+                        />
+                      )}
+                      {activeTab === 'insumos' && (
+                        <Insumos
+                          patient={visibleActivePatient}
+                          budget={record.budget}
+                          treatments={record.treatments}
+                          appointments={record.appointments}
+                          pricingCatalog={pricingCatalog}
+                          onBudgetFieldChange={handleBudgetFieldChange}
+                          onOpenSection={handleOpenPatientSheet}
                         />
                       )}
                       {activeTab === 'documentos' && (

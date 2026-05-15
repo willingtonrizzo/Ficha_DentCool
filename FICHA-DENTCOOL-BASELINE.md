@@ -61,6 +61,9 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - La ayuda contextual de `Gestion interna` ya abre explicacion clicable en la tarjeta.
 - Los valores canonicos del catalogo base ya no deben arrastrarse entre tratamientos.
 - El bloque de pricing y finanzas ya fue verificado otra vez con `npm test` y `npm run build`.
+- El MVP chico de insumos ya tiene motor puro, seeds locales, storage local y tests automatizados.
+- El modulo de insumos ya puede entregar un `supplySnapshotId` al motor financiero como puente minimo.
+- El modulo de insumos ya tiene UI minima integrada en la ficha para agregar materiales nuevos y mostrar el catalogo solo bajo demanda.
 - Existen pruebas automatizadas base del odontograma y de persistencia local.
 - Existe un modelo clinico base y un esquema inicial de `SQLite`.
 
@@ -146,6 +149,7 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - Si se sigue usando `nextVisit` como agenda y `paid` incrustado en tratamientos como pseudo-cobro por demasiado tiempo, despues costara separar agenda real y libro de caja.
 - Si no se revisa el `md` financiero y se documentan las decisiones tomadas y por que, el siguiente bloque puede repetir criterios ya resueltos.
 - Si se vuelve a mezclar valores manuales entre tratamientos del catalogo, los reportes financieros pierden confianza operativa.
+- Si se intenta cerrar UI de insumos antes de validar motor y persistencia, se corre el riesgo de mezclar una capa visual con una base que todavia esta madurando.
 
 ## Siguiente paso recomendado
 

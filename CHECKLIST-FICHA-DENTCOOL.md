@@ -58,9 +58,15 @@
 - [x] Separar entidad formal de citas
 - [x] Separar entidad formal de cobros y abonos
 - [x] Revisar `dentcool_pricing_codex_skill.md` y dejar registradas las decisiones financieras y su motivo
+- [x] Iniciar el MVP chico de insumos con motor puro, storage local y tests
+- [x] Conectar el puente minimo de insumos hacia pricing con `supplySnapshotId`
+- [x] Agregar UI minima de alta de materiales dentro de la ficha
+- [x] Permitir mostrar el catalogo local de insumos bajo demanda
+- [x] Agregar ayudas contextuales para cantidad por unidad y origen del costo unitario
 
 ## En curso / siguiente
 
+- [ ] Refinar el flujo real de uso del modulo de insumos con la doctora
 - [ ] Decidir e implementar primera integracion real de `SQLite`
 - [ ] Profundizar reportes financieros con datos mas operativos
 - [ ] Refinar componentes UX/UI uno por uno
@@ -68,6 +74,7 @@
 - [ ] Preparar deploy demo en `Vercel`
 - [ ] Preparar deploy demo en `Render`
 - [ ] Subir el estado actual para prueba de la doctora
+- [x] Push a GitHub realizado para disparar despliegue en Render si esta conectado a `main`
 
 ## Mas adelante
 

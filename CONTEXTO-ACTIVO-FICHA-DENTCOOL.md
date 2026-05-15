@@ -21,6 +21,7 @@ Ruta activa del proyecto:
 - dejar documentado el estado actual antes de subir para prueba de la doctora
 - revisar `dentcool_pricing_codex_skill.md` y registrar ahi las decisiones tomadas y por que
 - mantener documentacion viva para retomar sesiones sin perder contexto
+- GitHub queda como fuente de despliegue para Render si el servicio esta conectado a `main` con auto-deploy
 
 ## Lo ultimo verificado
 
@@ -62,6 +63,11 @@ Ruta activa del proyecto:
 - los campos `Gestion interna` y otros costos del catalogo ya tienen ayuda contextual clicable
 - los tratamientos de pricing ya cargan valores base canonicos y no deben arrastrar montos cruzados entre cards
 - la capa nueva ya paso por `npm test` y `npm run build`
+- se inicio el MVP chico de insumos con motor puro, seeds, storage local y tests
+- el modulo de insumos ya tiene puente minimo hacia pricing con `supplySnapshotId`
+- el modulo de insumos ya paso `npm test` y `npm run build`
+- el tab `Insumos` ya permite crear nuevos materiales y mostrar el catalogo local solo cuando se solicita
+- el tab `Insumos` ya muestra ayuda contextual para cantidad por unidad y origen del costo unitario
 
 ## Decision de producto vigente
 
@@ -95,6 +101,8 @@ Razon:
 - seguir usando `nextVisit` y `paid` como puente por mucho tiempo hara mas costosa la separacion de agenda y caja
 - la separacion existe en modelo y UI, pero el puente legado sigue activo para compatibilidad
 - el bloque visual del catalogo de pricing ya quedo estabilizado y no debe volver a mezclar valores entre tratamientos
+- el modulo de insumos ya tiene UI minima de alta de materiales y una lista opcional de catalogo; falta seguir refinando el flujo real de uso
+- el despliegue demo conectado a GitHub debe refrescarse desde el push a `main` si Render esta apuntando a ese repo
 
 ## Instruccion de retoma
 

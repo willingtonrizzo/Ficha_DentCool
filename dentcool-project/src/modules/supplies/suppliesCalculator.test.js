@@ -1,0 +1,114 @@
+import { describe, expect, it } from 'vitest';
+import {
+  DEFAULT_SUPPLY_CATALOG,
+  DEFAULT_SUPPLY_RECIPES,
+} from './suppliesSeeds';
+import {
+  applyPurchaseToStock,
+  calculateAmortizedCost,
+  calculatePatientSupplyUsageCost,
+  calculateRecipeCost,
+  calculateSterilizationCostPerPack,
+  calculateUnitCost,
+  calculateWeightedAverageCost,
+  checkAgendaSupplyNeeds,
+  checkLowStock,
+  createSupplySnapshot,
+} from './suppliesCalculator';
+
+describe('supplies calculator', () => {
+  it('calculates unit cost from a purchase', () => {
+    expect(calculateUnitCost(3000, 100)).toBe(30);
+  });
+
+  it('calculates weighted average cost after a new purchase', () => {
+    expect(calculateWeightedAverageCost(50, 30, 100, 40)).toBeCloseTo(36.67, 2);
+  });
+
+  it('calculates amortized cost by estimated uses', () => {
+    expect(calculateAmortizedCost(30000, 60)).toBe(500);
+  });
+
+  it('calculates sterilization cost per pack', () => {
+    expect(calculateSterilizationCostPerPack(12000, 10)).toBe(1200);
+  });
+
+  it('calculates recipe cost from catalog items', () => {
+    const recipe = DEFAULT_SUPPLY_RECIPES.find((item) => item.id === 'recipe_limpieza_vip');
+    const result = calculateRecipeCost(recipe, DEFAULT_SUPPLY_CATALOG);
+
+    expect(result.totalCost).toBe(4910);
+    expect(result.lines).toHaveLength(9);
+    expect(result.missingItemIds).toHaveLength(0);
+  });
+
+  it('uses patient quantities when they differ from the recipe', () => {
+    const result = calculatePatientSupplyUsageCost(
+      [
+        { itemId: 'sup_gasa_001', quantity: 4 },
+        { itemId: 'sup_vaso_001', quantity: 1 },
+      ],
+      DEFAULT_SUPPLY_CATALOG
+    );
+
+    expect(result.totalCost).toBe(190);
+    expect(result.lines[0].quantity).toBe(4);
+  });
+
+  it('creates immutable supply snapshots', () => {
+    const usageItems = [{ itemId: 'sup_vaso_001', quantity: 2 }];
+    const snapshot = createSupplySnapshot({
+      patientId: 'patient-maria-soto',
+      treatmentId: 'evaluacion',
+      usageItems,
+      catalog: DEFAULT_SUPPLY_CATALOG,
+      notes: 'Demo',
+    });
+
+    usageItems[0].quantity = 99;
+
+    expect(snapshot.totalSupplyCost).toBe(60);
+    expect(snapshot.items[0].quantity).toBe(2);
+    expect(snapshot.patientId).toBe('patient-maria-soto');
+  });
+
+  it('flags low stock when the current stock reaches the minimum', () => {
+    expect(checkLowStock({ currentStock: 18, minimumStock: 20 })).toBe(true);
+    expect(checkLowStock({ currentStock: 21, minimumStock: 20 })).toBe(false);
+  });
+
+  it('calculates agenda supply needs from upcoming appointments', () => {
+    const result = checkAgendaSupplyNeeds(
+      [
+        { id: 'apt-1', treatmentId: 'limpieza-vip', status: 'confirmed', dateLabel: '18 may 2026' },
+        { id: 'apt-2', treatmentId: 'evaluacion', status: 'scheduled', dateLabel: '19 may 2026' },
+      ],
+      DEFAULT_SUPPLY_RECIPES,
+      DEFAULT_SUPPLY_CATALOG
+    );
+
+    const vaso = result.totals.find((line) => line.itemId === 'sup_vaso_001');
+    const pack = result.totals.find((line) => line.itemId === 'pack_examen_001');
+
+    expect(result.lines).toHaveLength(2);
+    expect(vaso.quantity).toBe(2);
+    expect(pack.quantity).toBe(2);
+  });
+
+  it('applies a purchase to stock using weighted average cost', () => {
+    const item = applyPurchaseToStock(
+      {
+        currentStock: 50,
+        unitCost: 30,
+        minimumStock: 20,
+      },
+      {
+        quantityPurchased: 100,
+        totalCost: 4000,
+      }
+    );
+
+    expect(item.currentStock).toBe(150);
+    expect(item.unitCost).toBeCloseTo(36.67, 2);
+  });
+});

@@ -576,6 +576,7 @@ export function calculatePricingResult({
 
   return {
     treatmentId: safeTreatment.id,
+    supplySnapshotId: input.supplySnapshotId ?? null,
     listPrice,
     discountAmount,
     finalPrice,

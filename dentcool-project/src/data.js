@@ -211,4 +211,11 @@ export const STORAGE_KEYS = {
   clinicalRecords: 'ficha-dentcool.clinical-records.v1',
   pricingSettings: 'ficha-dentcool.pricing-settings.v1',
   pricingCatalog: 'ficha-dentcool.pricing-catalog.v1',
+  suppliesCatalog: 'ficha-dentcool.supplies-catalog.v1',
+  suppliesRecipes: 'ficha-dentcool.supplies-recipes.v1',
+  suppliesSnapshots: 'ficha-dentcool.supplies-snapshots.v1',
+  suppliesCategories: 'ficha-dentcool.supplies-categories.v1',
+  suppliesUnits: 'ficha-dentcool.supplies-units.v1',
+  suppliesSuppliers: 'ficha-dentcool.supplies-suppliers.v1',
+  suppliesPurchases: 'ficha-dentcool.supplies-purchases.v1',
 };

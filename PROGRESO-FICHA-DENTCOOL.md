@@ -133,6 +133,16 @@ Hecho:
 - la ayuda contextual de `Gestion interna` ya abre explicacion clicable en la tarjeta
 - los valores canonicos del catalogo base ya no deben arrastrarse entre tratamientos
 - se volvio a verificar el bloque completo con `npm test` y `npm run build`
+- el commit quedo subido a GitHub y, si Render esta conectado a `main` con auto-deploy, debe refrescar con ese push
+- se inicio el `Bloque Funcionalidades - insumos MVP chico`
+- se agrego el motor puro de insumos en `src/modules/supplies/suppliesCalculator.js`
+- se agregaron seeds locales para catalogo, recetas, proveedores, unidades y compras
+- se agrego persistencia local de insumos en `src/modules/supplies/suppliesStorage.js`
+- se conecto el puente minimo hacia pricing con `supplySnapshotId`
+- se agregaron tests unitarios del motor y de la persistencia de insumos
+- el modulo de insumos ya pasa `npm test` y `npm run build`
+- el tab `Insumos` ahora se simplifico a alta de nuevos materiales con listado opcional del catalogo
+- el tab `Insumos` ahora explica la unidad de cantidad con ayudas `?` y muestra la base de compra del costo unitario
 
 ## Como se hizo este bloque
 
@@ -160,6 +170,8 @@ Hecho:
 
 - revisar el `md` financiero `dentcool_pricing_codex_skill.md`
 - documentar explicitamente las decisiones tomadas en ese `md` y por que se tomaron
+- cerrar el MVP chico de insumos con una UI minima mas adelante, sin mezclarlo aun con `SQLite`
+- dejar el editor de catalogo de insumos en la version actual: alta simple de materiales y lista opcional
 - preparar la siguiente capa de persistencia para que esto deje de vivir solo en `localStorage`
 - seguir afinando la sincronizacion entre agenda, cobros, tratamientos y resumen financiero
 - preparar la migracion de esta capa separada a `SQLite`
@@ -167,9 +179,10 @@ Hecho:
 ## Como se va a proceder
 
 1. revisar y cerrar el `md` financiero con las decisiones y su justificacion
-2. mantener el puente operativo solo mientras no rompa compatibilidad
-3. pasar la persistencia de este flujo a `SQLite` cuando el modelo ya este separado
-4. volver a verificar con tests despues de cada cambio relevante
+2. dejar el MVP chico de insumos en su corte actual: motor puro, tests, persistencia local y alta simple de materiales
+3. mantener el puente operativo solo mientras no rompa compatibilidad
+4. pasar la persistencia de este flujo a `SQLite` cuando el modelo ya este separado
+5. volver a verificar con tests despues de cada cambio relevante
 
 ## Estado actual del proyecto
 

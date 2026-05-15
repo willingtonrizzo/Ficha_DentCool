@@ -6,6 +6,18 @@ import {
   calculatePricingResult,
   findPricingTreatmentForProcedure,
 } from './pricing';
+import {
+  calculatePatientSupplyUsageCost,
+  checkAgendaSupplyNeeds,
+  checkLowStock,
+  createSupplySnapshot,
+} from './modules/supplies/suppliesCalculator';
+import {
+  loadSupplyState,
+  resetSupplyCatalog,
+  resetSupplyState,
+  saveSupplyState,
+} from './modules/supplies/suppliesStorage';
 
 function fmtPercent(value) {
   return `${new Intl.NumberFormat('es-CL', {
@@ -45,6 +57,7 @@ export function Tabs({ active, onChange, counts }) {
     { k: 'motivo', label: 'Motivo y diagnostico' },
     { k: 'evolucion', label: 'Evolucion clinica', count: counts.evol },
     { k: 'presupuesto', label: 'Presupuesto', count: counts.tx },
+    { k: 'insumos', label: 'Insumos' },
     { k: 'documentos', label: 'Documentos', count: counts.docs },
     { k: 'historial', label: 'Historial', count: counts.hist },
   ];
@@ -1792,6 +1805,580 @@ export function CobrosAbonos({
       {!payments.length && (
         <div className="finance-empty">Aun no hay cobros o abonos separados como entidad formal para este paciente.</div>
       )}
+    </div>
+  );
+}
+
+export function Insumos({
+  patient,
+  treatments,
+  appointments,
+  pricingCatalog,
+  budget,
+  onBudgetFieldChange,
+  onOpenSection,
+  mirror = false,
+}) {
+  const treatmentOptions = treatments ?? [];
+  const initialTreatmentId = budget?.pricingReferenceTreatmentId ?? treatmentOptions.find((item) => item.procedure && findPricingTreatmentForProcedure(item.procedure, pricingCatalog ?? []))?.id ?? treatmentOptions[0]?.id ?? '';
+  const [moduleState, setModuleState] = useState(() => loadSupplyState());
+  const [selectedTreatmentId, setSelectedTreatmentId] = useState(initialTreatmentId);
+  const [draftItems, setDraftItems] = useState([]);
+  const [extraItemId, setExtraItemId] = useState('');
+  const [openInsumosHelp, setOpenInsumosHelp] = useState(null);
+  const [newCatalogName, setNewCatalogName] = useState('');
+  const [newCatalogUnit, setNewCatalogUnit] = useState('unidad');
+  const [newCatalogQuantity, setNewCatalogQuantity] = useState(1);
+  const [newCatalogTotalCost, setNewCatalogTotalCost] = useState(0);
+  const [showCatalogList, setShowCatalogList] = useState(false);
+  const [editingCatalogId, setEditingCatalogId] = useState('');
+
+  useEffect(() => {
+    saveSupplyState(moduleState);
+  }, [moduleState]);
+
+  useEffect(() => {
+    if (!selectedTreatmentId && initialTreatmentId) {
+      setSelectedTreatmentId(initialTreatmentId);
+      return;
+    }
+    if (selectedTreatmentId && treatmentOptions.some((item) => item.id === selectedTreatmentId)) return;
+    if (initialTreatmentId) setSelectedTreatmentId(initialTreatmentId);
+  }, [initialTreatmentId, selectedTreatmentId, treatmentOptions]);
+
+  const selectedTreatment =
+    treatmentOptions.find((item) => item.id === selectedTreatmentId) ??
+    treatmentOptions.find((item) => item.id === budget?.pricingReferenceTreatmentId) ??
+    treatmentOptions.find((item) => item.procedure && findPricingTreatmentForProcedure(item.procedure, pricingCatalog ?? [])) ??
+    treatmentOptions[0] ??
+    null;
+  const mappedPricingTreatment = selectedTreatment
+    ? findPricingTreatmentForProcedure(selectedTreatment.procedure, pricingCatalog ?? [])
+    : null;
+  const selectedRecipe = mappedPricingTreatment
+    ? moduleState.recipes.find((recipe) => recipe.treatmentId === mappedPricingTreatment.id)
+    : null;
+
+  useEffect(() => {
+    if (!selectedRecipe) {
+      setDraftItems([]);
+      return;
+    }
+
+    setDraftItems(
+      selectedRecipe.items.map((item) => ({
+        ...item,
+      }))
+    );
+  }, [selectedRecipe?.id]);
+
+  const usageResult = calculatePatientSupplyUsageCost(draftItems, moduleState.catalog);
+  const agendaNeeds = checkAgendaSupplyNeeds(appointments ?? [], moduleState.recipes, moduleState.catalog);
+  const lowStockItems = moduleState.catalog.filter(checkLowStock);
+  const patientSnapshots = moduleState.snapshots.filter((snapshot) => snapshot.patientId === patient?.id);
+
+  const handleQtyChange = (itemId, value) => {
+    const nextQuantity = Number(value) || 0;
+    setDraftItems((current) =>
+      current.map((item) => (item.itemId === itemId ? { ...item, quantity: nextQuantity } : item))
+    );
+  };
+
+  const handleAddExtraItem = () => {
+    const item = moduleState.catalog.find((catalogItem) => catalogItem.id === extraItemId);
+    if (!item) return;
+
+    setDraftItems((current) => {
+      if (current.some((entry) => entry.itemId === item.id)) return current;
+      return [
+        ...current,
+        {
+          itemId: item.id,
+          quantity: item.defaultUsePerPatient ?? 1,
+          editableAtPatientLevel: true,
+          isExtra: true,
+        },
+      ];
+    });
+    setExtraItemId('');
+  };
+
+  const handleRemoveDraftItem = (itemId) => {
+    setDraftItems((current) => current.filter((item) => item.itemId !== itemId));
+  };
+
+  const handleSaveCatalogItem = () => {
+    const nextName = newCatalogName.trim() || 'Nuevo insumo';
+    const nextQuantity = Number(newCatalogQuantity) || 0;
+    const nextTotalCost = Number(newCatalogTotalCost) || 0;
+    const nextUnitCost = nextQuantity > 0 ? Math.round(nextTotalCost / nextQuantity) : 0;
+
+    if (editingCatalogId) {
+      setModuleState((current) => ({
+        ...current,
+        catalog: current.catalog.map((item) => {
+          if (item.id !== editingCatalogId) return item;
+          return {
+            ...item,
+            name: nextName,
+            unit: newCatalogUnit,
+            purchaseQuantity: nextQuantity,
+            purchaseTotalCost: nextTotalCost,
+            unitCost: nextUnitCost,
+          };
+        }),
+      }));
+    } else {
+      const nextIndex = moduleState.catalog.length + 1;
+      const nextId = `sup_custom_${Date.now()}_${nextIndex}`;
+      setModuleState((current) => ({
+        ...current,
+        catalog: [
+          {
+            id: nextId,
+            name: nextName,
+            category: 'Otros',
+            itemType: 'consumable',
+            unit: newCatalogUnit,
+            purchaseQuantity: nextQuantity,
+            purchaseTotalCost: nextTotalCost,
+            unitCost: nextUnitCost,
+            currentStock: 0,
+            minimumStock: 0,
+            supplierId: '',
+            defaultUsePerPatient: 1,
+            active: true,
+            notes: '',
+          },
+          ...current.catalog,
+        ],
+      }));
+    }
+    setNewCatalogName('');
+    setNewCatalogUnit('unidad');
+    setNewCatalogQuantity(1);
+    setNewCatalogTotalCost(0);
+    setEditingCatalogId('');
+  };
+
+  const handleRemoveCatalogItem = (itemId) => {
+    setModuleState((current) => ({
+      ...current,
+      catalog: current.catalog.filter((item) => item.id !== itemId),
+    }));
+  };
+
+  const handleResetCatalog = () => {
+    setModuleState((current) => ({
+      ...current,
+      catalog: resetSupplyCatalog(),
+    }));
+  };
+
+  const handleEditCatalogItem = (item) => {
+    setEditingCatalogId(item.id);
+    setNewCatalogName(item.name ?? '');
+    setNewCatalogUnit(item.unit ?? 'unidad');
+    setNewCatalogQuantity(item.purchaseQuantity ?? 1);
+    setNewCatalogTotalCost(item.purchaseTotalCost ?? 0);
+    setShowCatalogList(false);
+  };
+
+  const handleCancelCatalogEdit = () => {
+    setEditingCatalogId('');
+    setNewCatalogName('');
+    setNewCatalogUnit('unidad');
+    setNewCatalogQuantity(1);
+    setNewCatalogTotalCost(0);
+  };
+
+  const handleResetModule = () => {
+    const resetState = resetSupplyState();
+    setModuleState(resetState);
+    setDraftItems(
+      selectedRecipe?.items.map((item) => ({
+        ...item,
+      })) ?? []
+    );
+  };
+
+  const handleSaveSnapshot = () => {
+    if (!patient?.id || !selectedTreatment || !selectedRecipe) return;
+
+    const snapshot = createSupplySnapshot({
+      patientId: patient.id,
+      treatmentId: mappedPricingTreatment?.id ?? selectedTreatment.id,
+      appointmentId: appointments?.[0]?.id ?? null,
+      recipeId: selectedRecipe.id,
+      recipeName: selectedRecipe.name,
+      usageItems: draftItems,
+      catalog: moduleState.catalog,
+      notes: `Snapshot de insumos para ${selectedTreatment.procedure}`,
+      status: 'confirmed',
+      source: 'manual',
+    });
+
+    setModuleState((current) => ({
+      ...current,
+      snapshots: [snapshot, ...current.snapshots],
+    }));
+    onBudgetFieldChange?.('supplySnapshotId', snapshot.id);
+  };
+
+  return (
+    <div className="documents-editor">
+      <div className="documents-toolbar">
+        <div>
+          <div className="muted" style={{ fontSize: 12.5 }}>
+            {patient?.fullName ?? 'Sin paciente seleccionado'} · {patientSnapshots.length} snapshots locales
+          </div>
+          <div className="documents-save-note">
+            {selectedRecipe ? selectedRecipe.name : 'Selecciona un tratamiento con receta para ver insumos'}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary" type="button" onClick={handleResetModule}>
+            <Icon.edit />
+            Restaurar modulo
+          </button>
+          <button className="btn btn-primary" type="button" onClick={handleSaveSnapshot} disabled={!selectedRecipe}>
+            <Icon.plus />
+            Guardar snapshot
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 14 }}>
+        <div className="budget-pricing-kpi budget-pricing-kpi-small tone-good">
+          <div className="budget-pricing-kpi-head"><span>Catalogo</span></div>
+          <strong>{moduleState.catalog.length}</strong>
+          <small>items cargados</small>
+        </div>
+        <div className="budget-pricing-kpi budget-pricing-kpi-small tone-good">
+          <div className="budget-pricing-kpi-head"><span>Recetas</span></div>
+          <strong>{moduleState.recipes.length}</strong>
+          <small>tratamientos mapeados</small>
+        </div>
+        <div className="budget-pricing-kpi budget-pricing-kpi-small tone-warn">
+          <div className="budget-pricing-kpi-head"><span>Stock bajo</span></div>
+          <strong>{lowStockItems.length}</strong>
+          <small>alertas activas</small>
+        </div>
+        <div className="budget-pricing-kpi budget-pricing-kpi-small tone-good">
+          <div className="budget-pricing-kpi-head"><span>Snapshot</span></div>
+          <strong>{usageResult.totalCost > 0 ? fmtCLP(usageResult.totalCost) : '$0'}</strong>
+          <small>costo de receta actual</small>
+        </div>
+      </div>
+
+      <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
+        <div className="budget-pricing-settings-head">
+          <div>
+            <div className="bs-label">{editingCatalogId ? 'Editar material del catalogo' : 'Agregar material al catalogo'}</div>
+            <div className="bs-help">{editingCatalogId ? 'Ajusta el material seleccionado y guarda los cambios.' : 'Primera etapa: agregar materiales nuevos sin saturar la pantalla.'}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary" type="button" onClick={() => setShowCatalogList((current) => !current)}>
+              <Icon.edit />
+              {showCatalogList ? 'Ocultar catalogo' : 'Ver catalogo'}
+            </button>
+            <button className="btn btn-secondary" type="button" onClick={handleResetCatalog}>
+              <Icon.edit />
+              Restaurar catalogo base
+            </button>
+          </div>
+        </div>
+        <div className="budget-pricing-settings-grid">
+          <label className="pricing-setting-field" style={{ gridColumn: '1 / span 2' }}>
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Nombre del material</span>
+            </span>
+            <input value={newCatalogName} onChange={(event) => setNewCatalogName(event.target.value)} placeholder="Vaso desechable" />
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Unidad</span>
+            </span>
+            <select value={newCatalogUnit} onChange={(event) => setNewCatalogUnit(event.target.value)}>
+              {(moduleState.units.length ? moduleState.units : ['unidad']).map((unit) => (
+                <option key={unit} value={unit}>{unit}</option>
+              ))}
+            </select>
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Cantidad de compra</span>
+            </span>
+            <input type="number" min="0" step="1" value={newCatalogQuantity} onChange={(event) => setNewCatalogQuantity(event.target.value)} />
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Costo total compra</span>
+            </span>
+            <input type="number" min="0" step="1" value={newCatalogTotalCost} onChange={(event) => setNewCatalogTotalCost(event.target.value)} />
+          </label>
+          <div style={{ display: 'flex', alignItems: 'end', gap: 8 }}>
+            <button className="btn btn-primary" type="button" onClick={handleSaveCatalogItem}>
+              <Icon.plus />
+              {editingCatalogId ? 'Actualizar material' : 'Guardar material'}
+            </button>
+            {editingCatalogId && (
+              <button className="btn btn-secondary" type="button" onClick={handleCancelCatalogEdit}>
+                Cancelar
+              </button>
+            )}
+          </div>
+        </div>
+        {showCatalogList && (
+          <div className="documents-list" style={{ marginTop: 14 }}>
+            {moduleState.catalog.map((item) => {
+              const unitCost = item.purchaseQuantity > 0 ? Math.round((Number(item.purchaseTotalCost) / Number(item.purchaseQuantity)) || 0) : 0;
+              return (
+                <div key={item.id} className="document-row">
+                  <div className="document-main">
+                    <div className="document-head">
+                      <div className="document-title">{item.name || 'Sin nombre'}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className="count">{fmtCLP(unitCost)}</span>
+                        <button className="row-action" type="button" onClick={() => handleEditCatalogItem(item)} title="Editar insumo">
+                          <Icon.edit />
+                        </button>
+                        <button className="row-action" type="button" onClick={() => handleRemoveCatalogItem(item.id)} title="Eliminar insumo">
+                          <Icon.trash />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="document-meta-line">
+                      <span className="document-kind">{item.unit}</span>
+                      <span>{item.purchaseQuantity} comprados · stock {item.currentStock} · minimo {item.minimumStock}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
+        <div className="budget-pricing-settings-head">
+          <div>
+            <div className="bs-label">Referencia de insumos</div>
+            <div className="bs-help">Elige un tratamiento del paciente para ver su receta, ajustar cantidades y congelar un snapshot local.</div>
+          </div>
+        </div>
+        <div className="budget-pricing-settings-grid">
+          <label className="pricing-setting-field" style={{ gridColumn: '1 / -1' }}>
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Tratamiento del paciente</span>
+            </span>
+            <select value={selectedTreatmentId} onChange={(event) => setSelectedTreatmentId(event.target.value)}>
+              {treatmentOptions.map((item) => {
+                const mapped = item.procedure ? findPricingTreatmentForProcedure(item.procedure, pricingCatalog ?? []) : null;
+                return (
+                  <option key={item.id} value={item.id}>
+                    {item.procedure || 'Sin procedimiento'}{mapped ? ` · ${mapped.name}` : ' · sin receta'}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+        </div>
+        <div className="budget-pricing-kpi-row" style={{ marginTop: 12 }}>
+          <div className="budget-pricing-kpi budget-pricing-kpi-small">
+            <div className="budget-pricing-kpi-head"><span>Receta</span></div>
+            <strong>{selectedRecipe?.name ?? 'Sin receta'}</strong>
+            <small>{mappedPricingTreatment?.name ?? 'Sin mapeo a pricing'}</small>
+          </div>
+          <div className="budget-pricing-kpi budget-pricing-kpi-small">
+            <div className="budget-pricing-kpi-head"><span>Agenda</span></div>
+            <strong>{agendaNeeds.lines.length}</strong>
+            <small>citas futuras con receta</small>
+          </div>
+        </div>
+
+        <div className="budget-pricing-settings-head" style={{ marginTop: 14 }}>
+          <div>
+            <div className="bs-label">Agregar insumo</div>
+            <div className="bs-help">Si la receta necesita algo mas, sumalo aqui antes de congelar el snapshot.</div>
+          </div>
+        </div>
+        <div className="budget-pricing-settings-grid">
+          <label className="pricing-setting-field" style={{ gridColumn: '1 / span 2' }}>
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Insumo extra</span>
+            </span>
+            <select value={extraItemId} onChange={(event) => setExtraItemId(event.target.value)}>
+              <option value="">Selecciona un insumo</option>
+              {moduleState.catalog
+                .filter((item) => !draftItems.some((entry) => entry.itemId === item.id))
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name} · {item.unit}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <div style={{ display: 'flex', alignItems: 'end' }}>
+            <button className="btn btn-secondary" type="button" onClick={handleAddExtraItem} disabled={!extraItemId}>
+              <Icon.plus />
+              Agregar insumo
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="table-wrap" style={{ marginBottom: 14 }}>
+        <table className="tx">
+          <thead>
+            <tr>
+              <th>Insumo</th>
+              <th>Unidad</th>
+              <th style={{ textAlign: 'right' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  Cantidad
+                  <PricingHelpButton
+                    label="Cantidad por unidad"
+                    text="La cantidad se interpreta segun la unidad del insumo. Si la unidad es par, cantidad 1 = 1 par. Si la unidad es unidad, cantidad 1 = 1 unidad."
+                    compact
+                    open={openInsumosHelp === 'quantity'}
+                    onToggle={() => setOpenInsumosHelp((current) => (current === 'quantity' ? null : 'quantity'))}
+                    placement="left"
+                  />
+                </span>
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  Costo unitario
+                  <PricingHelpButton
+                    label="Origen del costo unitario"
+                    text="El costo unitario sale de la compra base del insumo: costo total de compra dividido por la cantidad comprada. Por eso no es el mismo valor para todos los insumos."
+                    compact
+                    open={openInsumosHelp === 'unitCost'}
+                    onToggle={() => setOpenInsumosHelp((current) => (current === 'unitCost' ? null : 'unitCost'))}
+                    placement="left"
+                  />
+                </span>
+              </th>
+              <th style={{ textAlign: 'right' }}>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {draftItems.map((item) => {
+              const line = usageResult.lines.find((entry) => entry.itemId === item.itemId);
+              return (
+                <tr key={item.itemId}>
+                  <td style={{ fontWeight: 600 }}>{line?.itemName ?? item.itemId}</td>
+                  <td>{line?.unit ?? 'unidad'}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={item.quantity}
+                        onChange={(event) => handleQtyChange(item.itemId, event.target.value)}
+                        style={{ width: 92, textAlign: 'right' }}
+                      />
+                    </div>
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                      <strong>{fmtCLP(line?.unitCostAtTime ?? 0)}</strong>
+                      {(line?.purchaseQuantity ?? 0) > 0 && (line?.purchaseTotalCost ?? 0) > 0 && (
+                        <small style={{ color: 'var(--muted)', fontSize: 11 }}>
+                          Base: {line.purchaseQuantity} {line.unit} / {fmtCLP(line.purchaseTotalCost)}
+                        </small>
+                      )}
+                    </div>
+                  </td>
+                  <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                      <span>{fmtCLP(line?.totalCostAtTime ?? 0)}</span>
+                      {item.isExtra && (
+                        <button className="row-action" type="button" onClick={() => handleRemoveDraftItem(item.itemId)} title="Quitar insumo">
+                          <Icon.trash />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {!draftItems.length && (
+              <tr>
+                <td colSpan="5" className="finance-table-empty">No hay receta vinculada a este tratamiento.</td>
+              </tr>
+            )}
+          </tbody>
+          {draftItems.length > 0 && (
+            <tfoot>
+              <tr>
+                <td colSpan="4" style={{ textAlign: 'right', color: 'var(--muted)' }}>Total receta</td>
+                <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmtCLP(usageResult.totalCost)}</td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 14 }}>
+        <div className="budget-pricing-settings">
+          <div className="budget-pricing-settings-head">
+            <div>
+              <div className="bs-label">Stock bajo</div>
+              <div className="bs-help">Insumos que ya quedaron en o bajo el minimo configurado.</div>
+            </div>
+          </div>
+          <div className="documents-list">
+            {lowStockItems.slice(0, 5).map((item) => (
+              <div key={item.id} className="document-row">
+                <div className="document-main">
+                  <div className="document-head">
+                    <div className="document-title">{item.name}</div>
+                    <span className="count">{item.currentStock} / {item.minimumStock}</span>
+                  </div>
+                  <div className="document-meta-line">
+                    <span className="document-kind">{item.category}</span>
+                    <span>Reponer a tiempo para no frenar agenda.</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {!lowStockItems.length && <div className="finance-empty">No hay alertas de stock bajo en este momento.</div>}
+          </div>
+        </div>
+
+        <div className="budget-pricing-settings">
+          <div className="budget-pricing-settings-head">
+            <div>
+              <div className="bs-label">Snapshots locales</div>
+              <div className="bs-help">Historico guardado solo para este modulo de prueba local.</div>
+            </div>
+          </div>
+          <div className="documents-list">
+            {patientSnapshots.slice(0, 5).map((snapshot) => (
+              <div key={snapshot.id} className="document-row">
+                <div className="document-main">
+                  <div className="document-head">
+                    <div className="document-title">{snapshot.recipeName || 'Snapshot'}</div>
+                    <span className="count">{fmtCLP(snapshot.totalSupplyCost || 0)}</span>
+                  </div>
+                  <div className="document-meta-line">
+                    <span className="document-kind">{snapshot.status}</span>
+                    <span>{snapshot.createdAt ? new Date(snapshot.createdAt).toLocaleString('es-CL') : 'Sin fecha'}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {!patientSnapshots.length && <div className="finance-empty">Todavia no hay snapshots guardados para este paciente.</div>}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 14 }} className="finance-empty">
+        Este panel es el MVP chico de insumos: receta, ajuste por paciente, stock bajo y snapshot local. No usa SQLite todavia.
+      </div>
     </div>
   );
 }
