@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { EVOLUTION, HISTORY, STORAGE_KEYS, TREATMENTS } from './data';
 import { FinanceDashboard, FloatingNewPatientButton, HomeDashboard, LoginScreen, PatientsDirectoryView, PriceListView, Sidebar, TopbarInner, PatientHeader, PatientsSheet, Odontogram, ToothPanel } from './app';
-import { Tabs, Antecedentes, Motivo, Evolucion, Presupuesto, Insumos, Documentos, Historial, AgendaClinica, CobrosAbonos, TreatmentsTable, NextAppointments } from './tabs';
+import { Tabs, Antecedentes, Motivo, Evolucion, Presupuesto, Insumos, InventarioInsumos, Documentos, Historial, AgendaClinica, CobrosAbonos, TreatmentsTable, NextAppointments } from './tabs';
 import { updateToothSurfaceState } from './odontogram';
 import {
   buildClinicalRecordFromMocks,
@@ -1351,6 +1351,8 @@ export default function App() {
             </>
           ) : activeView === 'priceList' ? (
             <PriceListView pricingCatalog={pricingCatalog} />
+          ) : activeView === 'inventory' ? (
+            <InventarioInsumos pricingCatalog={pricingCatalog} />
           ) : activeView === 'finance' ? (
             <FinanceDashboard
               financeDashboard={financeDashboard}

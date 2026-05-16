@@ -29,14 +29,14 @@ export const USER_ROLES = {
 
 export const ROLE_PERMISSIONS = {
   admin: {
-    views: ['home', 'patients', 'patient', 'priceList', 'finance'],
+    views: ['home', 'patients', 'patient', 'priceList', 'inventory', 'finance'],
     patientTabs: ['antecedentes', 'motivo', 'evolucion', 'presupuesto', 'insumos', 'documentos', 'historial'],
     sheetSections: ['datos', 'antecedentes', 'motivo', 'evolucion', 'agenda', 'cobros', 'presupuesto', 'documentos', 'historial'],
     canManagePricing: true,
     canSeeFinance: true,
   },
   dr: {
-    views: ['home', 'patients', 'patient', 'priceList'],
+    views: ['home', 'patients', 'patient', 'priceList', 'inventory'],
     patientTabs: ['antecedentes', 'motivo', 'evolucion', 'presupuesto', 'documentos', 'historial'],
     sheetSections: ['datos', 'antecedentes', 'motivo', 'evolucion', 'agenda', 'presupuesto', 'documentos', 'historial'],
     canManagePricing: false,

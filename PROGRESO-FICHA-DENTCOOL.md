@@ -173,6 +173,13 @@ Hecho:
 - se verifico el bloque con `npm test -- --run`: `70` tests verdes
 - se verifico el bloque con `npm run build`: build correcto
 - estado actual listo para prueba de la doctora en navegador local o despliegue GitHub/Render si esta conectado
+- se inicio la separacion de compras/proveedores fuera de la ficha del paciente
+- `Insumos` por paciente ahora queda solo con lista base, ajustes clinicos, stock bajo y costo guardado
+- se agrego la vista general `Inventario` para registrar compras, revisar proveedores y ver historico de compras
+- la vista `Inventario` ya queda disponible para `Admin` y `Dr`, no para `Staff`
+- la compra ya no vive en la ficha del paciente; ahora vive en el inventario general
+- se verifico la separacion con `npm test -- --run`: `70` tests verdes
+- se verifico la separacion con `npm run build`: build correcto
 
 ## Como se hizo este bloque
 
@@ -195,6 +202,10 @@ Hecho:
 - se extendio `createBudgetRecord` para persistir seleccion, modalidad y descuento del pack
 - se permitio que `handleAddTreatment` reciba datos iniciales para agregar el pack como linea del plan
 - se agregaron tests unitarios para descuento ponderado, limite de 3 tratamientos y persistencia del pack
+- se movio el flujo de compra/proveedor a un inventario general con estado local propio
+- se simplifico `Insumos` por paciente quitando compra/proveedor y dejando solo consumo clinico
+- se agrego `InventarioInsumos` como nueva vista general con registro de compra, historial y proveedores
+- se actualizo el login/permisos para que `Admin` y `Dr` vean inventario, pero `Staff` no
 
 ## Que tenemos ahora
 
@@ -215,12 +226,13 @@ Hecho:
 - lista de precios visible para recepcion sin exponer costos internos
 - presupuesto simplificado para `Dr` sin costos internos, pricing avanzado ni gestion de insumos
 - presupuesto pack simple para `Admin` y `Dr`, con maximo 3 tratamientos, modalidad por sesiones y descuento controlado
+- inventario general separado de la ficha del paciente, con compras y proveedores fuera del flujo clinico
 
 ## Que falta antes de seguir
 
 - validar con la doctora si el pack debe crear una sola linea comercial o tambien desglosar automaticamente cada tratamiento dentro del plan
 - definir si el descuento de pack requiere aprobacion explicita de `Admin` cuando lo aplica `Dr`
-- validar con la doctora si el flujo de compra necesita proveedor obligatorio, numero de boleta/factura, fecha editable o solo registro rapido
+- validar con la doctora si el inventario general necesita proveedor obligatorio, numero de boleta/factura, fecha editable o solo registro rapido
 - decidir si el siguiente paso de insumos es descuento de stock al confirmar atencion o editor de recetas por tratamiento
 - mover `Registrar compra` a inventario general cuando exista la vista global de insumos
 - fase dos de inventario debe permitir fecha editable, proveedor, direccion/contacto del proveedor, documento/boleta y analisis historico de compras por insumo

@@ -265,6 +265,7 @@ export function Sidebar({
   ];
   const items2 = [
     { ic: 'doc', label: 'Lista precios', view: 'priceList' },
+    { ic: 'cash', label: 'Inventario', view: 'inventory' },
     { ic: 'chart', label: 'Reportes', view: 'finance' },
     { ic: 'cash', label: 'Facturacion', view: 'finance' },
     { ic: 'doc', label: 'Documentos' },
@@ -349,6 +350,12 @@ export function TopbarInner({ patientName, activeView = 'patients', currentUser 
             <span>Gestion</span>
             <span className="sep">/</span>
             <strong>Lista de precios</strong>
+          </>
+        ) : activeView === 'inventory' ? (
+          <>
+            <span>Gestion</span>
+            <span className="sep">/</span>
+            <strong>Inventario general</strong>
           </>
         ) : activeView === 'finance' ? (
           <>

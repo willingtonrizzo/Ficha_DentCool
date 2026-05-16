@@ -2154,11 +2154,6 @@ export function Insumos({
   const [newCatalogMinimumStock, setNewCatalogMinimumStock] = useState(0);
   const [showCatalogList, setShowCatalogList] = useState(false);
   const [editingCatalogId, setEditingCatalogId] = useState('');
-  const [purchaseItemId, setPurchaseItemId] = useState('');
-  const [purchaseQuantity, setPurchaseQuantity] = useState(1);
-  const [purchaseTotalCost, setPurchaseTotalCost] = useState(0);
-  const [purchaseSupplierId, setPurchaseSupplierId] = useState('');
-  const [purchaseNote, setPurchaseNote] = useState('');
 
   useEffect(() => {
     saveSupplyState(moduleState);
@@ -2203,9 +2198,6 @@ export function Insumos({
   const agendaNeeds = checkAgendaSupplyNeeds(appointments ?? [], moduleState.recipes, moduleState.catalog);
   const lowStockItems = moduleState.catalog.filter(checkLowStock);
   const patientSnapshots = moduleState.snapshots.filter((snapshot) => snapshot.patientId === patient?.id);
-  const recentPurchases = [...moduleState.purchases]
-    .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime())
-    .slice(0, 5);
 
   const handleQtyChange = (itemId, value) => {
     const nextQuantity = Number(value) || 0;
@@ -2335,41 +2327,6 @@ export function Insumos({
         ...item,
       })) ?? []
     );
-  };
-
-  const handleRegisterPurchase = () => {
-    const catalogItem = moduleState.catalog.find((item) => item.id === purchaseItemId);
-    const quantity = Number(purchaseQuantity) || 0;
-    const totalCost = Number(purchaseTotalCost) || 0;
-    if (!catalogItem || quantity <= 0 || totalCost <= 0) return;
-
-    const now = new Date().toISOString();
-    const unitCost = Math.round((totalCost / quantity) * 100) / 100;
-    const purchase = {
-      id: `supply-purchase-${catalogItem.id}-${Date.now()}`,
-      itemId: catalogItem.id,
-      itemName: catalogItem.name,
-      itemUnit: catalogItem.unit ?? 'unidad',
-      quantityPurchased: quantity,
-      totalCost,
-      unitCost,
-      supplierId: purchaseSupplierId,
-      note: purchaseNote.trim(),
-      createdAt: now,
-    };
-
-    setModuleState((current) => ({
-      ...current,
-      catalog: current.catalog.map((item) =>
-        item.id === catalogItem.id ? applyPurchaseToStock(item, purchase) : item
-      ),
-      purchases: [purchase, ...current.purchases],
-    }));
-    setPurchaseItemId('');
-    setPurchaseQuantity(1);
-    setPurchaseTotalCost(0);
-    setPurchaseSupplierId('');
-    setPurchaseNote('');
   };
 
   const handleSaveSnapshot = () => {
@@ -2534,85 +2491,6 @@ export function Insumos({
             })}
           </div>
         )}
-      </div>
-
-      <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
-        <div className="budget-pricing-settings-head">
-          <div>
-            <div className="bs-label">Registrar compra</div>
-            <div className="bs-help">Puente MVP: suma stock y recalcula costo promedio. Luego esta accion ira en inventario general.</div>
-          </div>
-        </div>
-        <div className="budget-pricing-settings-grid">
-          <label className="pricing-setting-field" style={{ gridColumn: '1 / span 2' }}>
-            <span className="pricing-setting-label-row">
-              <span className="pricing-setting-label-text">Insumo comprado</span>
-            </span>
-            <select value={purchaseItemId} onChange={(event) => setPurchaseItemId(event.target.value)}>
-              <option value="">Selecciona un insumo</option>
-              {moduleState.catalog.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name} · stock {item.currentStock ?? 0} {item.unit ?? 'unidad'}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="pricing-setting-field">
-            <span className="pricing-setting-label-row">
-              <span className="pricing-setting-label-text">Cantidad comprada</span>
-            </span>
-            <input type="number" min="0" step="1" value={purchaseQuantity} onChange={(event) => setPurchaseQuantity(event.target.value)} />
-          </label>
-          <label className="pricing-setting-field">
-            <span className="pricing-setting-label-row">
-              <span className="pricing-setting-label-text">Costo total</span>
-            </span>
-            <input type="number" min="0" step="1" value={purchaseTotalCost} onChange={(event) => setPurchaseTotalCost(event.target.value)} />
-          </label>
-          <label className="pricing-setting-field">
-            <span className="pricing-setting-label-row">
-              <span className="pricing-setting-label-text">Proveedor</span>
-            </span>
-            <select value={purchaseSupplierId} onChange={(event) => setPurchaseSupplierId(event.target.value)}>
-              <option value="">Sin proveedor</option>
-              {moduleState.suppliers.map((supplier) => (
-                <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-              ))}
-            </select>
-          </label>
-          <label className="pricing-setting-field" style={{ gridColumn: 'span 2' }}>
-            <span className="pricing-setting-label-row">
-              <span className="pricing-setting-label-text">Nota</span>
-            </span>
-            <input value={purchaseNote} onChange={(event) => setPurchaseNote(event.target.value)} placeholder="Boleta, compra semanal o detalle breve" />
-          </label>
-          <div style={{ display: 'flex', alignItems: 'end' }}>
-            <button className="btn btn-primary" type="button" onClick={handleRegisterPurchase} disabled={!purchaseItemId || Number(purchaseQuantity) <= 0 || Number(purchaseTotalCost) <= 0}>
-              <Icon.plus />
-              Registrar compra
-            </button>
-          </div>
-        </div>
-        <div className="documents-list" style={{ marginTop: 14 }}>
-          {recentPurchases.map((purchase) => {
-            const supplier = moduleState.suppliers.find((item) => item.id === purchase.supplierId);
-            return (
-              <div key={purchase.id} className="document-row">
-                <div className="document-main">
-                  <div className="document-head">
-                    <div className="document-title">{purchase.itemName || 'Compra de insumo'}</div>
-                    <span className="count">{fmtCLP(purchase.totalCost || 0)}</span>
-                  </div>
-                  <div className="document-meta-line">
-                    <span className="document-kind">{purchase.quantityPurchased} {purchase.itemUnit ?? 'unidad'}</span>
-                    <span>{supplier?.name ?? 'Sin proveedor'} · costo unitario {fmtCLP(purchase.unitCost || 0)}</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          {!recentPurchases.length && <div className="finance-empty">Todavia no hay compras registradas.</div>}
-        </div>
       </div>
 
       <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
@@ -2832,7 +2710,226 @@ export function Insumos({
       </div>
 
       <div style={{ marginTop: 14 }} className="finance-empty">
-        Este panel es el MVP chico de insumos: lista base, ajuste por paciente, stock bajo, compra puente y costo guardado local. No usa SQLite todavia.
+        Este panel es el MVP chico de insumos: lista base, ajuste por paciente, stock bajo y costo guardado local. No usa SQLite todavia.
+      </div>
+    </div>
+  );
+}
+
+export function InventarioInsumos({
+  pricingCatalog,
+  onOpenSection,
+}) {
+  const [moduleState, setModuleState] = useState(() => loadSupplyState());
+  const [purchaseItemId, setPurchaseItemId] = useState('');
+  const [purchaseQuantity, setPurchaseQuantity] = useState(1);
+  const [purchaseTotalCost, setPurchaseTotalCost] = useState(0);
+  const [purchaseSupplierId, setPurchaseSupplierId] = useState('');
+  const [purchaseNote, setPurchaseNote] = useState('');
+  const [showSuppliers, setShowSuppliers] = useState(false);
+
+  useEffect(() => {
+    saveSupplyState(moduleState);
+  }, [moduleState]);
+
+  const recentPurchases = [...moduleState.purchases]
+    .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime())
+    .slice(0, 10);
+
+  const handleRegisterPurchase = () => {
+    const catalogItem = moduleState.catalog.find((item) => item.id === purchaseItemId);
+    const quantity = Number(purchaseQuantity) || 0;
+    const totalCost = Number(purchaseTotalCost) || 0;
+    if (!catalogItem || quantity <= 0 || totalCost <= 0) return;
+
+    const now = new Date().toISOString();
+    const unitCost = Math.round((totalCost / quantity) * 100) / 100;
+    const purchase = {
+      id: `supply-purchase-${catalogItem.id}-${Date.now()}`,
+      itemId: catalogItem.id,
+      itemName: catalogItem.name,
+      itemUnit: catalogItem.unit ?? 'unidad',
+      quantityPurchased: quantity,
+      totalCost,
+      unitCost,
+      supplierId: purchaseSupplierId,
+      note: purchaseNote.trim(),
+      createdAt: now,
+    };
+
+    setModuleState((current) => ({
+      ...current,
+      catalog: current.catalog.map((item) =>
+        item.id === catalogItem.id ? applyPurchaseToStock(item, purchase) : item
+      ),
+      purchases: [purchase, ...current.purchases],
+    }));
+    setPurchaseItemId('');
+    setPurchaseQuantity(1);
+    setPurchaseTotalCost(0);
+    setPurchaseSupplierId('');
+    setPurchaseNote('');
+  };
+
+  const supplierById = new Map(moduleState.suppliers.map((item) => [item.id, item]));
+  const lowStockItems = moduleState.catalog.filter(checkLowStock);
+
+  return (
+    <div className="documents-editor">
+      <div className="documents-toolbar">
+        <div>
+          <div className="muted" style={{ fontSize: 12.5 }}>Inventario general de insumos</div>
+          <div className="documents-save-note">Compras, proveedores y trazabilidad fuera de la ficha del paciente.</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary" type="button" onClick={() => setShowSuppliers((current) => !current)}>
+            <Icon.edit />
+            {showSuppliers ? 'Ocultar proveedores' : 'Ver proveedores'}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 14 }}>
+        <div className="budget-pricing-kpi budget-pricing-kpi-small tone-good">
+          <div className="budget-pricing-kpi-head"><span>Catalogo</span></div>
+          <strong>{moduleState.catalog.length}</strong>
+          <small>materiales</small>
+        </div>
+        <div className="budget-pricing-kpi budget-pricing-kpi-small tone-good">
+          <div className="budget-pricing-kpi-head"><span>Proveedores</span></div>
+          <strong>{moduleState.suppliers.length}</strong>
+          <small>activos</small>
+        </div>
+        <div className="budget-pricing-kpi budget-pricing-kpi-small tone-warn">
+          <div className="budget-pricing-kpi-head"><span>Stock bajo</span></div>
+          <strong>{lowStockItems.length}</strong>
+          <small>alertas</small>
+        </div>
+        <div className="budget-pricing-kpi budget-pricing-kpi-small tone-good">
+          <div className="budget-pricing-kpi-head"><span>Compras</span></div>
+          <strong>{recentPurchases.length}</strong>
+          <small>recientes</small>
+        </div>
+      </div>
+
+      <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
+        <div className="budget-pricing-settings-head">
+          <div>
+            <div className="bs-label">Registrar compra</div>
+            <div className="bs-help">Aqui vive el flujo de compra para que no quede dentro de la ficha del paciente.</div>
+          </div>
+        </div>
+        <div className="budget-pricing-settings-grid">
+          <label className="pricing-setting-field" style={{ gridColumn: '1 / span 2' }}>
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Insumo comprado</span>
+            </span>
+            <select value={purchaseItemId} onChange={(event) => setPurchaseItemId(event.target.value)}>
+              <option value="">Selecciona un insumo</option>
+              {moduleState.catalog.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} · stock {item.currentStock ?? 0} {item.unit ?? 'unidad'}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Cantidad comprada</span>
+            </span>
+            <input type="number" min="0" step="1" value={purchaseQuantity} onChange={(event) => setPurchaseQuantity(event.target.value)} />
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Costo total</span>
+            </span>
+            <input type="number" min="0" step="1" value={purchaseTotalCost} onChange={(event) => setPurchaseTotalCost(event.target.value)} />
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Proveedor</span>
+            </span>
+            <select value={purchaseSupplierId} onChange={(event) => setPurchaseSupplierId(event.target.value)}>
+              <option value="">Sin proveedor</option>
+              {moduleState.suppliers.map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="pricing-setting-field" style={{ gridColumn: 'span 2' }}>
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Nota</span>
+            </span>
+            <input value={purchaseNote} onChange={(event) => setPurchaseNote(event.target.value)} placeholder="Boleta, compra semanal o detalle breve" />
+          </label>
+          <div style={{ display: 'flex', alignItems: 'end' }}>
+            <button className="btn btn-primary" type="button" onClick={handleRegisterPurchase} disabled={!purchaseItemId || Number(purchaseQuantity) <= 0 || Number(purchaseTotalCost) <= 0}>
+              <Icon.plus />
+              Registrar compra
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
+        <div className="budget-pricing-settings-head">
+          <div>
+            <div className="bs-label">Ultimas compras</div>
+            <div className="bs-help">Historial reciente para revisar cantidades, proveedores y costo unitario.</div>
+          </div>
+        </div>
+        <div className="documents-list">
+          {recentPurchases.map((purchase) => {
+            const supplier = supplierById.get(purchase.supplierId);
+            return (
+              <div key={purchase.id} className="document-row">
+                <div className="document-main">
+                  <div className="document-head">
+                    <div className="document-title">{purchase.itemName || 'Compra de insumo'}</div>
+                    <span className="count">{fmtCLP(purchase.totalCost || 0)}</span>
+                  </div>
+                  <div className="document-meta-line">
+                    <span className="document-kind">{purchase.quantityPurchased} {purchase.itemUnit ?? 'unidad'}</span>
+                    <span>{supplier?.name ?? 'Sin proveedor'} · costo unitario {fmtCLP(purchase.unitCost || 0)}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {!recentPurchases.length && <div className="finance-empty">Todavia no hay compras registradas.</div>}
+        </div>
+      </div>
+
+      {showSuppliers && (
+        <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
+          <div className="budget-pricing-settings-head">
+            <div>
+              <div className="bs-label">Proveedores</div>
+              <div className="bs-help">Catalogo maestro de proveedores para el inventario general.</div>
+            </div>
+          </div>
+          <div className="documents-list">
+            {moduleState.suppliers.map((supplier) => (
+              <div key={supplier.id} className="document-row">
+                <div className="document-main">
+                  <div className="document-head">
+                    <div className="document-title">{supplier.name}</div>
+                    <span className="count">{supplier.active ? 'Activo' : 'Inactivo'}</span>
+                  </div>
+                  <div className="document-meta-line">
+                    <span className="document-kind">{supplier.contactName || 'Sin contacto'}</span>
+                    <span>{supplier.address || 'Sin direccion'}{supplier.phone ? ` · ${supplier.phone}` : ''}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {!moduleState.suppliers.length && <div className="finance-empty">No hay proveedores configurados.</div>}
+          </div>
+        </div>
+      )}
+
+      <div style={{ marginTop: 14 }} className="finance-empty">
+        Este panel concentra compras y proveedores para que la ficha del paciente quede clinica.
       </div>
     </div>
   );

@@ -78,6 +78,9 @@
 - [x] Agregar presupuesto pack simple de hasta 3 tratamientos para `Admin` y `Dr`
 - [x] Calcular descuento maximo ponderado, horas/sesiones y honorario doctor para packs
 - [x] Marcar la linea del pack como `saleKind: pack` para trazabilidad comercial
+- [x] Separar compras y proveedores fuera de la ficha del paciente
+- [x] Agregar vista general `Inventario` para compras, proveedores y historial
+- [x] Mantener `Insumos` por paciente solo para consumo clinico y costo guardado
 
 ## En curso / siguiente
 
@@ -86,7 +89,7 @@
 - [ ] Definir aprobacion de `Admin` para descuentos de pack aplicados por `Dr`
 - [ ] Refinar el flujo real de uso del modulo de insumos con la doctora
 - [ ] Decidir si insumos fase dos parte por descuento de stock por atencion o editor de listas base
-- [ ] Mover registro de compras de insumos a inventario general cuando exista esa vista
+- [ ] Validar con la doctora el flujo real del inventario general: proveedor obligatorio, fecha, documento y comparacion de precios
 - [ ] Fase dos inventario: historial de compras por insumo/proveedor con fecha, documento, direccion/contacto y evolucion de precios
 - [ ] Decidir e implementar primera integracion real de `SQLite`
 - [ ] Profundizar reportes financieros con datos mas operativos

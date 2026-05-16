@@ -132,6 +132,9 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - Existe login local MVP con roles `Admin`, `Dr` y `Staff`.
 - `Staff` puede ver pacientes, agenda/documentos basicos y lista de precios sin acceder a costos internos, finanzas, presupuesto interno ni insumos.
 - `Admin` y `Dr` pueden armar un pack simple desde el catalogo de pricing y agregarlo al plan del paciente como linea comercial.
+- `Inventario` ya existe como vista general separada para compras, proveedores e historico.
+- La ficha del paciente ya no contiene compra/proveedor; solo consumo clinico y costo guardado.
+- `Inventario` ya puede registrar compras y mostrar proveedores fuera de la ficha clinica.
 
 ### Testing
 
@@ -162,10 +165,11 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - Si se empieza a descontar stock automaticamente sin definir que evento clinico confirma consumo real, los reportes de insumos pueden divergir de la operacion.
 - El login local actual solo es barrera de uso para demo; no debe tratarse como seguridad real hasta tener usuarios/permisos robustos.
 - El pack simple hoy no reemplaza agenda/caja real: crea una linea comercial unica y falta decidir si debe desglosar tratamientos, sesiones y cobros en fase posterior.
+- El inventario general todavia necesita validacion de flujo: documento, fecha editable, filtros y comparacion historica.
 
 ## Siguiente paso recomendado
 
-1. Probar login local y presupuesto pack simple con `Admin`, `Dr` y `Staff`.
+1. Probar login local, presupuesto pack simple e inventario general con `Admin`, `Dr` y `Staff`.
 2. Validar con la doctora el flujo de insumos fase uno.
 3. Decidir si insumos fase dos parte por descuento de stock al confirmar atencion o por editor de recetas.
 4. Limpiar el rol residual de `uiContext` global frente al contexto por paciente.

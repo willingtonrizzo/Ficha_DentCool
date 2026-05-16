@@ -86,6 +86,8 @@ Ruta activa del proyecto:
 - `Admin` ve ademas costo estimado de box y traslado por sesiones para el pack; `Dr` no ve costos internos
 - `Agregar pack al plan` crea una linea comercial `Pack: ...` dentro de tratamientos del paciente
 - esa linea queda marcada como `saleKind: pack` para poder distinguir venta de pack sin depender solo del texto
+- la compra y el proveedor ya salieron de la ficha del paciente y viven en `Inventario`
+- la ficha por paciente conserva solo el consumo clinico, la lista base y el costo guardado
 - `Lista precios` muestra precio lista, descuento maximo recomendado y precio minimo sin costos internos
 - el login local es barrera de uso para demo, no seguridad fuerte definitiva
 
@@ -109,9 +111,9 @@ Razon:
 2. probar login local con `Admin`, `Dr` y `Staff` antes de entrega, validando que `Dr` no vea insumos ni costos internos
 3. probar presupuesto pack simple con ejemplos reales: `Limpieza VIP + Blanqueamiento` y `Evaluacion + Limpieza standard + Blanqueamiento`
 4. validar con la doctora si el pack debe quedar como linea unica o desglosar automaticamente tratamientos
-5. validar con la doctora el flujo de insumos fase uno: alta de material, compra, lista base y snapshot
-6. decidir si fase dos de insumos parte por descuento de stock al confirmar atencion o por editor de listas base
-7. para fase dos de inventario, contemplar historial de compras por insumo/proveedor con fecha, documento, direccion/contacto y comparacion de precios
+5. validar con la doctora la nueva vista `Inventario`: compras, proveedores y trazabilidad general
+6. validar con la doctora el flujo de insumos fase uno: alta de material, lista base y snapshot
+7. decidir si fase dos de insumos parte por descuento de stock al confirmar atencion o por editor de listas base
 8. seguir limpiando el `uiContext` global residual
 9. seguir refinando la operacion local antes de `SQLite runtime`
 10. preparar la futura transicion a `SQLite` sin mezclar demasiados frentes
@@ -133,6 +135,7 @@ Razon:
 - login local no reemplaza usuarios reales ni permisos robustos; requiere rediseño al pasar a SQLite/Tauri
 - modo `Dr` simplificado debe validarse con flujo real de descuentos y honorarios
 - el pack simple hoy agrega una linea comercial unica al plan; falta decidir si en fase siguiente debe desglosar tratamientos y agenda/cobros separados
+- el inventario general ahora existe como vista separada; falta validarlo con la doctora y decidir si requiere numero de documento, fecha editable y filtros
 - el despliegue demo conectado a GitHub debe refrescarse desde el push a `main` si Render esta apuntando a ese repo
 
 ## Instruccion de retoma
