@@ -15,6 +15,14 @@ CREATE TABLE IF NOT EXISTS patients (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS patient_payloads (
+  patient_id TEXT PRIMARY KEY,
+  payload_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS patient_alerts (
   id TEXT PRIMARY KEY,
   patient_id TEXT NOT NULL,
@@ -32,6 +40,39 @@ CREATE TABLE IF NOT EXISTS clinical_records (
   selected_surface TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
+  FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS motivo_diagnostico_records (
+  patient_id TEXT PRIMARY KEY,
+  consultation_reason TEXT,
+  current_illness TEXT,
+  extraoral_exam TEXT,
+  intraoral_exam TEXT,
+  periodontal_exam TEXT,
+  clinical_impression TEXT,
+  diagnoses_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (patient_id) REFERENCES clinical_records(id) ON DELETE CASCADE,
+  FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS clinical_record_payloads (
+  patient_id TEXT PRIMARY KEY,
+  payload_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (patient_id) REFERENCES clinical_records(id) ON DELETE CASCADE,
+  FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS budget_records (
+  patient_id TEXT PRIMARY KEY,
+  payload_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (patient_id) REFERENCES clinical_records(id) ON DELETE CASCADE,
   FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
 );
 
@@ -59,6 +100,7 @@ CREATE TABLE IF NOT EXISTS treatment_items (
   cost INTEGER NOT NULL DEFAULT 0,
   paid INTEGER NOT NULL DEFAULT 0,
   coverage_percent INTEGER NOT NULL DEFAULT 0,
+  sale_kind TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
@@ -87,6 +129,26 @@ CREATE TABLE IF NOT EXISTS history_entries (
   date_label TEXT NOT NULL,
   title TEXT NOT NULL,
   clinician_name TEXT,
+  category TEXT,
+  summary TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+  FOREIGN KEY (record_id) REFERENCES clinical_records(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS payment_entries (
+  id TEXT PRIMARY KEY,
+  patient_id TEXT NOT NULL,
+  treatment_id TEXT,
+  record_id TEXT,
+  date_label TEXT NOT NULL,
+  amount INTEGER NOT NULL DEFAULT 0,
+  method TEXT NOT NULL,
+  concept TEXT,
+  notes TEXT,
+  status TEXT,
+  source TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
@@ -98,8 +160,21 @@ CREATE TABLE IF NOT EXISTS documents (
   patient_id TEXT NOT NULL,
   record_id TEXT,
   name TEXT NOT NULL,
+  ext TEXT,
+  kind TEXT,
   file_path TEXT,
   mime_type TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+  FOREIGN KEY (record_id) REFERENCES clinical_records(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS pricing_budget_entries (
+  id TEXT PRIMARY KEY,
+  patient_id TEXT NOT NULL,
+  record_id TEXT,
+  payload_json TEXT NOT NULL,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
@@ -116,6 +191,8 @@ CREATE TABLE IF NOT EXISTS appointments (
   clinician_name TEXT,
   location TEXT,
   status TEXT,
+  notes TEXT,
+  source TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,

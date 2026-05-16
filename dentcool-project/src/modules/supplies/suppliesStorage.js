@@ -1,4 +1,5 @@
 import { STORAGE_KEYS } from '../../data';
+import { getPersistedItem, removePersistedItem, setPersistedItem } from '../../persistence';
 import {
   DEFAULT_SUPPLY_CATALOG,
   DEFAULT_SUPPLY_CATEGORIES,
@@ -18,7 +19,7 @@ function isPlainObject(value) {
 function loadJsonArray(key, fallback) {
   if (typeof window === 'undefined') return cloneValue(fallback);
   try {
-    const raw = window.localStorage.getItem(key);
+    const raw = getPersistedItem(key);
     if (!raw) return cloneValue(fallback);
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return cloneValue(fallback);
@@ -30,12 +31,12 @@ function loadJsonArray(key, fallback) {
 
 function saveJsonArray(key, value) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(key, JSON.stringify(cloneValue(value)));
+  setPersistedItem(key, JSON.stringify(cloneValue(value)));
 }
 
 function resetJsonArray(key, fallback) {
   if (typeof window !== 'undefined') {
-    window.localStorage.removeItem(key);
+    removePersistedItem(key);
   }
   return cloneValue(fallback);
 }

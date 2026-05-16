@@ -179,6 +179,7 @@ function createBlankBackgroundItems(template) {
 export function createPatient(input) {
   const fullName = (input.fullName ?? input.name ?? 'Paciente sin nombre').trim() || 'Paciente sin nombre';
   const birthDate = input.birthDate ?? '';
+  const computedAge = birthDate ? calculateAge(birthDate) : null;
   const id = input.id ?? `patient-${slugify(fullName) || 'sin-nombre'}`;
   const alerts = Array.isArray(input.alerts) ? input.alerts : [];
   const isDraftPatient = id.startsWith('patient-new-');
@@ -191,8 +192,8 @@ export function createPatient(input) {
     rut: input.rut ?? '',
     fullName,
     birthDate,
-    birthDateLabel: input.birthDateLabel ?? formatBirthDate(birthDate),
-    age: input.age ?? calculateAge(birthDate),
+    birthDateLabel: birthDate ? formatBirthDate(birthDate) : (input.birthDateLabel ?? ''),
+    age: computedAge ?? input.age ?? null,
     gender: input.gender ?? '',
     phone: input.phone ?? '',
     email: input.email ?? '',
@@ -288,8 +289,16 @@ export function isValidRutFormat(value = '') {
 }
 
 export function isValidEmailFormat(value = '') {
-  if (!value) return true;
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+  const email = value.trim();
+  if (!email) return true;
+
+  if (email.includes(' ') || !email.includes('@')) return false;
+
+  const [localPart, domainPart] = email.split('@');
+  if (!localPart || !domainPart || !domainPart.includes('.')) return false;
+
+  const domainSegments = domainPart.split('.').filter(Boolean);
+  return domainSegments.length >= 2 && domainSegments.every((segment) => segment.length > 0);
 }
 
 export function validatePatientDraft(draft, patients = []) {

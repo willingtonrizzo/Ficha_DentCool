@@ -95,6 +95,7 @@
 - [x] Exportar inventario a CSV/XLSX
 - [x] Agregar una vista de historial por proveedor mas navegable
 - [x] Resaltar visualmente los paneles principales del inventario general
+- [x] Dejar lista la primera capa de persistencia para `Tauri + SQLite`
 
 ## En curso / siguiente
 
@@ -105,7 +106,18 @@
 - [ ] Decidir si insumos fase dos parte por descuento de stock por atencion o editor de listas base
 - [ ] Validar con la doctora el flujo real del inventario general: comparacion historica completa y reglas de documento
 - [ ] Fase dos inventario: historial de compras por insumo/proveedor con fecha, documento, direccion/contacto y evolucion de precios
-- [ ] Decidir e implementar primera integracion real de `SQLite`
+- [ ] Validar el arranque desktop de `Tauri + SQLite`
+- [x] Verificar que `npm run tauri build` genere binario de release
+- [x] Iniciar migracion real de `patients` y `clinicalRecords` a `SQLite`
+- [x] Completar la migracion del resto de tablas clinicas a `SQLite`
+- [x] Instalar Rust/rustup en la laptop para poder correr `tauri dev`
+- [x] Pre-cargar la base SQLite en la configuracion desktop de Tauri
+- [x] Recalcular la edad desde la fecha de nacimiento al guardar la ficha
+- [x] Validar correo con `@` y punto despues del dominio
+- [x] Mantener validacion de RUT con formato basico y unicidad
+- [x] Ajustar el modal de ficha de paciente para mejor densidad vertical en escritorio
+- [x] Preparar workflow de GitHub Actions para compilar el instalador de Windows
+- [ ] Ejecutar el workflow y descargar el instalador de Windows
 - [ ] Profundizar reportes financieros con datos mas operativos
 - [ ] Refinar componentes UX/UI uno por uno
 - [ ] Ajustar funcionalidades de negocio vivas

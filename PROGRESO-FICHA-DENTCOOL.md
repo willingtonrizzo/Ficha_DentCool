@@ -2,7 +2,7 @@
 
 ## Donde vamos
 
-Fase actual: `Bloque UX/UI - Inicio operativo y directorio` + `Bloque Funcionalidades - ficha clinica lateral por paciente`
+Fase actual: `Bloque UX/UI - Inicio operativo y directorio` + `Bloque Funcionalidades - ficha clinica lateral por paciente` + `Bloque Funcionalidades - SQLite parcial para pacientes y ficha clinica`
 
 Objetivo inmediato:
 
@@ -14,7 +14,7 @@ Objetivo inmediato:
 
 ## Ultimo avance realizado
 
-Fecha de referencia: `2026-05-15`
+Fecha de referencia: `2026-05-16`
 
 Hecho:
 
@@ -31,6 +31,11 @@ Hecho:
 - se cubrio cambio de superficie y persistencia/restauracion local
 - se agrego un modelo clinico normalizado inicial
 - se dejo esquema base de `SQLite` en `db/schema.sql`
+- se inicio una migracion real a `SQLite` para `patients` y `clinicalRecords`
+- se agregaron tablas de payload para guardar el paciente completo y la ficha completa sin perder el puente `app_kv`
+- se completo la lectura y escritura relacional de la ficha clinica en SQLite, manteniendo payload de respaldo para compatibilidad
+- `storage.js` ahora usa la misma normalizacion para navegador y desktop
+- se agregaron tests de persistencia para el nuevo puente de `SQLite`
 - se conecto la UI principal a partes del modelo clinico normalizado
 - se abrio el bloque UX/UI
 - se hizo una primera pasada sobre marca, header, odontograma y panel derecho
@@ -317,7 +322,7 @@ Hecho:
 2. probar login con `Admin`, `Dr` y `Staff` antes de entregar demo, especialmente restricciones de presupuesto e insumos
 3. decidir si insumos fase dos sera descuento de stock por atencion confirmada o editor de recetas
 4. limpiar el rol residual de `uiContext` global
-5. despues preparar la transicion a `SQLite` runtime
+5. preparar la entrada de `Tauri + SQLite` con una primera capa de persistencia local
 6. evaluar cierre de caja, abonos y conciliacion con snapshots aceptados
 
 ## Riesgos abiertos
@@ -340,3 +345,23 @@ Hecho:
 - el login actual es una barrera local de MVP, no seguridad fuerte; no usar como seguridad real hasta tener usuarios/permisos persistidos de forma robusta
 - el modo `Dr` aun requiere validacion de negocio fina sobre descuentos y honorarios antes de uso real con doctores externos
 - inventario general: paneles principales resaltados visualmente para distinguir mejor `Agregar material`, `Registrar compra`, `Ultimas compras`, `Comparacion de precios`, `Proveedores` e `Historial por proveedor`
+- base de `Tauri + SQLite` ya iniciada con capa de persistencia y scaffold desktop, pendiente validar el arranque nativo
+- arranque desktop en progreso: `cargo` no estaba instalado en la laptop y ya se instalo `rustup` para poder correr `npm run tauri dev`
+- icono desktop provisional de Tauri ya usa el logo DentCool en un cuadrado, pendiente revisar si luego se reemplaza por uno final
+- SQLite desktop ya queda pre-cargado desde `tauri.conf.json` y con permisos explicitos para `load/select/execute`
+- `npm run tauri build` ya termino bien y dejo el binario de release en `src-tauri/target/release/dentcool`
+- SQLite desktop ya inicializa el esquema real desde `db/schema.sql` al arrancar Tauri
+- la primera migracion real de pacientes y ficha clinica a SQLite ya pasa `npm test -- --run` y `npm run build`
+- se completo la escritura de las tablas clinicas hijas en SQLite: odontograma, tratamientos, evoluciones, historial, agenda, cobros, documentos, presupuesto y snapshots de presupuesto
+- se completo tambien la lectura de esas tablas clinicas desde SQLite en el puente actual
+- la verificacion actual sigue en verde con `npm test -- --run`: `74` tests y `npm run build`
+- la fecha de nacimiento en la ficha de paciente paso a un selector dia/mes/anio para evitar el picker nativo recortado en Tauri
+- el formulario del paciente quedo con mejor distribucion vertical para que el footer no se corte en escritorio
+- el modal de ficha de paciente quedo mas bajo y mas centrado para que el bloque entre mejor en la ventana de Tauri
+- el modal de ficha de paciente quedo mas compacto en paddings y alturas para que entren mejor los controles y el footer
+- se compactaron tambien el encabezado del directorio, la grilla de secciones y el bloque inicial de datos generales para abrir espacio visible hacia abajo
+- la edad del paciente ahora se muestra en la lista general y en la cabecera de la ficha activa
+- la edad del paciente ahora se recalcula desde la fecha de nacimiento al guardar para evitar valores viejos como `0`
+- el correo del paciente ahora se rechaza si no tiene `@` o si no tiene punto despues del `@`
+- la validacion de RUT sigue activa con formato basico y control de duplicados
+- se preparo el workflow de GitHub Actions para generar un instalador de Windows desde `dentcool-project`

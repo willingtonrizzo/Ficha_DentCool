@@ -129,6 +129,87 @@ function getVisitFollowUp(nextVisit) {
   };
 }
 
+const BIRTH_DATE_MONTHS = [
+  { value: '01', label: 'Ene' },
+  { value: '02', label: 'Feb' },
+  { value: '03', label: 'Mar' },
+  { value: '04', label: 'Abr' },
+  { value: '05', label: 'May' },
+  { value: '06', label: 'Jun' },
+  { value: '07', label: 'Jul' },
+  { value: '08', label: 'Ago' },
+  { value: '09', label: 'Sep' },
+  { value: '10', label: 'Oct' },
+  { value: '11', label: 'Nov' },
+  { value: '12', label: 'Dic' },
+];
+
+const BIRTH_DATE_YEARS = Array.from({ length: 121 }, (_, index) => String(new Date().getFullYear() - index));
+
+function splitBirthDate(value) {
+  if (!value || typeof value !== 'string') {
+    return { day: '', month: '', year: '' };
+  }
+
+  const [year = '', month = '', day = ''] = value.split('-');
+  return {
+    day,
+    month,
+    year,
+  };
+}
+
+function composeBirthDate(parts) {
+  if (!parts?.day || !parts?.month || !parts?.year) return '';
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function BirthDatePicker({ value, onChange }) {
+  const [parts, setParts] = useState(() => splitBirthDate(value));
+
+  useEffect(() => {
+    setParts(splitBirthDate(value));
+  }, [value]);
+
+  const updatePart = (key, nextValue) => {
+    setParts((current) => {
+      const nextParts = { ...current, [key]: nextValue };
+      const composed = composeBirthDate(nextParts);
+
+      if (composed) {
+        onChange(composed);
+      } else if (!nextParts.day && !nextParts.month && !nextParts.year) {
+        onChange('');
+      }
+
+      return nextParts;
+    });
+  };
+
+  return (
+    <div className="birth-date-picker">
+      <select value={parts.day} onChange={(event) => updatePart('day', event.target.value)}>
+        <option value="">Dia</option>
+        {Array.from({ length: 31 }, (_, index) => String(index + 1).padStart(2, '0')).map((day) => (
+          <option key={day} value={day}>{day}</option>
+        ))}
+      </select>
+      <select value={parts.month} onChange={(event) => updatePart('month', event.target.value)}>
+        <option value="">Mes</option>
+        {BIRTH_DATE_MONTHS.map((month) => (
+          <option key={month.value} value={month.value}>{month.label}</option>
+        ))}
+      </select>
+      <select value={parts.year} onChange={(event) => updatePart('year', event.target.value)}>
+        <option value="">Anio</option>
+        {BIRTH_DATE_YEARS.map((year) => (
+          <option key={year} value={year}>{year}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 export const Icon = {
   search: (p) => <svg className={p?.cls || "icon"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>,
   bell: (p) => <svg className={p?.cls || "icon"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10 21a2 2 0 0 0 4 0" /></svg>,
@@ -1176,9 +1257,13 @@ export function PatientsDirectoryView({ patients, agendaCount = 0, onCreatePatie
                 </div>
                 <div className="patient-directory-record">{patient.recordNumber}</div>
                 <div className="patient-directory-meta">{patient.rut || 'Sin RUT'} · {patient.phone || 'Sin telefono'}</div>
+                <div className="patient-directory-meta">
+                  {patient.age != null ? `Edad ${patient.age} anos` : 'Edad no registrada'}
+                </div>
               </div>
             </div>
             <div className="patient-directory-row-stats">
+              <span><strong>Edad</strong>{patient.age != null ? `${patient.age} anos` : 'Sin registro'}</span>
               <span><strong>Ultima atencion</strong>{patient.lastVisit || 'Sin registro'}</span>
               <span><strong>Proxima cita</strong>{patient.nextVisit || 'Sin agendar'}</span>
             </div>
@@ -1261,7 +1346,6 @@ function PatientGeneralSection({ draft, activePatient, validationErrors = {}, on
     <form className="patient-section-body" onSubmit={onSubmit}>
       <div className="patient-section-intro">
         <h4>Datos generales del paciente</h4>
-        <p>Alta administrativa base antes de pasar a antecedentes y luego a la ficha clinica completa.</p>
       </div>
       <div className="patients-form-grid">
         <label className="patient-field patient-field-full">
@@ -1286,7 +1370,7 @@ function PatientGeneralSection({ draft, activePatient, validationErrors = {}, on
         </label>
         <label className="patient-field">
           <span>Fecha de nacimiento</span>
-          <input type="date" value={draft.birthDate} onChange={(event) => onChange('birthDate', event.target.value)} />
+          <BirthDatePicker value={draft.birthDate} onChange={(value) => onChange('birthDate', value)} />
         </label>
         <label className="patient-field">
           <span>Genero</span>
@@ -1634,7 +1718,9 @@ export function PatientsSheet({
                 <div className="patients-eyebrow">Ficha administrativa</div>
                 <div className="patients-directory-title">Secciones internas del paciente</div>
               </div>
-              <div className="patients-form-badge">#{activePatient?.recordNumber ?? 'Sin ficha'}</div>
+              <div className="patients-form-badge">
+                #{activePatient?.recordNumber ?? 'Sin ficha'}{activePatient?.age != null ? ` · ${activePatient.age} anos` : ''}
+              </div>
             </div>
             <div className="patient-sheet-nav">
               {sectionItems.map((section) => (

@@ -9,6 +9,7 @@ coverage/
 dentcool-project/node_modules/
 dentcool-project/dist/
 dentcool-project/coverage/
+dentcool-project/src-tauri/target/
 
 # Local env files
 .env

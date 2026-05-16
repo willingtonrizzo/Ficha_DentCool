@@ -1,0 +1,42 @@
+name: DentCool Windows Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: dentcool-project/package-lock.json
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        working-directory: dentcool-project
+        run: npm ci
+
+      - name: Build and publish Windows installer
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: dentcool-project
+          tagName: dentcool-v__VERSION__
+          releaseName: DentCool v__VERSION__
+          releaseBody: Windows 11 installer for DentCool. Download the attached asset and install it on the client laptop.
+          releaseDraft: false
+          prerelease: false
+          args: ''

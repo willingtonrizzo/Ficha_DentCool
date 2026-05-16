@@ -30,6 +30,10 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - Existe persistencia local de `Documentos` por `patientId`.
 - Existe persistencia local del odontograma por `patientId`.
 - Existe validacion base para alta y edicion de pacientes.
+- Existe una primera capa de persistencia preparada para migrar a `Tauri + SQLite` sin romper el flujo web actual.
+- Existe una migracion real parcial a `SQLite` para `patients` y `clinical_records`, con tablas de payload para conservar el objeto completo.
+- Existe escritura a SQLite para las tablas hijas de la ficha clinica: odontograma, tratamientos, evoluciones, historial, agenda, cobros, documentos, budget y snapshots de presupuesto.
+- Existe lectura desde SQLite para esa misma capa clinica, con respaldo todavia en payload completo para no romper compatibilidad.
 - `Antecedentes` ya refleja datos reales del paciente activo en la tab principal.
 - `Inicio` es la pantalla inicial y `Pacientes` funciona como directorio general en filas.
 - Desde el directorio ya se puede abrir `Ver ficha` para la pagina clinica o `Editar ficha` para la hoja lateral.
@@ -174,6 +178,8 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - El login local actual solo es barrera de uso para demo; no debe tratarse como seguridad real hasta tener usuarios/permisos robustos.
 - El pack simple hoy no reemplaza agenda/caja real: crea una linea comercial unica y falta decidir si debe desglosar tratamientos, sesiones y cobros en fase posterior.
 - El inventario general todavia necesita validacion de flujo: comparacion historica completa y reglas de documento obligatorio.
+- `SQLite` ya dejo de ser solo scaffold: falta validar el arranque desktop nativo con datos reales y seguir puliendo casos borde de la lectura relacional.
+- Ya quedo preparado un workflow de GitHub Actions para generar el instalador de Windows como release descargable.
 
 ## Siguiente paso recomendado
 

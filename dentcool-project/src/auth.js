@@ -1,4 +1,5 @@
 import { STORAGE_KEYS } from './data';
+import { getPersistedItem, removePersistedItem, setPersistedItem } from './persistence';
 
 export const USER_ROLES = {
   admin: {
@@ -58,7 +59,7 @@ export function getRolePermissions(roleId) {
 export function loadAuthSession() {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.authSession);
+    const raw = getPersistedItem(STORAGE_KEYS.authSession);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.roleId || !USER_ROLES[parsed.roleId]) return null;
@@ -70,12 +71,12 @@ export function loadAuthSession() {
 
 export function saveAuthSession(session) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(STORAGE_KEYS.authSession, JSON.stringify(session));
+  setPersistedItem(STORAGE_KEYS.authSession, JSON.stringify(session));
 }
 
 export function clearAuthSession() {
   if (typeof window === 'undefined') return;
-  window.localStorage.removeItem(STORAGE_KEYS.authSession);
+  removePersistedItem(STORAGE_KEYS.authSession);
 }
 
 export function validateLocalLogin(roleId, password) {

@@ -2,7 +2,7 @@
 
 ## Fecha de referencia
 
-`2026-05-15`
+`2026-05-16`
 
 ## Estado resumido
 
@@ -17,7 +17,9 @@ Ruta activa del proyecto:
 - consolidar la ficha por paciente
 - dejar la operacion local mas real
 - sostener el modulo financiero ya operativo sobre snapshots por paciente
-- seguir afinando reportes financieros avanzados ya conectados a tratamientos y citas visibles sin mezclar todavia `SQLite`
+- seguir afinando reportes financieros avanzados ya conectados a tratamientos y citas visibles
+- cerrar la primera migracion real a `SQLite` para pacientes y ficha clinica sin romper el flujo web actual
+- validar lectura relacional completa en Tauri y revisar casos borde de la ficha ya escrita en SQLite
 - dejar documentado el estado actual antes de subir para prueba de la doctora
 - cerrar y validar fase uno del modulo de insumos antes de escalar a `SQLite`
 - mantener documentacion viva para retomar sesiones sin perder contexto
@@ -26,7 +28,7 @@ Ruta activa del proyecto:
 ## Lo ultimo verificado
 
 - `npm test` pasa
-- `71` tests verdes
+- `74` tests verdes
 - `npm run build` pasa
 - ya existen persistencias locales por paciente para:
   - `Motivo y diagnostico`
@@ -125,14 +127,14 @@ Razon:
 6. validar con la doctora el flujo de insumos fase uno: alta de material, lista base y snapshot
 7. decidir si fase dos de insumos parte por descuento de stock al confirmar atencion o por editor de listas base
 8. seguir limpiando el `uiContext` global residual
-9. seguir refinando la operacion local antes de `SQLite runtime`
+9. seguir refinando la operacion local antes de `SQLite runtime` completo
 10. preparar la futura transicion a `SQLite` sin mezclar demasiados frentes
 
 ## Riesgos abiertos
 
 - `Inicio` todavia no es panel 100% real
 - parte del flujo clinico sigue compartiendo mocks
-- aun no hay runtime real de `SQLite`
+- `SQLite` ya existe como runtime parcial; lectura y escritura de las tablas clinicas ya quedaron cubiertas en codigo y tests, falta validar arranque desktop nativo y casos borde
 - falta protocolo de backup local antes de escalar uso real
 - el pricing ya tiene settings, catalogo, snapshots, estados refinados, vista general, objetivo editable, exportacion CSV, exportacion Excel y filtros/reportes avanzados completos, y ahora cruza tratamientos/citas visibles
 - seguir usando `nextVisit` y `paid` como puente por mucho tiempo hara mas costosa la separacion de agenda y caja
@@ -148,6 +150,24 @@ Razon:
 - el inventario general ahora existe como vista separada; falta validarlo con la doctora y decidir si requiere reglas finales de documento y trazabilidad historica completa
 - el despliegue demo conectado a GitHub debe refrescarse desde el push a `main` si Render esta apuntando a ese repo
 - los paneles principales de inventario quedaron resaltados visualmente para distinguir mejor cada bloque sin tocar el flujo
+- ya existe una primera capa de persistencia pensada para `Tauri + SQLite`; la migracion real de pacientes y ficha clinica ya comenzo
+- el arranque desktop ya detecto que faltaba `cargo` en la laptop; se instalo `rustup` y el primer `tauri dev` ya compila y abre la ventana
+- el icono provisional de la app desktop ya usa el logo DentCool en formato cuadrado; luego puede reemplazarse por uno final
+- la configuracion desktop ya pre-carga SQLite en `tauri.conf.json` y expone permisos explicitos para `load/select/execute`
+- el empaquetado `npm run tauri build` ya termino bien y dejo un binario de release en `src-tauri/target/release/dentcool`
+- SQLite ya arranca con el esquema real de `db/schema.sql` al abrir Tauri
+- la primera migracion real de tablas a SQLite ya esta en marcha para `patients` y `clinicalRecords`
+- el resto de tablas clinicas ya quedo escrito y leido desde SQLite en el puente actual; falta validar el arranque desktop nativo y revisar casos borde en Tauri
+- la fecha de nacimiento en la ficha de paciente paso a un selector dia/mes/anio para evitar el picker nativo cortado en escritorio
+- el formulario del paciente quedo mejor contenido verticalmente para que el footer no se recorte en Tauri
+- el modal de ficha de paciente quedo mas bajo y centrado para entrar mejor en la ventana desktop
+- el modal de ficha de paciente quedo mas compacto en paddings y alturas para que el footer tenga mas chance de aparecer sin scroll extra
+- se compactaron tambien el header del directorio, la grilla de secciones y el bloque inicial de datos generales para liberar mas alto util en la ficha
+- la edad del paciente ahora aparece tanto en la lista del directorio como en la cabecera de la ficha activa
+- la edad ahora se recalcula desde la fecha de nacimiento al guardar
+- el correo se valida con presencia de `@` y de punto despues del dominio
+- el RUT mantiene validacion basica y unicidad
+- ya quedo preparado el workflow de GitHub Actions para sacar el instalador de Windows sin compilarlo a mano en la laptop de la clienta
 
 ## Instruccion de retoma
 

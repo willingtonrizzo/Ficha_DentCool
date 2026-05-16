@@ -2,14 +2,19 @@ import { STORAGE_KEYS } from './data';
 import { cloneInitialTeeth } from './odontogram';
 import { createPricingCatalog, createPricingSettings } from './pricing';
 import {
-  createPatient,
+  getPersistedItem,
+  normalizeClinicalRecordCollectionJson,
+  normalizePatientCollectionJson,
+  removePersistedItem,
+  setPersistedItem,
+} from './persistence';
+import {
   createSeedPatients,
   DEFAULT_ALLERGIES,
   DEFAULT_DENTAL_HABITS,
   DEFAULT_MEDICAL_BACKGROUND,
   isUntouchedBackgroundCollection,
 } from './patients';
-import { createClinicalPatientRecord, createMotivoDiagnosticoRecord } from './clinical-model';
 
 function isPlainObject(value) {
   return value != null && typeof value === 'object' && !Array.isArray(value);
@@ -21,7 +26,7 @@ export function loadTeethState() {
   }
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.odontogram);
+    const raw = getPersistedItem(STORAGE_KEYS.odontogram);
     if (!raw) return cloneInitialTeeth();
 
     const parsed = JSON.parse(raw);
@@ -45,12 +50,12 @@ export function loadTeethState() {
 
 export function saveTeethState(teeth) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(STORAGE_KEYS.odontogram, JSON.stringify(teeth));
+  setPersistedItem(STORAGE_KEYS.odontogram, JSON.stringify(teeth));
 }
 
 export function resetTeethState() {
   if (typeof window === 'undefined') return cloneInitialTeeth();
-  window.localStorage.removeItem(STORAGE_KEYS.odontogram);
+  removePersistedItem(STORAGE_KEYS.odontogram);
   return cloneInitialTeeth();
 }
 
@@ -67,7 +72,7 @@ export function loadUiContext() {
   }
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.progress);
+    const raw = getPersistedItem(STORAGE_KEYS.progress);
     if (!raw) return { ...DEFAULT_UI_CONTEXT };
 
     const parsed = JSON.parse(raw);
@@ -86,12 +91,12 @@ export function loadUiContext() {
 
 export function saveUiContext(uiContext) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(STORAGE_KEYS.progress, JSON.stringify(uiContext));
+  setPersistedItem(STORAGE_KEYS.progress, JSON.stringify(uiContext));
 }
 
 export function resetUiContext() {
   if (typeof window === 'undefined') return { ...DEFAULT_UI_CONTEXT };
-  window.localStorage.removeItem(STORAGE_KEYS.progress);
+  removePersistedItem(STORAGE_KEYS.progress);
   return { ...DEFAULT_UI_CONTEXT };
 }
 
@@ -101,34 +106,10 @@ export function loadClinicalRecords() {
   }
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.clinicalRecords);
+    const raw = getPersistedItem(STORAGE_KEYS.clinicalRecords);
     if (!raw) return {};
 
-    const parsed = JSON.parse(raw);
-    if (!isPlainObject(parsed)) return {};
-
-    return Object.fromEntries(
-      Object.entries(parsed)
-        .filter(([patientId, record]) => typeof patientId === 'string' && isPlainObject(record))
-        .map(([patientId, record]) => {
-          const looksLegacyMotivoOnly =
-            'consultationReason' in record ||
-            'currentIllness' in record ||
-            'diagnoses' in record;
-
-          if (looksLegacyMotivoOnly) {
-            return [
-              patientId,
-              createClinicalPatientRecord(
-                { motivoDiagnostico: createMotivoDiagnosticoRecord(record) },
-                { id: patientId }
-              ),
-            ];
-          }
-
-          return [patientId, createClinicalPatientRecord(record, { id: patientId })];
-        })
-    );
+    return normalizeClinicalRecordCollectionJson(raw);
   } catch {
     return {};
   }
@@ -136,12 +117,12 @@ export function loadClinicalRecords() {
 
 export function saveClinicalRecords(recordsByPatient) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(STORAGE_KEYS.clinicalRecords, JSON.stringify(recordsByPatient));
+  setPersistedItem(STORAGE_KEYS.clinicalRecords, JSON.stringify(recordsByPatient));
 }
 
 export function resetClinicalRecords() {
   if (typeof window === 'undefined') return {};
-  window.localStorage.removeItem(STORAGE_KEYS.clinicalRecords);
+  removePersistedItem(STORAGE_KEYS.clinicalRecords);
   return {};
 }
 
@@ -153,15 +134,13 @@ export function loadPatientDirectory() {
   }
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.patients);
+    const raw = getPersistedItem(STORAGE_KEYS.patients);
     if (!raw) return fallback;
 
-    const parsed = JSON.parse(raw);
+    const parsed = normalizePatientCollectionJson(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) return fallback;
 
-    return parsed
-      .filter(isPlainObject)
-      .map((patient) => createPatient(patient));
+    return parsed;
   } catch {
     return fallback;
   }
@@ -169,7 +148,7 @@ export function loadPatientDirectory() {
 
 export function savePatientDirectory(patients) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(STORAGE_KEYS.patients, JSON.stringify(patients));
+  setPersistedItem(STORAGE_KEYS.patients, JSON.stringify(patients));
 }
 
 export function loadActivePatientId() {
@@ -179,21 +158,21 @@ export function loadActivePatientId() {
     return fallback;
   }
 
-  const stored = window.localStorage.getItem(STORAGE_KEYS.activePatientId);
+  const stored = getPersistedItem(STORAGE_KEYS.activePatientId);
   return stored || fallback;
 }
 
 export function saveActivePatientId(patientId) {
   if (typeof window === 'undefined' || !patientId) return;
-  window.localStorage.setItem(STORAGE_KEYS.activePatientId, patientId);
+  setPersistedItem(STORAGE_KEYS.activePatientId, patientId);
 }
 
 export function resetPatientDirectory() {
   const fallback = createSeedPatients();
 
   if (typeof window !== 'undefined') {
-    window.localStorage.removeItem(STORAGE_KEYS.patients);
-    window.localStorage.removeItem(STORAGE_KEYS.activePatientId);
+    removePersistedItem(STORAGE_KEYS.patients);
+    removePersistedItem(STORAGE_KEYS.activePatientId);
   }
 
   return {
@@ -210,7 +189,7 @@ export function loadPricingSettings() {
   }
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.pricingSettings);
+    const raw = getPersistedItem(STORAGE_KEYS.pricingSettings);
     if (!raw) return fallback;
 
     const parsed = JSON.parse(raw);
@@ -224,14 +203,14 @@ export function loadPricingSettings() {
 
 export function savePricingSettings(settings) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(STORAGE_KEYS.pricingSettings, JSON.stringify(createPricingSettings(settings)));
+  setPersistedItem(STORAGE_KEYS.pricingSettings, JSON.stringify(createPricingSettings(settings)));
 }
 
 export function resetPricingSettings() {
   const fallback = createPricingSettings();
 
   if (typeof window !== 'undefined') {
-    window.localStorage.removeItem(STORAGE_KEYS.pricingSettings);
+    removePersistedItem(STORAGE_KEYS.pricingSettings);
   }
 
   return fallback;
@@ -245,7 +224,7 @@ export function loadPricingCatalog() {
   }
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.pricingCatalog);
+    const raw = getPersistedItem(STORAGE_KEYS.pricingCatalog);
     if (!raw) return fallback;
 
     const parsed = JSON.parse(raw);
@@ -259,14 +238,14 @@ export function loadPricingCatalog() {
 
 export function savePricingCatalog(catalog) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(STORAGE_KEYS.pricingCatalog, JSON.stringify(createPricingCatalog(catalog)));
+  setPersistedItem(STORAGE_KEYS.pricingCatalog, JSON.stringify(createPricingCatalog(catalog)));
 }
 
 export function resetPricingCatalog() {
   const fallback = createPricingCatalog();
 
   if (typeof window !== 'undefined') {
-    window.localStorage.removeItem(STORAGE_KEYS.pricingCatalog);
+    removePersistedItem(STORAGE_KEYS.pricingCatalog);
   }
 
   return fallback;

@@ -12,7 +12,19 @@ describe('patients helpers', () => {
 
     expect(patient.initials).toBe('AL');
     expect(patient.birthDateLabel).toContain('1990');
+    expect(patient.age).toBe(calculateAge('1990-05-10'));
     expect(patient.alerts[0].severity).toBe('warn');
+  });
+
+  it('recomputes age from birthDate even when input age is stale', () => {
+    const patient = createPatient({
+      id: 'patient-stale-age',
+      fullName: 'Paciente Ejemplo',
+      birthDate: '2006-05-08',
+      age: 0,
+    });
+
+    expect(patient.age).toBe(calculateAge('2006-05-08'));
   });
 
   it('creates an editable draft without derived display fields', () => {
@@ -94,5 +106,15 @@ describe('patients helpers', () => {
     expect(duplicateRut.errors.rut).toContain('Ya existe');
     expect(badEmail.valid).toBe(false);
     expect(badEmail.errors.email).toContain('email valido');
+  });
+
+  it('rejects emails without at sign or dot', () => {
+    const withoutAt = validatePatientDraft({ id: 'patient-2', fullName: 'Luis Perez', rut: '', email: 'correo.cl' }, []);
+    const withoutDot = validatePatientDraft({ id: 'patient-2', fullName: 'Luis Perez', rut: '', email: 'correo@cl' }, []);
+
+    expect(withoutAt.valid).toBe(false);
+    expect(withoutAt.errors.email).toContain('email valido');
+    expect(withoutDot.valid).toBe(false);
+    expect(withoutDot.errors.email).toContain('email valido');
   });
 });
