@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { EVOLUTION, HISTORY, STORAGE_KEYS, TREATMENTS } from './data';
 import { FinanceDashboard, FloatingNewPatientButton, HomeDashboard, LoginScreen, PatientsDirectoryView, PriceListView, Sidebar, TopbarInner, PatientHeader, PatientsSheet, Odontogram, ToothPanel } from './app';
-import { Tabs, Antecedentes, Motivo, Evolucion, Presupuesto, Insumos, InventarioInsumos, Documentos, Historial, AgendaClinica, CobrosAbonos, TreatmentsTable, NextAppointments } from './tabs';
+import { Tabs, Antecedentes, Motivo, Evolucion, Presupuesto, Insumos, InventarioInsumos, Documentos, Historial, NotasRapidas, AgendaClinica, CobrosAbonos, TreatmentsTable, NextAppointments } from './tabs';
 import { updateToothSurfaceState } from './odontogram';
 import {
   buildClinicalRecordFromMocks,
@@ -39,6 +39,7 @@ import {
   loadPricingSettings,
   loadTeethState,
   loadUiContext,
+  flushStorageWrites,
   saveClinicalRecords,
   resetPatientDirectory,
   resetPricingCatalog,
@@ -768,6 +769,32 @@ export default function App() {
     }));
   };
 
+  const handleQuickNotesSave = (nextNotes) => {
+    if (!activePatient) return;
+    setClinicalSaveState('dirty');
+    setClinicalRecords((current) => {
+      const activeRecord = createClinicalPatientRecord(current[activePatient.id], activePatient);
+      const nextRecords = {
+        ...current,
+        [activePatient.id]: {
+          ...activeRecord,
+          quickNotes: {
+            ...activeRecord.quickNotes,
+            ...nextNotes,
+          },
+        },
+      };
+
+      saveClinicalRecords(nextRecords);
+      void flushStorageWrites().then(() => {
+        setClinicalSaveState('saved');
+        setLastClinicalSavedAt(new Date());
+      });
+
+      return nextRecords;
+    });
+  };
+
   const handlePricingSettingChange = (field, value) => {
     setPricingSettings((current) => ({
       ...current,
@@ -1262,6 +1289,17 @@ export default function App() {
           onAddEntry={handleAddHistoryEntry}
           onRemoveEntry={handleRemoveHistoryEntry}
           onOpenSection={handleOpenPatientSheet}
+        />
+      );
+    }
+
+    if (sectionId === 'notasRapidas') {
+      return (
+        <NotasRapidas
+          notes={record.quickNotes}
+          saveState={clinicalSaveState}
+          lastSavedAt={lastClinicalSavedAt}
+          onSave={handleQuickNotesSave}
         />
       );
     }

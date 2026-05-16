@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PATIENT, INITIAL_TEETH, TREATMENTS, EVOLUTION, HISTORY } from '../data';
-import { buildClinicalRecordFromMocks, DIAGNOSIS_SEVERITY, TREATMENT_STATUS } from '../clinical-model';
+import { buildClinicalRecordFromMocks, createClinicalPatientRecord, DIAGNOSIS_SEVERITY, TREATMENT_STATUS } from '../clinical-model';
 
 describe('clinical model', () => {
   it('maps the current mocks into a normalized patient and record structure', () => {
@@ -171,6 +171,34 @@ describe('clinical model', () => {
     expect(result.record.paymentEntries[0].amount).toBe(10000);
     expect(result.record.documents).toHaveLength(1);
     expect(result.record.documents[0].kind).toBe('consentimiento');
+    expect(result.record.quickNotes.feedbackTopic).toBe('general');
+    expect(result.record.quickNotes.quickNotes).toBe('');
+  });
+
+  it('normalizes quick notes as part of the patient clinical record', () => {
+    const record = createClinicalPatientRecord(
+      {
+        quickNotes: {
+          dateLabel: '16-05-2026',
+          reason: 'Control de restauracion',
+          quickNotes: '1.- mandar correo',
+          description: 'Descripcion posterior a la atencion.',
+          feedbackTopic: 'agenda',
+          feedbackDetail: 'Ajustar tiempos para proximo control.',
+        },
+      },
+      PATIENT
+    );
+
+    expect(record.quickNotes).toEqual({
+      dateLabel: '16-05-2026',
+      reason: 'Control de restauracion',
+      quickNotes: '1.- mandar correo',
+      description: 'Descripcion posterior a la atencion.',
+      feedbackTopic: 'agenda',
+      feedbackDetail: 'Ajustar tiempos para proximo control.',
+      updatedAt: '',
+    });
   });
 
   it('preserves patient specific odontogram and patient ui context', () => {

@@ -19,3 +19,8 @@ dentcool-project/src-tauri/target/
 # Local source archives
 Disertacion.zip
 _tmp_dental_zip/
+
+# Local clinical data backups / runtime logs
+backups/
+dentcool-project/vite-dev.log
+dentcool-project/vite-dev.err.log

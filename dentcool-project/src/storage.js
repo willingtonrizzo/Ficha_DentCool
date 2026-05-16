@@ -2,6 +2,7 @@ import { STORAGE_KEYS } from './data';
 import { cloneInitialTeeth } from './odontogram';
 import { createPricingCatalog, createPricingSettings } from './pricing';
 import {
+  flushPersistedWrites,
   getPersistedItem,
   normalizeClinicalRecordCollectionJson,
   normalizePatientCollectionJson,
@@ -118,6 +119,10 @@ export function loadClinicalRecords() {
 export function saveClinicalRecords(recordsByPatient) {
   if (typeof window === 'undefined') return;
   setPersistedItem(STORAGE_KEYS.clinicalRecords, JSON.stringify(recordsByPatient));
+}
+
+export function flushStorageWrites() {
+  return flushPersistedWrites();
 }
 
 export function resetClinicalRecords() {

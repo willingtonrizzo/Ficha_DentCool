@@ -588,6 +588,18 @@ export function resolveDocuments(patient, storedDocuments) {
   return createSeedDocuments(patient);
 }
 
+export function createQuickNotesRecord(input = {}) {
+  return {
+    dateLabel: typeof input.dateLabel === 'string' ? input.dateLabel : '',
+    reason: typeof input.reason === 'string' ? input.reason : '',
+    quickNotes: typeof input.quickNotes === 'string' ? input.quickNotes : '',
+    description: typeof input.description === 'string' ? input.description : '',
+    feedbackTopic: typeof input.feedbackTopic === 'string' ? input.feedbackTopic : 'general',
+    feedbackDetail: typeof input.feedbackDetail === 'string' ? input.feedbackDetail : '',
+    updatedAt: typeof input.updatedAt === 'string' ? input.updatedAt : '',
+  };
+}
+
 export function createClinicalPatientRecord(input = {}, patient) {
   const appointments = resolveAppointments(patient, input.appointments);
   const paymentEntries = resolvePayments(patient, input.paymentEntries, input.treatments);
@@ -607,6 +619,7 @@ export function createClinicalPatientRecord(input = {}, patient) {
     appointments,
     paymentEntries,
     documents: resolveDocuments(patient, input.documents),
+    quickNotes: createQuickNotesRecord(input.quickNotes),
   };
 }
 
@@ -669,6 +682,7 @@ export function createClinicalRecord(input) {
       : [],
     appointments,
     paymentEntries,
+    quickNotes: createQuickNotesRecord(input.quickNotes),
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
   };
@@ -786,6 +800,7 @@ export function buildClinicalRecordFromMocks({
       appointments: resolveAppointments(mappedPatient, patientClinicalRecord.appointments),
       paymentEntries: resolvePayments(mappedPatient, patientClinicalRecord.paymentEntries, patientClinicalRecord.treatments),
       documents: resolveDocuments(mappedPatient, patientClinicalRecord.documents),
+      quickNotes: createQuickNotesRecord(patientClinicalRecord.quickNotes),
       createdAt: now,
       updatedAt: now,
     }),

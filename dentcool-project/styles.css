@@ -5037,6 +5037,160 @@ table.tx tfoot td {
   outline: none;
 }
 
+.quick-notes-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.quick-notes-grid {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.45fr) minmax(240px, 1fr) minmax(180px, 0.55fr);
+  gap: 12px;
+}
+
+.quick-notes-grid.two {
+  grid-template-columns: minmax(150px, 0.45fr) minmax(240px, 1fr);
+}
+
+.quick-notes-grid.three {
+  grid-template-columns: minmax(150px, 0.45fr) minmax(240px, 1fr) minmax(180px, 0.55fr);
+}
+
+.quick-note-tabs {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #f8fbfe;
+}
+
+.quick-note-tab {
+  min-height: 36px;
+  border: 0;
+  border-radius: 9px;
+  padding: 0 14px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.quick-note-tab:hover {
+  color: var(--ink);
+  background: #fff;
+}
+
+.quick-note-tab.active {
+  color: var(--ink);
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.08);
+}
+
+.quick-notes-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.quick-notes-field span,
+.quick-notes-block-head span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.quick-notes-field input,
+.quick-notes-field select,
+.quick-notes-input,
+.quick-notes-detail {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+.quick-notes-field input,
+.quick-notes-field select {
+  height: 42px;
+  padding: 0 12px;
+}
+
+.quick-notes-input,
+.quick-notes-detail {
+  min-height: 160px;
+  padding: 12px 14px;
+  resize: vertical;
+  line-height: 1.55;
+}
+
+.quick-notes-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  min-height: 210px;
+}
+
+.quick-notes-detail.feedback {
+  min-height: 130px;
+}
+
+.quick-notes-field input:focus,
+.quick-notes-field select:focus,
+.quick-notes-input:focus,
+.quick-notes-detail:focus {
+  outline: none;
+}
+
+.quick-notes-sections {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(300px, 1.1fr);
+  gap: 14px;
+}
+
+.quick-notes-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.quick-notes-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.quick-notes-block:first-child {
+  grid-row: span 2;
+}
+
+.quick-notes-block-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quick-notes-block-head h4 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 15px;
+}
+
+.quick-notes-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 /* utility */
 .icon { width: 16px; height: 16px; flex: 0 0 16px; }
 .muted { color: var(--muted); }
@@ -5071,6 +5225,14 @@ table.tx tfoot td {
 
   .patient-sheet-nav {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .quick-notes-sections {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-notes-block:first-child {
+    grid-row: auto;
   }
 
   .home-grid {
@@ -5185,6 +5347,25 @@ table.tx tfoot td {
   .home-hero,
   .home-grid {
     grid-template-columns: 1fr;
+  }
+
+  .quick-notes-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-notes-grid.two,
+  .quick-notes-grid.three {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-note-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .quick-note-tab {
+    padding-inline: 8px;
   }
 
   .home-kpi-grid,

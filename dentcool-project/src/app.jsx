@@ -1592,6 +1592,7 @@ export function PatientsSheet({
     { id: 'presupuesto', label: 'Presupuesto', status: 'ready' },
     { id: 'documentos', label: 'Documentos', status: 'ready' },
     { id: 'historial', label: 'Historial', status: 'ready' },
+    { id: 'notasRapidas', label: 'Notas rapidas', status: 'ready' },
   ].filter((section) => !allowedSections || allowedSections.includes(section.id));
   const filteredPatients = patients.filter((patient) => {
     const search = query.trim().toLowerCase();

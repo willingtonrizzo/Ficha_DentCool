@@ -78,6 +78,14 @@ Hecho:
 - el directorio ahora permite limpiar borradores vacios `Paciente nuevo`
 - se agrego limpieza automatica para evitar acumulacion de borradores vacios duplicados
 - el odontograma ya se separo por `patientId` dentro del mismo `clinicalRecord`
+- se agrego seccion `Notas rapidas` dentro de la ficha interna del paciente para perfiles `Admin` y `Dr`
+- `Notas rapidas` incluye tres paneles internos: `Nota rapida`, `Nota detallada` y `Feedback`
+- `Nota rapida` inicia con `1.-` y soporta numeracion agil: un `Enter` continua el mismo punto y dos `Enter` crean el siguiente punto
+- `Feedback` permite registrar asunto operativo: agenda, costo, logistica, salud, consulta, ventas o insumos
+- se corrigio persistencia de `quickNotes` dentro del `clinicalRecord` para que sobreviva cierre completo de Tauri
+- se agrego espera explicita de la cola de escritura SQLite al guardar notas rapidas
+- se creo backup de `ficha-dentcool.db` antes de instalar la nueva version
+- se genero instalador NSIS `DentCool_0.1.0_x64-setup.exe` y se instalo la version nueva con la seccion de notas
 - al cambiar de paciente ahora se hidratan su odontograma, su pieza activa, su superficie activa y su tab clinico
 - se migro el odontograma global legado al paciente activo inicial para no perder el estado previo
 - el alta y la edicion de paciente ahora validan nombre obligatorio, RUT con formato basico y RUT no duplicado

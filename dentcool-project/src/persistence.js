@@ -1168,6 +1168,10 @@ export function setPersistedItem(key, value) {
   }
 }
 
+export function flushPersistedWrites() {
+  return writeChain;
+}
+
 export function removePersistedItem(key) {
   if (persistenceMode === 'sqlite') {
     sqliteCache.delete(key);

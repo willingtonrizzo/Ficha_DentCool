@@ -28,13 +28,19 @@ Ruta activa del proyecto:
 ## Lo ultimo verificado
 
 - `npm test` pasa
-- `74` tests verdes
+- `77` tests verdes
 - `npm run build` pasa
+- app Tauri instalada actualizada con `Notas rapidas` por paciente
+- backup de SQLite creado en `backups/ficha-dentcool-20260516-184308.db`
+- base real de Tauri ubicada en `C:\Users\welli\AppData\Roaming\com.dentcool.app\ficha-dentcool.db`
+- instalador nuevo generado en `dentcool-project/src-tauri/target/release/bundle/nsis/DentCool_0.1.0_x64-setup.exe`
+- `Notas rapidas` se valido manualmente con perfil `Admin`, cierre de sesion y cierre completo de app
 - ya existen persistencias locales por paciente para:
   - `Motivo y diagnostico`
   - `Evolucion clinica`
   - `Historial`
   - `Presupuesto`
+  - `Notas rapidas`
 - la vista `Inicio` existe pero aun mezcla datos reales con mocks
 - existe `src/pricing.js` con formulas base, alertas, margen y precios sugeridos
 - `Presupuesto` ya muestra una lectura financiera estimada para tratamientos compatibles con el catalogo base

@@ -1927,6 +1927,283 @@ export function Historial({
   );
 }
 
+const QUICK_NOTE_MARKER = /^(\d+)\.-\s?/;
+
+function getCurrentLine(value, caret) {
+  const lineStart = value.lastIndexOf('\n', Math.max(0, caret - 1)) + 1;
+  const nextBreak = value.indexOf('\n', caret);
+  const lineEnd = nextBreak === -1 ? value.length : nextBreak;
+  return {
+    lineStart,
+    lineEnd,
+    text: value.slice(lineStart, lineEnd),
+  };
+}
+
+function getNextQuickNoteNumber(value) {
+  const numbers = value
+    .split('\n')
+    .map((line) => line.match(QUICK_NOTE_MARKER))
+    .filter(Boolean)
+    .map((match) => Number(match[1]))
+    .filter(Number.isFinite);
+
+  return numbers.length ? Math.max(...numbers) + 1 : 1;
+}
+
+function replaceTextareaRange(textarea, nextValue, nextCaret, onChange) {
+  onChange(nextValue);
+  requestAnimationFrame(() => {
+    textarea.selectionStart = nextCaret;
+    textarea.selectionEnd = nextCaret;
+  });
+}
+
+function QuickNumberedNotes({ value = '', onChange }) {
+  const ensureFirstLine = (event) => {
+    if (!value.trim()) {
+      const nextValue = '1.- ';
+      replaceTextareaRange(event.currentTarget, nextValue, nextValue.length, onChange);
+    }
+  };
+
+  const handleKeyDown = (event) => {
+    const textarea = event.currentTarget;
+    const currentValue = textarea.value;
+    const caret = textarea.selectionStart;
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const line = getCurrentLine(currentValue, caret);
+
+      if (!line.text.trim()) {
+        const nextMarker = `${getNextQuickNoteNumber(currentValue)}.- `;
+        const nextValue = `${currentValue.slice(0, caret)}${nextMarker}${currentValue.slice(caret)}`;
+        replaceTextareaRange(textarea, nextValue, caret + nextMarker.length, onChange);
+        return;
+      }
+
+      const nextValue = `${currentValue.slice(0, caret)}\n${currentValue.slice(caret)}`;
+      replaceTextareaRange(textarea, nextValue, caret + 1, onChange);
+      return;
+    }
+
+    if (event.key === 'Backspace' && textarea.selectionStart === textarea.selectionEnd) {
+      const line = getCurrentLine(currentValue, caret);
+      const match = line.text.match(QUICK_NOTE_MARKER);
+      if (match && line.text.trim() === match[0].trim() && caret > line.lineStart) {
+        event.preventDefault();
+        const removeStart = line.lineStart > 0 ? line.lineStart - 1 : line.lineStart;
+        const nextValue = `${currentValue.slice(0, removeStart)}${currentValue.slice(line.lineEnd)}`;
+        replaceTextareaRange(textarea, nextValue, removeStart, onChange);
+      }
+    }
+  };
+
+  return (
+    <textarea
+      className="quick-notes-input"
+      value={value}
+      onFocus={ensureFirstLine}
+      onKeyDown={handleKeyDown}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder="Haz clic y escribe. Enter mantiene el numero; Enter sobre una linea vacia avanza al siguiente."
+    />
+  );
+}
+
+export function NotasRapidas({
+  notes = {},
+  saveState = 'loaded',
+  lastSavedAt,
+  onSave,
+}) {
+  const [activeNotePanel, setActiveNotePanel] = useState('rapida');
+  const today = new Intl.DateTimeFormat('es-CL', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date());
+  const buildDraft = (source = {}) => ({
+    ...source,
+    dateLabel: source.dateLabel || today,
+    quickNotes: source.quickNotes || '1.- ',
+    feedbackTopic: source.feedbackTopic || 'general',
+  });
+  const [draft, setDraft] = useState(() => buildDraft(notes));
+  const saveLabel =
+    saveState === 'dirty'
+      ? 'Guardando notas rapidas...'
+      : saveState === 'saved'
+        ? `Notas rapidas guardadas${lastSavedAt ? ` · ${lastSavedAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}` : ''}`
+        : 'Notas rapidas listas para edicion por paciente.';
+
+  useEffect(() => {
+    setDraft(buildDraft(notes));
+  }, [notes.updatedAt]);
+
+  const update = (field, value) => {
+    setDraft((current) => ({ ...current, [field]: value }));
+  };
+  const saveNow = () => {
+    onSave?.({
+      ...draft,
+      updatedAt: new Date().toISOString(),
+    });
+  };
+  const panelItems = [
+    { id: 'rapida', label: 'Nota rapida' },
+    { id: 'detallada', label: 'Nota detallada' },
+    { id: 'feedback', label: 'Feedback' },
+  ];
+
+  return (
+    <div className="quick-notes-editor">
+      <div className="documents-toolbar">
+        <div>
+          <div className="muted" style={{ fontSize: 12.5 }}>Registro agil de la atencion</div>
+          <div className="documents-save-note">{saveLabel}</div>
+        </div>
+      </div>
+
+      <div className="quick-note-tabs" role="tablist" aria-label="Tipos de notas">
+        {panelItems.map((panel) => (
+          <button
+            key={panel.id}
+            type="button"
+            className={`quick-note-tab ${activeNotePanel === panel.id ? 'active' : ''}`}
+            onClick={() => setActiveNotePanel(panel.id)}
+          >
+            {panel.label}
+          </button>
+        ))}
+      </div>
+
+      {activeNotePanel === 'rapida' && (
+        <section className="quick-notes-panel">
+          <div className="quick-notes-block-head">
+            <h4>Notas rapidas</h4>
+            <span>Enter mantiene el numero; Enter en una linea vacia avanza.</span>
+          </div>
+          <div className="quick-notes-grid two">
+            <label className="quick-notes-field compact">
+              <span>Fecha</span>
+              <input
+                value={draft.dateLabel}
+                onChange={(event) => update('dateLabel', event.target.value)}
+                placeholder="16-05-2026"
+              />
+            </label>
+            <label className="quick-notes-field">
+              <span>Motivo / tratamiento</span>
+              <input
+                value={draft.reason || ''}
+                onChange={(event) => update('reason', event.target.value)}
+                placeholder="Control, restauracion, urgencia, presupuesto..."
+              />
+            </label>
+          </div>
+          <QuickNumberedNotes
+            value={draft.quickNotes || '1.- '}
+            onChange={(value) => update('quickNotes', value)}
+          />
+          <div className="quick-notes-actions">
+            <button className="btn btn-primary" type="button" onClick={saveNow}><Icon.check />Guardar nota rapida</button>
+          </div>
+        </section>
+      )}
+
+      {activeNotePanel === 'detallada' && (
+        <section className="quick-notes-panel">
+          <div className="quick-notes-block-head">
+            <h4>Nota detallada</h4>
+            <span>Descripcion amplia para completar despues de la atencion.</span>
+          </div>
+          <div className="quick-notes-grid two">
+            <label className="quick-notes-field compact">
+              <span>Fecha</span>
+              <input
+                value={draft.dateLabel}
+                onChange={(event) => update('dateLabel', event.target.value)}
+                placeholder="16-05-2026"
+              />
+            </label>
+            <label className="quick-notes-field">
+              <span>Motivo / tratamiento</span>
+              <input
+                value={draft.reason || ''}
+                onChange={(event) => update('reason', event.target.value)}
+                placeholder="Control, restauracion, urgencia, presupuesto..."
+              />
+            </label>
+          </div>
+          <textarea
+            className="quick-notes-detail"
+            value={draft.description || ''}
+            onChange={(event) => update('description', event.target.value)}
+            placeholder="Anota con mas calma lo que paso, decisiones tomadas, contexto y pendientes clinicos."
+          />
+          <div className="quick-notes-actions">
+            <button className="btn btn-primary" type="button" onClick={saveNow}><Icon.check />Guardar nota detallada</button>
+          </div>
+        </section>
+      )}
+
+      {activeNotePanel === 'feedback' && (
+        <section className="quick-notes-panel">
+          <div className="quick-notes-block-head">
+            <h4>Feedback</h4>
+            <span>Experiencia, ajustes y aprendizajes de esa atencion.</span>
+          </div>
+          <div className="quick-notes-grid three">
+            <label className="quick-notes-field compact">
+              <span>Fecha</span>
+              <input
+                value={draft.dateLabel}
+                onChange={(event) => update('dateLabel', event.target.value)}
+                placeholder="16-05-2026"
+              />
+            </label>
+            <label className="quick-notes-field">
+              <span>Motivo / tratamiento</span>
+              <input
+                value={draft.reason || ''}
+                onChange={(event) => update('reason', event.target.value)}
+                placeholder="Control, restauracion, urgencia, presupuesto..."
+              />
+            </label>
+            <label className="quick-notes-field compact">
+              <span>Asunto</span>
+              <select
+                value={draft.feedbackTopic || 'general'}
+                onChange={(event) => update('feedbackTopic', event.target.value)}
+              >
+                <option value="general">General</option>
+                <option value="agenda">Agenda / tiempos</option>
+                <option value="costo">Costo</option>
+                <option value="logistica">Logistica</option>
+                <option value="salud">Salud</option>
+                <option value="consulta">Consulta / pregunta</option>
+                <option value="ventas">Ventas</option>
+                <option value="insumos">Insumos</option>
+              </select>
+            </label>
+          </div>
+          <textarea
+            className="quick-notes-detail feedback"
+            value={draft.feedbackDetail || ''}
+            onChange={(event) => update('feedbackDetail', event.target.value)}
+            placeholder="Ej: tarde mucho explicando y eso atraso la agenda; revisar pauta de tiempos. No recorde lentes. Paciente pregunto por anestesia que no tenia disponible."
+          />
+          <div className="quick-notes-actions">
+            <button className="btn btn-primary" type="button" onClick={saveNow}><Icon.check />Guardar feedback</button>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
 export function AgendaClinica({
   appointments,
   saveState = 'loaded',
