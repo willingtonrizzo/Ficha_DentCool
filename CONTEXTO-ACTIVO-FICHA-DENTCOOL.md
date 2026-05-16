@@ -158,6 +158,7 @@ Razon:
 - SQLite ya arranca con el esquema real de `db/schema.sql` al abrir Tauri
 - la primera migracion real de tablas a SQLite ya esta en marcha para `patients` y `clinicalRecords`
 - el resto de tablas clinicas ya quedo escrito y leido desde SQLite en el puente actual; falta validar el arranque desktop nativo y revisar casos borde en Tauri
+- el workflow de Windows quedo actualizado a `tauri-action@v1` porque el build si compila pero la publicacion de artefactos estaba fallando con la version anterior
 - la fecha de nacimiento en la ficha de paciente paso a un selector dia/mes/anio para evitar el picker nativo cortado en escritorio
 - el formulario del paciente quedo mejor contenido verticalmente para que el footer no se recorte en Tauri
 - el modal de ficha de paciente quedo mas bajo y centrado para entrar mejor en la ventana desktop
