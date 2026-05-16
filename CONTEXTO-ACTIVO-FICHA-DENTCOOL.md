@@ -147,6 +147,7 @@ Razon:
 - el pack simple hoy agrega una linea comercial unica al plan; falta decidir si en fase siguiente debe desglosar tratamientos y agenda/cobros separados
 - el inventario general ahora existe como vista separada; falta validarlo con la doctora y decidir si requiere reglas finales de documento y trazabilidad historica completa
 - el despliegue demo conectado a GitHub debe refrescarse desde el push a `main` si Render esta apuntando a ese repo
+- los paneles principales de inventario quedaron resaltados visualmente para distinguir mejor cada bloque sin tocar el flujo
 
 ## Instruccion de retoma
 

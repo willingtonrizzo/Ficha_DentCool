@@ -2334,7 +2334,7 @@ export function Insumos({
         </div>
       </div>
 
-      <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
+      <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
         <div className="budget-pricing-settings-head">
           <div>
             <div className="bs-label">Referencia de insumos</div>
@@ -3037,7 +3037,7 @@ export function InventarioInsumos({
         </div>
       </div>
 
-      <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
+      <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
         <div className="budget-pricing-settings-head">
           <div>
             <div className="bs-label">{editingCatalogId ? 'Editar material' : 'Agregar material'}</div>
@@ -3139,7 +3139,7 @@ export function InventarioInsumos({
         )}
       </div>
 
-      <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
+      <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
         <div className="budget-pricing-settings-head">
           <div>
             <div className="bs-label">{editingPurchaseId ? 'Editar compra' : 'Registrar compra'}</div>
@@ -3237,7 +3237,7 @@ export function InventarioInsumos({
         </div>
       </div>
 
-      <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
+      <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
         <div className="budget-pricing-settings-head">
           <div>
             <div className="bs-label">Ultimas compras</div>
@@ -3307,7 +3307,7 @@ export function InventarioInsumos({
         </div>
       </div>
 
-      <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
+      <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
         <div className="budget-pricing-settings-head">
           <div>
             <div className="bs-label">Comparacion de precios</div>
@@ -3347,7 +3347,7 @@ export function InventarioInsumos({
       </div>
 
       {showSuppliers && (
-        <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
+        <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
           <div className="budget-pricing-settings-head">
             <div>
               <div className="bs-label">{editingSupplierId ? 'Editar proveedor' : 'Proveedores'}</div>
@@ -3454,7 +3454,7 @@ export function InventarioInsumos({
         </div>
       )}
 
-      <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
+      <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
         <div className="budget-pricing-settings-head">
           <div>
             <div className="bs-label">Historial por proveedor</div>

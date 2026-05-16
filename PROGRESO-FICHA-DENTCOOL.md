@@ -339,3 +339,4 @@ Hecho:
 - falta historial analitico de compras para ver variacion de precios por proveedor, fecha e insumo
 - el login actual es una barrera local de MVP, no seguridad fuerte; no usar como seguridad real hasta tener usuarios/permisos persistidos de forma robusta
 - el modo `Dr` aun requiere validacion de negocio fina sobre descuentos y honorarios antes de uso real con doctores externos
+- inventario general: paneles principales resaltados visualmente para distinguir mejor `Agregar material`, `Registrar compra`, `Ultimas compras`, `Comparacion de precios`, `Proveedores` e `Historial por proveedor`

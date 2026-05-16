@@ -94,6 +94,7 @@
 - [x] Permitir editar proveedores desde el inventario general
 - [x] Exportar inventario a CSV/XLSX
 - [x] Agregar una vista de historial por proveedor mas navegable
+- [x] Resaltar visualmente los paneles principales del inventario general
 
 ## En curso / siguiente
 
