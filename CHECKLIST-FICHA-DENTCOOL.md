@@ -81,6 +81,14 @@
 - [x] Separar compras y proveedores fuera de la ficha del paciente
 - [x] Agregar vista general `Inventario` para compras, proveedores y historial
 - [x] Mantener `Insumos` por paciente solo para consumo clinico y costo guardado
+- [x] Agregar fecha, documento y comparacion basica de precios al inventario general
+- [x] Agregar filtros por proveedor e insumo al inventario general
+- [x] Hacer obligatorio el numero de documento para registrar una compra
+- [x] Refinar el historial del inventario para mostrar fecha, proveedor, documento y costo unitario por compra
+- [x] Refinar la comparacion historica del inventario con minimo, promedio, ultimo costo, maximo y proveedor del ultimo movimiento
+- [x] Mover el alta de materiales del catalogo desde la ficha del paciente al inventario general
+- [x] Agregar campo de marca al catalogo de insumos del inventario general
+- [x] Convertir el historial y la comparacion del inventario en una tabla horizontal legible
 
 ## En curso / siguiente
 
@@ -89,7 +97,7 @@
 - [ ] Definir aprobacion de `Admin` para descuentos de pack aplicados por `Dr`
 - [ ] Refinar el flujo real de uso del modulo de insumos con la doctora
 - [ ] Decidir si insumos fase dos parte por descuento de stock por atencion o editor de listas base
-- [ ] Validar con la doctora el flujo real del inventario general: proveedor obligatorio, fecha, documento y comparacion de precios
+- [ ] Validar con la doctora el flujo real del inventario general: comparacion historica completa y reglas de documento
 - [ ] Fase dos inventario: historial de compras por insumo/proveedor con fecha, documento, direccion/contacto y evolucion de precios
 - [ ] Decidir e implementar primera integracion real de `SQLite`
 - [ ] Profundizar reportes financieros con datos mas operativos

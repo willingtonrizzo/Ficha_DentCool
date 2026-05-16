@@ -36,7 +36,7 @@ export const ROLE_PERMISSIONS = {
     canSeeFinance: true,
   },
   dr: {
-    views: ['home', 'patients', 'patient', 'priceList', 'inventory'],
+    views: ['home', 'patients', 'patient', 'priceList'],
     patientTabs: ['antecedentes', 'motivo', 'evolucion', 'presupuesto', 'documentos', 'historial'],
     sheetSections: ['datos', 'antecedentes', 'motivo', 'evolucion', 'agenda', 'presupuesto', 'documentos', 'historial'],
     canManagePricing: false,

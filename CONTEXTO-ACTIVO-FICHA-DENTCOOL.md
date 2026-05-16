@@ -26,7 +26,7 @@ Ruta activa del proyecto:
 ## Lo ultimo verificado
 
 - `npm test` pasa
-- `68` tests verdes
+- `71` tests verdes
 - `npm run build` pasa
 - ya existen persistencias locales por paciente para:
   - `Motivo y diagnostico`
@@ -88,6 +88,13 @@ Ruta activa del proyecto:
 - esa linea queda marcada como `saleKind: pack` para poder distinguir venta de pack sin depender solo del texto
 - la compra y el proveedor ya salieron de la ficha del paciente y viven en `Inventario`
 - la ficha por paciente conserva solo el consumo clinico, la lista base y el costo guardado
+- `Inventario` ahora guarda fecha editable, tipo/numero de documento y una comparacion basica de precios por insumo
+- `Inventario` ahora permite filtrar el historial por proveedor e insumo
+- `Inventario` ahora muestra el historial reciente mas limpio con fecha, proveedor, documento, costo unitario y nota
+- la comparacion historica del inventario ahora incluye minimo, promedio, ultimo costo, maximo y proveedor del ultimo movimiento
+- el alta de materiales del catalogo ya quedo movida desde la ficha del paciente al inventario general
+- `Inventario` ahora permite capturar `marca` en el alta de materiales y conservarla en el historial de compras
+- el historial y la comparacion del inventario ahora se muestran como tabla horizontal con columnas visibles
 - `Lista precios` muestra precio lista, descuento maximo recomendado y precio minimo sin costos internos
 - el login local es barrera de uso para demo, no seguridad fuerte definitiva
 
@@ -111,7 +118,7 @@ Razon:
 2. probar login local con `Admin`, `Dr` y `Staff` antes de entrega, validando que `Dr` no vea insumos ni costos internos
 3. probar presupuesto pack simple con ejemplos reales: `Limpieza VIP + Blanqueamiento` y `Evaluacion + Limpieza standard + Blanqueamiento`
 4. validar con la doctora si el pack debe quedar como linea unica o desglosar automaticamente tratamientos
-5. validar con la doctora la nueva vista `Inventario`: compras, proveedores y trazabilidad general
+5. validar con la doctora la nueva vista `Inventario`: compras, proveedores, fecha, documento y comparacion de precios
 6. validar con la doctora el flujo de insumos fase uno: alta de material, lista base y snapshot
 7. decidir si fase dos de insumos parte por descuento de stock al confirmar atencion o por editor de listas base
 8. seguir limpiando el `uiContext` global residual
@@ -128,14 +135,14 @@ Razon:
 - seguir usando `nextVisit` y `paid` como puente por mucho tiempo hara mas costosa la separacion de agenda y caja
 - la separacion existe en modelo y UI, pero el puente legado sigue activo para compatibilidad
 - el bloque visual del catalogo de pricing ya quedo estabilizado y no debe volver a mezclar valores entre tratamientos
-- el modulo de insumos ya tiene UI minima de alta de materiales, stock minimo de alerta, lista opcional de catalogo, compras, stock y costo promedio; falta validar flujo real de uso con la doctora
+- el modulo de insumos por paciente quedo mas clinico; el alta de materiales vive en inventario y falta validar el flujo real de uso con la doctora
 - insumos todavia no descuenta stock automaticamente por atencion confirmada ni tiene editor completo de recetas
-- compras de insumos debe moverse a una vista general de inventario cuando se abra esa etapa
+- compras y alta de materiales ya viven en una vista general de inventario; falta seguir refinando trazabilidad y comparacion historica
 - falta historial analitico de compras para comparar precios por proveedor, fecha e insumo
 - login local no reemplaza usuarios reales ni permisos robustos; requiere rediseño al pasar a SQLite/Tauri
 - modo `Dr` simplificado debe validarse con flujo real de descuentos y honorarios
 - el pack simple hoy agrega una linea comercial unica al plan; falta decidir si en fase siguiente debe desglosar tratamientos y agenda/cobros separados
-- el inventario general ahora existe como vista separada; falta validarlo con la doctora y decidir si requiere numero de documento, fecha editable y filtros
+- el inventario general ahora existe como vista separada; falta validarlo con la doctora y decidir si requiere reglas finales de documento y trazabilidad historica completa
 - el despliegue demo conectado a GitHub debe refrescarse desde el push a `main` si Render esta apuntando a ese repo
 
 ## Instruccion de retoma

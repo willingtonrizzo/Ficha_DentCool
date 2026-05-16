@@ -41,7 +41,7 @@ describe('local auth', () => {
     expect(staffPermissions.patientTabs).not.toContain('insumos');
     expect(drPermissions.patientTabs).toContain('presupuesto');
     expect(drPermissions.patientTabs).not.toContain('insumos');
-    expect(drPermissions.views).toContain('inventory');
+    expect(drPermissions.views).not.toContain('inventory');
     expect(adminPermissions.views).toContain('inventory');
     expect(drPermissions.canManagePricing).toBe(false);
   });

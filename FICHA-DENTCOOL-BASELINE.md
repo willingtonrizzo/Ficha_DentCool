@@ -63,10 +63,11 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - El bloque de pricing y finanzas ya fue verificado otra vez con `npm test` y `npm run build`.
 - El MVP chico de insumos ya tiene motor puro, seeds locales, storage local y tests automatizados.
 - El modulo de insumos ya puede entregar un `supplySnapshotId` al motor financiero como puente minimo.
-- El modulo de insumos ya tiene UI minima integrada en la ficha para agregar materiales nuevos y mostrar el catalogo solo bajo demanda.
+- El modulo de insumos por paciente ya queda para uso clinico y referencia de costos; el alta de materiales nuevos vive en `Inventario`.
 - `Presupuesto` ya tiene pack simple para `Admin` y `Dr` con maximo 3 tratamientos, descuento controlado, horas/sesiones y honorario doctor.
 - `Admin` ve la referencia de box y traslado estimado del pack; `Dr` no ve costos internos.
 - La linea del pack queda marcada como `saleKind: pack` para trazabilidad comercial.
+- `Inventario` ya guarda fecha editable, tipo/numero de documento y una comparacion basica de precios por insumo.
 - Existen pruebas automatizadas base del odontograma y de persistencia local.
 - Existe un modelo clinico base y un esquema inicial de `SQLite`.
 
@@ -135,6 +136,10 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - `Inventario` ya existe como vista general separada para compras, proveedores e historico.
 - La ficha del paciente ya no contiene compra/proveedor; solo consumo clinico y costo guardado.
 - `Inventario` ya puede registrar compras y mostrar proveedores fuera de la ficha clinica.
+- `Inventario` ya guarda fecha editable, tipo/numero de documento y una comparacion basica de precios por insumo.
+- `Inventario` ya permite filtrar el historial por proveedor e insumo.
+- `Inventario` ya incluye alta de materiales al catalogo general para que la ficha no concentre gestion de inventario.
+- `Inventario` ya puede capturar marca del material y conservarla en compras y comparacion historica.
 
 ### Testing
 
@@ -165,7 +170,7 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - Si se empieza a descontar stock automaticamente sin definir que evento clinico confirma consumo real, los reportes de insumos pueden divergir de la operacion.
 - El login local actual solo es barrera de uso para demo; no debe tratarse como seguridad real hasta tener usuarios/permisos robustos.
 - El pack simple hoy no reemplaza agenda/caja real: crea una linea comercial unica y falta decidir si debe desglosar tratamientos, sesiones y cobros en fase posterior.
-- El inventario general todavia necesita validacion de flujo: documento, fecha editable, filtros y comparacion historica.
+- El inventario general todavia necesita validacion de flujo: comparacion historica completa y reglas de documento obligatorio.
 
 ## Siguiente paso recomendado
 

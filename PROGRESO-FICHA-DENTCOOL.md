@@ -150,8 +150,8 @@ Hecho:
 - se verifico el bloque con `npm test -- --run`: `65` tests verdes
 - se verifico el bloque con `npm run build`: build correcto
 - se aclaro la nomenclatura del modulo: `receta` pasa a mostrarse como `lista base de insumos`
-- se decidio dejar `Registrar compra` dentro del tab `Insumos` solo como puente MVP para mostrar de donde salen stock, cantidades y precios
-- decision pendiente: mover compras a un modulo general de inventario en una etapa posterior, fuera de la ficha por paciente
+- se decidio sacar `Registrar compra` de la ficha del paciente y moverlo a un modulo general de inventario
+- la vista `Inventario` ya registra compras, proveedores, fecha y documento, y muestra una comparacion basica de precios por insumo
 - el formulario de material ahora permite configurar `Stock minimo alerta`
 - el stock actual no se configura manualmente: se alimenta con compras registradas
 - `minimumStock: 0` ahora significa sin alerta configurada y no dispara stock bajo con stock `0`
@@ -175,10 +175,17 @@ Hecho:
 - estado actual listo para prueba de la doctora en navegador local o despliegue GitHub/Render si esta conectado
 - se inicio la separacion de compras/proveedores fuera de la ficha del paciente
 - `Insumos` por paciente ahora queda solo con lista base, ajustes clinicos, stock bajo y costo guardado
-- se agrego la vista general `Inventario` para registrar compras, revisar proveedores y ver historico de compras
+- se agrego la vista general `Inventario` para registrar compras, revisar proveedores, dar de alta materiales y ver historico de compras
 - la vista `Inventario` ya queda disponible para `Admin` y `Dr`, no para `Staff`
 - la compra ya no vive en la ficha del paciente; ahora vive en el inventario general
-- se verifico la separacion con `npm test -- --run`: `70` tests verdes
+- la vista `Inventario` ahora guarda fecha editable, tipo/numero de documento y una comparacion basica de precios por insumo
+- la vista `Inventario` ahora permite filtrar el historial por proveedor e insumo
+- la vista `Inventario` ahora muestra historial mas limpio con fecha, proveedor, documento, costo unitario y nota
+- la comparacion historica del inventario ahora resume minimo, promedio, ultimo costo, maximo y proveedor del ultimo movimiento
+- el alta de materiales del catalogo quedo movida desde la ficha del paciente al inventario general
+- la vista `Inventario` ahora permite registrar `marca` del material y la conserva en el historial de compras
+- el historial y la comparacion del inventario quedaron como tabla horizontal con columnas visibles por insumo
+- se verifico la separacion con `npm test -- --run`: `71` tests verdes
 - se verifico la separacion con `npm run build`: build correcto
 
 ## Como se hizo este bloque
@@ -227,6 +234,7 @@ Hecho:
 - presupuesto simplificado para `Dr` sin costos internos, pricing avanzado ni gestion de insumos
 - presupuesto pack simple para `Admin` y `Dr`, con maximo 3 tratamientos, modalidad por sesiones y descuento controlado
 - inventario general separado de la ficha del paciente, con compras y proveedores fuera del flujo clinico
+- inventario general con historial mas legible y comparacion historica mas util por insumo
 
 ## Que falta antes de seguir
 

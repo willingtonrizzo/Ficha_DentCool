@@ -128,6 +128,84 @@ export function calculatePatientSupplyUsageCost(patientUsageItems = [], catalog 
   };
 }
 
+function parsePurchaseDate(purchase = {}) {
+  const createdAt = purchase.createdAt ? new Date(purchase.createdAt).getTime() : 0;
+  if (Number.isFinite(createdAt) && createdAt > 0) return createdAt;
+  return 0;
+}
+
+function resolveSupplierName(suppliers = [], supplierId = '') {
+  if (!supplierId) return 'Sin proveedor';
+  return suppliers.find((supplier) => supplier?.id === supplierId)?.name ?? 'Sin proveedor';
+}
+
+export function buildSupplyPurchaseComparisonRows(purchases = [], suppliers = []) {
+  const grouped = new Map();
+
+  (Array.isArray(purchases) ? purchases : []).forEach((purchase) => {
+    if (!purchase?.itemId) return;
+    const current = grouped.get(purchase.itemId) ?? {
+      itemId: purchase.itemId,
+      itemName: purchase.itemName ?? 'Sin nombre',
+      purchaseCount: 0,
+      quantityTotal: 0,
+      totalCost: 0,
+      minUnitCost: Number.POSITIVE_INFINITY,
+      maxUnitCost: 0,
+      lastUnitCost: 0,
+      lastPurchaseAt: 0,
+      lastPurchaseLabel: '',
+      lastSupplierId: '',
+      lastBrandName: '',
+      supplierIds: new Set(),
+    };
+    const quantity = toNumber(purchase.quantityPurchased ?? purchase.quantity, 0);
+    const totalCost = toNumber(purchase.totalCost, 0);
+    const unitCost = purchase.unitCost != null
+      ? toNumber(purchase.unitCost, 0)
+      : calculateUnitCost(totalCost, quantity);
+    const purchaseAt = parsePurchaseDate(purchase);
+
+    current.purchaseCount += 1;
+    current.quantityTotal += quantity;
+    current.totalCost += totalCost;
+    current.minUnitCost = Math.min(current.minUnitCost, unitCost);
+    current.maxUnitCost = Math.max(current.maxUnitCost, unitCost);
+    current.supplierIds.add(purchase.supplierId || '');
+
+    if (purchaseAt >= current.lastPurchaseAt) {
+      current.lastPurchaseAt = purchaseAt;
+      current.lastPurchaseLabel = purchase.purchaseDateLabel ?? '';
+      current.lastSupplierId = purchase.supplierId ?? '';
+      current.lastBrandName = purchase.itemBrand ?? '';
+      current.lastUnitCost = unitCost;
+    }
+
+    grouped.set(purchase.itemId, current);
+  });
+
+  return Array.from(grouped.values())
+    .map((row) => {
+      const averageUnitCost = row.quantityTotal > 0 ? row.totalCost / row.quantityTotal : 0;
+      return {
+        itemId: row.itemId,
+        itemName: row.itemName,
+        purchaseCount: row.purchaseCount,
+        quantityTotal: row.quantityTotal,
+        totalCost: row.totalCost,
+        minUnitCost: Number.isFinite(row.minUnitCost) ? roundCost(row.minUnitCost) : 0,
+        maxUnitCost: roundCost(row.maxUnitCost),
+        averageUnitCost: roundCost(averageUnitCost),
+        lastUnitCost: roundCost(row.lastUnitCost),
+        lastPurchaseLabel: row.lastPurchaseLabel,
+        lastBrandName: row.lastBrandName,
+        lastSupplierName: resolveSupplierName(suppliers, row.lastSupplierId),
+        supplierCount: Array.from(row.supplierIds).filter(Boolean).length,
+      };
+    })
+    .sort((a, b) => a.itemName.localeCompare(b.itemName));
+}
+
 export function createSupplySnapshot({
   id,
   patientId,

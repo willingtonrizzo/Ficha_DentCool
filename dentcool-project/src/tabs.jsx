@@ -9,6 +9,7 @@ import {
 } from './pricing';
 import {
   applyPurchaseToStock,
+  buildSupplyPurchaseComparisonRows,
   calculatePatientSupplyUsageCost,
   checkAgendaSupplyNeeds,
   checkLowStock,
@@ -2147,13 +2148,6 @@ export function Insumos({
   const [draftItems, setDraftItems] = useState([]);
   const [extraItemId, setExtraItemId] = useState('');
   const [openInsumosHelp, setOpenInsumosHelp] = useState(null);
-  const [newCatalogName, setNewCatalogName] = useState('');
-  const [newCatalogUnit, setNewCatalogUnit] = useState('unidad');
-  const [newCatalogQuantity, setNewCatalogQuantity] = useState(1);
-  const [newCatalogTotalCost, setNewCatalogTotalCost] = useState(0);
-  const [newCatalogMinimumStock, setNewCatalogMinimumStock] = useState(0);
-  const [showCatalogList, setShowCatalogList] = useState(false);
-  const [editingCatalogId, setEditingCatalogId] = useState('');
 
   useEffect(() => {
     saveSupplyState(moduleState);
@@ -2229,94 +2223,11 @@ export function Insumos({
     setDraftItems((current) => current.filter((item) => item.itemId !== itemId));
   };
 
-  const handleSaveCatalogItem = () => {
-    const nextName = newCatalogName.trim() || 'Nuevo insumo';
-    const nextQuantity = Number(newCatalogQuantity) || 0;
-    const nextTotalCost = Number(newCatalogTotalCost) || 0;
-    const nextMinimumStock = Number(newCatalogMinimumStock) || 0;
-    const nextUnitCost = nextQuantity > 0 ? Math.round(nextTotalCost / nextQuantity) : 0;
-
-    if (editingCatalogId) {
-      setModuleState((current) => ({
-        ...current,
-        catalog: current.catalog.map((item) => {
-          if (item.id !== editingCatalogId) return item;
-          return {
-            ...item,
-            name: nextName,
-            unit: newCatalogUnit,
-            purchaseQuantity: nextQuantity,
-            purchaseTotalCost: nextTotalCost,
-            unitCost: nextUnitCost,
-            minimumStock: nextMinimumStock,
-          };
-        }),
-      }));
-    } else {
-      const nextIndex = moduleState.catalog.length + 1;
-      const nextId = `sup_custom_${Date.now()}_${nextIndex}`;
-      setModuleState((current) => ({
-        ...current,
-        catalog: [
-          {
-            id: nextId,
-            name: nextName,
-            category: 'Otros',
-            itemType: 'consumable',
-            unit: newCatalogUnit,
-            purchaseQuantity: nextQuantity,
-            purchaseTotalCost: nextTotalCost,
-            unitCost: nextUnitCost,
-            currentStock: 0,
-            minimumStock: nextMinimumStock,
-            supplierId: '',
-            defaultUsePerPatient: 1,
-            active: true,
-            notes: '',
-          },
-          ...current.catalog,
-        ],
-      }));
-    }
-    setNewCatalogName('');
-    setNewCatalogUnit('unidad');
-    setNewCatalogQuantity(1);
-    setNewCatalogTotalCost(0);
-    setNewCatalogMinimumStock(0);
-    setEditingCatalogId('');
-  };
-
-  const handleRemoveCatalogItem = (itemId) => {
-    setModuleState((current) => ({
-      ...current,
-      catalog: current.catalog.filter((item) => item.id !== itemId),
-    }));
-  };
-
   const handleResetCatalog = () => {
     setModuleState((current) => ({
       ...current,
       catalog: resetSupplyCatalog(),
     }));
-  };
-
-  const handleEditCatalogItem = (item) => {
-    setEditingCatalogId(item.id);
-    setNewCatalogName(item.name ?? '');
-    setNewCatalogUnit(item.unit ?? 'unidad');
-    setNewCatalogQuantity(item.purchaseQuantity ?? 1);
-    setNewCatalogTotalCost(item.purchaseTotalCost ?? 0);
-    setNewCatalogMinimumStock(item.minimumStock ?? 0);
-    setShowCatalogList(false);
-  };
-
-  const handleCancelCatalogEdit = () => {
-    setEditingCatalogId('');
-    setNewCatalogName('');
-    setNewCatalogUnit('unidad');
-    setNewCatalogQuantity(1);
-    setNewCatalogTotalCost(0);
-    setNewCatalogMinimumStock(0);
   };
 
   const handleResetModule = () => {
@@ -2396,101 +2307,6 @@ export function Insumos({
           <strong>{usageResult.totalCost > 0 ? fmtCLP(usageResult.totalCost) : '$0'}</strong>
           <small>costo de lista actual</small>
         </div>
-      </div>
-
-      <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
-        <div className="budget-pricing-settings-head">
-          <div>
-            <div className="bs-label">{editingCatalogId ? 'Editar material del catalogo' : 'Agregar material al catalogo'}</div>
-            <div className="bs-help">{editingCatalogId ? 'Ajusta el material seleccionado y guarda los cambios.' : 'Primera etapa: agregar materiales nuevos sin saturar la pantalla.'}</div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn btn-secondary" type="button" onClick={() => setShowCatalogList((current) => !current)}>
-              <Icon.edit />
-              {showCatalogList ? 'Ocultar catalogo' : 'Ver catalogo'}
-            </button>
-            <button className="btn btn-secondary" type="button" onClick={handleResetCatalog}>
-              <Icon.edit />
-              Restaurar catalogo base
-            </button>
-          </div>
-        </div>
-        <div className="budget-pricing-settings-grid">
-          <label className="pricing-setting-field" style={{ gridColumn: '1 / span 2' }}>
-            <span className="pricing-setting-label-row">
-              <span className="pricing-setting-label-text">Nombre del material</span>
-            </span>
-            <input value={newCatalogName} onChange={(event) => setNewCatalogName(event.target.value)} placeholder="Vaso desechable" />
-          </label>
-          <label className="pricing-setting-field">
-            <span className="pricing-setting-label-row">
-              <span className="pricing-setting-label-text">Unidad</span>
-            </span>
-            <select value={newCatalogUnit} onChange={(event) => setNewCatalogUnit(event.target.value)}>
-              {(moduleState.units.length ? moduleState.units : ['unidad']).map((unit) => (
-                <option key={unit} value={unit}>{unit}</option>
-              ))}
-            </select>
-          </label>
-          <label className="pricing-setting-field">
-            <span className="pricing-setting-label-row">
-              <span className="pricing-setting-label-text">Cantidad de compra</span>
-            </span>
-            <input type="number" min="0" step="1" value={newCatalogQuantity} onChange={(event) => setNewCatalogQuantity(event.target.value)} />
-          </label>
-          <label className="pricing-setting-field">
-            <span className="pricing-setting-label-row">
-              <span className="pricing-setting-label-text">Costo total compra</span>
-            </span>
-            <input type="number" min="0" step="1" value={newCatalogTotalCost} onChange={(event) => setNewCatalogTotalCost(event.target.value)} />
-          </label>
-          <label className="pricing-setting-field">
-            <span className="pricing-setting-label-row">
-              <span className="pricing-setting-label-text">Stock minimo alerta</span>
-            </span>
-            <input type="number" min="0" step="1" value={newCatalogMinimumStock} onChange={(event) => setNewCatalogMinimumStock(event.target.value)} />
-          </label>
-          <div style={{ display: 'flex', alignItems: 'end', gap: 8 }}>
-            <button className="btn btn-primary" type="button" onClick={handleSaveCatalogItem}>
-              <Icon.plus />
-              {editingCatalogId ? 'Actualizar material' : 'Guardar material'}
-            </button>
-            {editingCatalogId && (
-              <button className="btn btn-secondary" type="button" onClick={handleCancelCatalogEdit}>
-                Cancelar
-              </button>
-            )}
-          </div>
-        </div>
-        {showCatalogList && (
-          <div className="documents-list" style={{ marginTop: 14 }}>
-            {moduleState.catalog.map((item) => {
-              const unitCost = item.purchaseQuantity > 0 ? Math.round((Number(item.purchaseTotalCost) / Number(item.purchaseQuantity)) || 0) : 0;
-              return (
-                <div key={item.id} className="document-row">
-                  <div className="document-main">
-                    <div className="document-head">
-                      <div className="document-title">{item.name || 'Sin nombre'}</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span className="count">{fmtCLP(unitCost)}</span>
-                        <button className="row-action" type="button" onClick={() => handleEditCatalogItem(item)} title="Editar insumo">
-                          <Icon.edit />
-                        </button>
-                        <button className="row-action" type="button" onClick={() => handleRemoveCatalogItem(item.id)} title="Eliminar insumo">
-                          <Icon.trash />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="document-meta-line">
-                      <span className="document-kind">{item.unit}</span>
-                      <span>{item.purchaseQuantity} comprados · stock {item.currentStock} · minimo {item.minimumStock}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
@@ -2721,26 +2537,145 @@ export function InventarioInsumos({
   onOpenSection,
 }) {
   const [moduleState, setModuleState] = useState(() => loadSupplyState());
+  const [newCatalogName, setNewCatalogName] = useState('');
+  const [newCatalogBrand, setNewCatalogBrand] = useState('');
+  const [newCatalogUnit, setNewCatalogUnit] = useState('unidad');
+  const [newCatalogQuantity, setNewCatalogQuantity] = useState(1);
+  const [newCatalogTotalCost, setNewCatalogTotalCost] = useState(0);
+  const [newCatalogMinimumStock, setNewCatalogMinimumStock] = useState(0);
+  const [showCatalogList, setShowCatalogList] = useState(false);
+  const [editingCatalogId, setEditingCatalogId] = useState('');
   const [purchaseItemId, setPurchaseItemId] = useState('');
   const [purchaseQuantity, setPurchaseQuantity] = useState(1);
   const [purchaseTotalCost, setPurchaseTotalCost] = useState(0);
   const [purchaseSupplierId, setPurchaseSupplierId] = useState('');
+  const [purchaseDateLabel, setPurchaseDateLabel] = useState(() => new Intl.DateTimeFormat('es-CL', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date()));
+  const [purchaseDocumentType, setPurchaseDocumentType] = useState('boleta');
+  const [purchaseDocumentNumber, setPurchaseDocumentNumber] = useState('');
   const [purchaseNote, setPurchaseNote] = useState('');
   const [showSuppliers, setShowSuppliers] = useState(false);
+  const [filterSupplierId, setFilterSupplierId] = useState('all');
+  const [filterItemId, setFilterItemId] = useState('all');
 
   useEffect(() => {
     saveSupplyState(moduleState);
   }, [moduleState]);
 
-  const recentPurchases = [...moduleState.purchases]
+  const filteredPurchases = [...moduleState.purchases]
+    .filter((purchase) => filterSupplierId === 'all' || purchase.supplierId === filterSupplierId)
+    .filter((purchase) => filterItemId === 'all' || purchase.itemId === filterItemId)
     .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime())
     .slice(0, 10);
+  const priceComparisonRows = buildSupplyPurchaseComparisonRows(moduleState.purchases, moduleState.suppliers);
+
+  const handleSaveCatalogItem = () => {
+    const nextName = newCatalogName.trim() || 'Nuevo insumo';
+    const nextBrand = newCatalogBrand.trim();
+    const nextQuantity = Number(newCatalogQuantity) || 0;
+    const nextTotalCost = Number(newCatalogTotalCost) || 0;
+    const nextMinimumStock = Number(newCatalogMinimumStock) || 0;
+    const nextUnitCost = nextQuantity > 0 ? Math.round(nextTotalCost / nextQuantity) : 0;
+
+    if (editingCatalogId) {
+      setModuleState((current) => ({
+        ...current,
+        catalog: current.catalog.map((item) => {
+          if (item.id !== editingCatalogId) return item;
+          return {
+            ...item,
+            name: nextName,
+            brand: nextBrand,
+            unit: newCatalogUnit,
+            purchaseQuantity: nextQuantity,
+            purchaseTotalCost: nextTotalCost,
+            unitCost: nextUnitCost,
+            minimumStock: nextMinimumStock,
+          };
+        }),
+      }));
+    } else {
+      const nextIndex = moduleState.catalog.length + 1;
+      const nextId = `sup_custom_${Date.now()}_${nextIndex}`;
+      setModuleState((current) => ({
+        ...current,
+        catalog: [
+          {
+            id: nextId,
+            name: nextName,
+            brand: nextBrand,
+            category: 'Otros',
+            itemType: 'consumable',
+            unit: newCatalogUnit,
+            purchaseQuantity: nextQuantity,
+            purchaseTotalCost: nextTotalCost,
+            unitCost: nextUnitCost,
+            currentStock: 0,
+            minimumStock: nextMinimumStock,
+            supplierId: '',
+            defaultUsePerPatient: 1,
+            active: true,
+            notes: '',
+          },
+          ...current.catalog,
+        ],
+      }));
+    }
+    setNewCatalogName('');
+    setNewCatalogBrand('');
+    setNewCatalogUnit('unidad');
+    setNewCatalogQuantity(1);
+    setNewCatalogTotalCost(0);
+    setNewCatalogMinimumStock(0);
+    setEditingCatalogId('');
+  };
+
+  const handleRemoveCatalogItem = (itemId) => {
+    setModuleState((current) => ({
+      ...current,
+      catalog: current.catalog.filter((item) => item.id !== itemId),
+    }));
+  };
+
+  const handleEditCatalogItem = (item) => {
+    setEditingCatalogId(item.id);
+    setNewCatalogName(item.name ?? '');
+    setNewCatalogBrand(item.brand ?? '');
+    setNewCatalogUnit(item.unit ?? 'unidad');
+    setNewCatalogQuantity(item.purchaseQuantity ?? 1);
+    setNewCatalogTotalCost(item.purchaseTotalCost ?? 0);
+    setNewCatalogMinimumStock(item.minimumStock ?? 0);
+    setShowCatalogList(false);
+  };
+
+  const handleCancelCatalogEdit = () => {
+    setEditingCatalogId('');
+    setNewCatalogName('');
+    setNewCatalogBrand('');
+    setNewCatalogUnit('unidad');
+    setNewCatalogQuantity(1);
+    setNewCatalogTotalCost(0);
+    setNewCatalogMinimumStock(0);
+  };
+
+  const handleResetCatalog = () => {
+    setModuleState((current) => ({
+      ...current,
+      catalog: resetSupplyCatalog(),
+    }));
+    setEditingCatalogId('');
+    setShowCatalogList(false);
+  };
 
   const handleRegisterPurchase = () => {
     const catalogItem = moduleState.catalog.find((item) => item.id === purchaseItemId);
     const quantity = Number(purchaseQuantity) || 0;
     const totalCost = Number(purchaseTotalCost) || 0;
-    if (!catalogItem || quantity <= 0 || totalCost <= 0) return;
+    const documentNumber = purchaseDocumentNumber.trim();
+    if (!catalogItem || quantity <= 0 || totalCost <= 0 || !documentNumber) return;
 
     const now = new Date().toISOString();
     const unitCost = Math.round((totalCost / quantity) * 100) / 100;
@@ -2748,11 +2683,15 @@ export function InventarioInsumos({
       id: `supply-purchase-${catalogItem.id}-${Date.now()}`,
       itemId: catalogItem.id,
       itemName: catalogItem.name,
+      itemBrand: catalogItem.brand ?? '',
       itemUnit: catalogItem.unit ?? 'unidad',
       quantityPurchased: quantity,
       totalCost,
       unitCost,
       supplierId: purchaseSupplierId,
+      documentType: purchaseDocumentType,
+      documentNumber,
+      purchaseDateLabel: purchaseDateLabel.trim(),
       note: purchaseNote.trim(),
       createdAt: now,
     };
@@ -2768,6 +2707,13 @@ export function InventarioInsumos({
     setPurchaseQuantity(1);
     setPurchaseTotalCost(0);
     setPurchaseSupplierId('');
+    setPurchaseDocumentType('boleta');
+    setPurchaseDocumentNumber('');
+    setPurchaseDateLabel(new Intl.DateTimeFormat('es-CL', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(new Date()));
     setPurchaseNote('');
   };
 
@@ -2807,9 +2753,111 @@ export function InventarioInsumos({
         </div>
         <div className="budget-pricing-kpi budget-pricing-kpi-small tone-good">
           <div className="budget-pricing-kpi-head"><span>Compras</span></div>
-          <strong>{recentPurchases.length}</strong>
+          <strong>{filteredPurchases.length}</strong>
           <small>recientes</small>
         </div>
+      </div>
+
+      <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
+        <div className="budget-pricing-settings-head">
+          <div>
+            <div className="bs-label">{editingCatalogId ? 'Editar material' : 'Agregar material'}</div>
+            <div className="bs-help">{editingCatalogId ? 'Ajusta el insumo del catalogo general y guarda los cambios.' : 'Alta de material nuevo para que luego puedas registrar compras sobre ese item.'}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary" type="button" onClick={() => setShowCatalogList((current) => !current)}>
+              <Icon.edit />
+              {showCatalogList ? 'Ocultar catalogo' : 'Ver catalogo'}
+            </button>
+            <button className="btn btn-secondary" type="button" onClick={handleResetCatalog}>
+              <Icon.edit />
+              Restaurar catalogo base
+            </button>
+          </div>
+        </div>
+        <div className="budget-pricing-settings-grid">
+          <label className="pricing-setting-field" style={{ gridColumn: '1 / span 2' }}>
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Nombre del material</span>
+            </span>
+            <input value={newCatalogName} onChange={(event) => setNewCatalogName(event.target.value)} placeholder="Vaso desechable" />
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Marca</span>
+            </span>
+            <input value={newCatalogBrand} onChange={(event) => setNewCatalogBrand(event.target.value)} placeholder="3M, Nitriflex, etc." />
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Unidad</span>
+            </span>
+            <select value={newCatalogUnit} onChange={(event) => setNewCatalogUnit(event.target.value)}>
+              {(moduleState.units.length ? moduleState.units : ['unidad']).map((unit) => (
+                <option key={unit} value={unit}>{unit}</option>
+              ))}
+            </select>
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Cantidad de compra</span>
+            </span>
+            <input type="number" min="0" step="1" value={newCatalogQuantity} onChange={(event) => setNewCatalogQuantity(event.target.value)} />
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Costo total compra</span>
+            </span>
+            <input type="number" min="0" step="1" value={newCatalogTotalCost} onChange={(event) => setNewCatalogTotalCost(event.target.value)} />
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Stock minimo alerta</span>
+            </span>
+            <input type="number" min="0" step="1" value={newCatalogMinimumStock} onChange={(event) => setNewCatalogMinimumStock(event.target.value)} />
+          </label>
+          <div style={{ display: 'flex', alignItems: 'end', gap: 8 }}>
+            <button className="btn btn-primary" type="button" onClick={handleSaveCatalogItem}>
+              <Icon.plus />
+              {editingCatalogId ? 'Actualizar material' : 'Guardar material'}
+            </button>
+            {editingCatalogId && (
+              <button className="btn btn-secondary" type="button" onClick={handleCancelCatalogEdit}>
+                Cancelar
+              </button>
+            )}
+          </div>
+        </div>
+        {showCatalogList && (
+          <div className="documents-list" style={{ marginTop: 14 }}>
+            {moduleState.catalog.map((item) => {
+              const unitCost = item.purchaseQuantity > 0 ? Math.round((Number(item.purchaseTotalCost) / Number(item.purchaseQuantity)) || 0) : 0;
+              return (
+                <div key={item.id} className="document-row">
+                  <div className="document-main">
+                    <div className="document-head">
+                      <div className="document-title">{item.name || 'Sin nombre'}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className="count">{fmtCLP(unitCost)}</span>
+                        <button className="row-action" type="button" onClick={() => handleEditCatalogItem(item)} title="Editar insumo">
+                          <Icon.edit />
+                        </button>
+                        <button className="row-action" type="button" onClick={() => handleRemoveCatalogItem(item.id)} title="Eliminar insumo">
+                          <Icon.trash />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="document-meta-line">
+                      <span className="document-kind">{item.unit}</span>
+                      <span>{item.brand || 'Sin marca'} · {item.purchaseQuantity} comprados · stock {item.currentStock} · minimo {item.minimumStock}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {!moduleState.catalog.length && <div className="finance-empty">No hay materiales cargados.</div>}
+          </div>
+        )}
       </div>
 
       <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
@@ -2828,7 +2876,7 @@ export function InventarioInsumos({
               <option value="">Selecciona un insumo</option>
               {moduleState.catalog.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.name} · stock {item.currentStock ?? 0} {item.unit ?? 'unidad'}
+                  {item.name}{item.brand ? ` · ${item.brand}` : ''} · stock {item.currentStock ?? 0} {item.unit ?? 'unidad'}
                 </option>
               ))}
             </select>
@@ -2856,6 +2904,29 @@ export function InventarioInsumos({
               ))}
             </select>
           </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Fecha</span>
+            </span>
+            <input value={purchaseDateLabel} onChange={(event) => setPurchaseDateLabel(event.target.value)} placeholder="15/05/2026" />
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Documento</span>
+            </span>
+            <select value={purchaseDocumentType} onChange={(event) => setPurchaseDocumentType(event.target.value)}>
+              <option value="boleta">Boleta</option>
+              <option value="factura">Factura</option>
+              <option value="vale">Vale</option>
+              <option value="otro">Otro</option>
+            </select>
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Numero doc.</span>
+            </span>
+            <input value={purchaseDocumentNumber} onChange={(event) => setPurchaseDocumentNumber(event.target.value)} placeholder="Folio / N° / referencia" />
+          </label>
           <label className="pricing-setting-field" style={{ gridColumn: 'span 2' }}>
             <span className="pricing-setting-label-row">
               <span className="pricing-setting-label-text">Nota</span>
@@ -2863,7 +2934,17 @@ export function InventarioInsumos({
             <input value={purchaseNote} onChange={(event) => setPurchaseNote(event.target.value)} placeholder="Boleta, compra semanal o detalle breve" />
           </label>
           <div style={{ display: 'flex', alignItems: 'end' }}>
-            <button className="btn btn-primary" type="button" onClick={handleRegisterPurchase} disabled={!purchaseItemId || Number(purchaseQuantity) <= 0 || Number(purchaseTotalCost) <= 0}>
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={handleRegisterPurchase}
+              disabled={
+                !purchaseItemId ||
+                Number(purchaseQuantity) <= 0 ||
+                Number(purchaseTotalCost) <= 0 ||
+                !purchaseDocumentNumber.trim()
+              }
+            >
               <Icon.plus />
               Registrar compra
             </button>
@@ -2877,26 +2958,85 @@ export function InventarioInsumos({
             <div className="bs-label">Ultimas compras</div>
             <div className="bs-help">Historial reciente para revisar cantidades, proveedores y costo unitario.</div>
           </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <select value={filterSupplierId} onChange={(event) => setFilterSupplierId(event.target.value)}>
+              <option value="all">Todos los proveedores</option>
+              {moduleState.suppliers.map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+              ))}
+            </select>
+            <select value={filterItemId} onChange={(event) => setFilterItemId(event.target.value)}>
+              <option value="all">Todos los insumos</option>
+              {moduleState.catalog.map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div className="documents-list">
-          {recentPurchases.map((purchase) => {
+        <div className="inventory-table-shell">
+          <div className="inventory-table-head inventory-purchases-head">
+            <span>Insumo</span>
+            <span>Marca</span>
+            <span>Cant.</span>
+            <span>Fecha</span>
+            <span>Proveedor</span>
+            <span>Documento</span>
+            <span>Costo c/u</span>
+          </div>
+          {filteredPurchases.map((purchase) => {
             const supplier = supplierById.get(purchase.supplierId);
+            const documentType = purchase.documentType
+              ? `${purchase.documentType.charAt(0).toUpperCase()}${purchase.documentType.slice(1)}`
+              : 'Documento';
+            const purchaseDate = purchase.purchaseDateLabel || (purchase.createdAt ? new Date(purchase.createdAt).toLocaleDateString('es-CL') : 'Sin fecha');
             return (
-              <div key={purchase.id} className="document-row">
-                <div className="document-main">
-                  <div className="document-head">
-                    <div className="document-title">{purchase.itemName || 'Compra de insumo'}</div>
-                    <span className="count">{fmtCLP(purchase.totalCost || 0)}</span>
-                  </div>
-                  <div className="document-meta-line">
-                    <span className="document-kind">{purchase.quantityPurchased} {purchase.itemUnit ?? 'unidad'}</span>
-                    <span>{supplier?.name ?? 'Sin proveedor'} · costo unitario {fmtCLP(purchase.unitCost || 0)}</span>
-                  </div>
-                </div>
+              <div key={purchase.id} className="inventory-table-row inventory-purchases-row">
+                <strong>{purchase.itemName || 'Compra de insumo'}</strong>
+                <span>{purchase.itemBrand || 'Sin marca'}</span>
+                <span>{purchase.quantityPurchased} {purchase.itemUnit ?? 'unidad'}</span>
+                <span>{purchaseDate}</span>
+                <span>{supplier?.name ?? 'Sin proveedor'}</span>
+                <span>{documentType} {purchase.documentNumber || 'Sin numero'}</span>
+                <span>{fmtCLP(purchase.unitCost || 0)}</span>
+                {purchase.note ? <span className="inventory-table-note">{purchase.note}</span> : null}
               </div>
             );
           })}
-          {!recentPurchases.length && <div className="finance-empty">Todavia no hay compras registradas.</div>}
+          {!filteredPurchases.length && <div className="finance-empty">Todavia no hay compras registradas para ese filtro.</div>}
+        </div>
+      </div>
+
+      <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
+        <div className="budget-pricing-settings-head">
+          <div>
+            <div className="bs-label">Comparacion de precios</div>
+            <div className="bs-help">Lectura basica del costo unitario por insumo segun el historial local guardado.</div>
+          </div>
+        </div>
+        <div className="inventory-table-shell">
+          <div className="inventory-table-head inventory-comparison-head">
+            <span>Insumo</span>
+            <span>Marca</span>
+            <span>Min</span>
+            <span>Prom</span>
+            <span>Ultimo</span>
+            <span>Max</span>
+            <span>Fecha</span>
+            <span>Proveedor</span>
+          </div>
+          {priceComparisonRows.map((row) => (
+            <div key={row.itemId} className="inventory-table-row inventory-comparison-row">
+              <strong>{row.itemName}</strong>
+              <span>{row.lastBrandName || 'Sin marca'}</span>
+              <span>{fmtCLP(row.minUnitCost || 0)}</span>
+              <span>{fmtCLP(row.averageUnitCost || 0)}</span>
+              <span>{fmtCLP(row.lastUnitCost || 0)}</span>
+              <span>{fmtCLP(row.maxUnitCost || 0)}</span>
+              <span>{row.lastPurchaseLabel || 'Sin fecha'}</span>
+              <span>{row.lastSupplierName || 'Sin proveedor'}</span>
+            </div>
+          ))}
+          {!priceComparisonRows.length && <div className="finance-empty">Todavia no hay compras suficientes para comparar precios.</div>}
         </div>
       </div>
 
@@ -2929,7 +3069,7 @@ export function InventarioInsumos({
       )}
 
       <div style={{ marginTop: 14 }} className="finance-empty">
-        Este panel concentra compras y proveedores para que la ficha del paciente quede clinica.
+        Este panel concentra compras y proveedores para que la ficha del paciente quede clinica. El numero de documento es obligatorio para guardar una compra.
       </div>
     </div>
   );

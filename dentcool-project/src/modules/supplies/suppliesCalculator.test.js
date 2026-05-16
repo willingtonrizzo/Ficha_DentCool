@@ -5,6 +5,7 @@ import {
 } from './suppliesSeeds';
 import {
   applyPurchaseToStock,
+  buildSupplyPurchaseComparisonRows,
   calculateAmortizedCost,
   calculatePatientSupplyUsageCost,
   calculateRecipeCost,
@@ -111,5 +112,45 @@ describe('supplies calculator', () => {
 
     expect(item.currentStock).toBe(150);
     expect(item.unitCost).toBeCloseTo(36.67, 2);
+  });
+
+  it('builds purchase comparison rows with averages and supplier context', () => {
+    const rows = buildSupplyPurchaseComparisonRows(
+      [
+        {
+          itemId: 'sup_vaso_001',
+          itemName: 'Vaso desechable',
+          itemBrand: 'Nitriflex',
+          quantityPurchased: 100,
+          totalCost: 3000,
+          unitCost: 30,
+          supplierId: 'prov_dental_001',
+          purchaseDateLabel: '15/05/2026',
+          createdAt: '2026-05-15T12:00:00.000Z',
+        },
+        {
+          itemId: 'sup_vaso_001',
+          itemName: 'Vaso desechable',
+          itemBrand: 'Nitriflex',
+          quantityPurchased: 50,
+          totalCost: 2000,
+          unitCost: 40,
+          supplierId: 'prov_dental_001',
+          purchaseDateLabel: '20/05/2026',
+          createdAt: '2026-05-20T12:00:00.000Z',
+        },
+      ],
+      [
+        { id: 'prov_dental_001', name: 'Proveedor Dental X' },
+      ]
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].minUnitCost).toBe(30);
+    expect(rows[0].averageUnitCost).toBeCloseTo(33.33, 2);
+    expect(rows[0].lastUnitCost).toBe(40);
+    expect(rows[0].lastBrandName).toBe('Nitriflex');
+    expect(rows[0].lastSupplierName).toBe('Proveedor Dental X');
+    expect(rows[0].supplierCount).toBe(1);
   });
 });
