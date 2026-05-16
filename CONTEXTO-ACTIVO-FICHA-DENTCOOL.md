@@ -95,6 +95,9 @@ Ruta activa del proyecto:
 - el alta de materiales del catalogo ya quedo movida desde la ficha del paciente al inventario general
 - `Inventario` ahora permite capturar `marca` en el alta de materiales y conservarla en el historial de compras
 - el historial y la comparacion del inventario ahora se muestran como tabla horizontal con columnas visibles
+- `Inventario` ahora permite editar y eliminar compras, ajustando stock y costo promedio sin perder la trazabilidad
+- el historial del inventario ahora muestra mas detalle de proveedor dentro de la misma fila horizontal
+- `Inventario` ahora permite editar proveedores, exportar a CSV/XLSX y revisar un historial por proveedor mas navegable
 - `Lista precios` muestra precio lista, descuento maximo recomendado y precio minimo sin costos internos
 - el login local es barrera de uso para demo, no seguridad fuerte definitiva
 

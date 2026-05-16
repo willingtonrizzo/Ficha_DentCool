@@ -185,7 +185,12 @@ Hecho:
 - el alta de materiales del catalogo quedo movida desde la ficha del paciente al inventario general
 - la vista `Inventario` ahora permite registrar `marca` del material y la conserva en el historial de compras
 - el historial y la comparacion del inventario quedaron como tabla horizontal con columnas visibles por insumo
-- se verifico la separacion con `npm test -- --run`: `71` tests verdes
+- el inventario general ahora permite editar y eliminar compras sin romper stock ni costo promedio
+- el inventario general ahora permite editar proveedores desde la misma vista
+- el inventario general ahora exporta compras, comparacion y proveedores a CSV/XLSX
+- el historial por proveedor ahora es navegable desde una vista resumen del propio inventario
+- el historial del inventario ahora muestra mas trazabilidad del proveedor en la misma fila horizontal
+- se verifico la separacion con `npm test -- --run`: `72` tests verdes
 - se verifico la separacion con `npm run build`: build correcto
 
 ## Como se hizo este bloque

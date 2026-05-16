@@ -5,6 +5,7 @@ import {
 } from './suppliesSeeds';
 import {
   applyPurchaseToStock,
+  adjustSupplyItemForPurchaseChange,
   buildSupplyPurchaseComparisonRows,
   calculateAmortizedCost,
   calculatePatientSupplyUsageCost,
@@ -112,6 +113,25 @@ describe('supplies calculator', () => {
 
     expect(item.currentStock).toBe(150);
     expect(item.unitCost).toBeCloseTo(36.67, 2);
+  });
+
+  it('adjusts stock and cost when a purchase is edited or removed', () => {
+    const baseItem = {
+      currentStock: 150,
+      unitCost: 36.67,
+    };
+    const purchase = {
+      quantityPurchased: 100,
+      unitCost: 40,
+    };
+
+    const removed = adjustSupplyItemForPurchaseChange(baseItem, purchase, -1);
+    const restored = adjustSupplyItemForPurchaseChange(removed, purchase, 1);
+
+    expect(removed.currentStock).toBe(50);
+    expect(removed.unitCost).toBeCloseTo(30, 0);
+    expect(restored.currentStock).toBe(150);
+    expect(restored.unitCost).toBeCloseTo(36.67, 2);
   });
 
   it('builds purchase comparison rows with averages and supplier context', () => {

@@ -8,7 +8,7 @@ import {
   findPricingTreatmentForProcedure,
 } from './pricing';
 import {
-  applyPurchaseToStock,
+  adjustSupplyItemForPurchaseChange,
   buildSupplyPurchaseComparisonRows,
   calculatePatientSupplyUsageCost,
   checkAgendaSupplyNeeds,
@@ -52,6 +52,31 @@ function PricingHelpButton({ label, text, compact = false, open, onToggle, place
       {open && <div className="pricing-help-popover">{text}</div>}
     </div>
   );
+}
+
+function csvEscape(value) {
+  const text = value == null ? '' : String(value);
+  if (/[",\n;]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+  return text;
+}
+
+function buildCsv(columns, rows) {
+  const header = columns.map((column) => csvEscape(column.label)).join(',');
+  const body = rows.map((row) => columns.map((column) => csvEscape(column.value(row))).join(',')).join('\n');
+  return `${header}\n${body}`;
+}
+
+function triggerDownload(filename, content, mimeType = 'text/csv;charset=utf-8;') {
+  if (typeof document === 'undefined') return;
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 export function Tabs({ active, onChange, counts, allowedTabs }) {
@@ -2557,6 +2582,16 @@ export function InventarioInsumos({
   const [purchaseDocumentType, setPurchaseDocumentType] = useState('boleta');
   const [purchaseDocumentNumber, setPurchaseDocumentNumber] = useState('');
   const [purchaseNote, setPurchaseNote] = useState('');
+  const [editingPurchaseId, setEditingPurchaseId] = useState('');
+  const [editingSupplierId, setEditingSupplierId] = useState('');
+  const [supplierName, setSupplierName] = useState('');
+  const [supplierContactName, setSupplierContactName] = useState('');
+  const [supplierPhone, setSupplierPhone] = useState('');
+  const [supplierEmail, setSupplierEmail] = useState('');
+  const [supplierAddress, setSupplierAddress] = useState('');
+  const [supplierWebsite, setSupplierWebsite] = useState('');
+  const [supplierNotes, setSupplierNotes] = useState('');
+  const [supplierActive, setSupplierActive] = useState(true);
   const [showSuppliers, setShowSuppliers] = useState(false);
   const [filterSupplierId, setFilterSupplierId] = useState('all');
   const [filterItemId, setFilterItemId] = useState('all');
@@ -2571,6 +2606,43 @@ export function InventarioInsumos({
     .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime())
     .slice(0, 10);
   const priceComparisonRows = buildSupplyPurchaseComparisonRows(moduleState.purchases, moduleState.suppliers);
+  const supplierHistoryRows = Array.from(
+    moduleState.purchases.reduce((acc, purchase) => {
+      const key = purchase.supplierId || '__none__';
+      const current = acc.get(key) ?? {
+        supplierId: purchase.supplierId || '',
+        supplierName: purchase.supplierId
+          ? moduleState.suppliers.find((supplier) => supplier.id === purchase.supplierId)?.name ?? 'Sin proveedor'
+          : 'Sin proveedor',
+        contactName: purchase.supplierId
+          ? moduleState.suppliers.find((supplier) => supplier.id === purchase.supplierId)?.contactName ?? ''
+          : '',
+        phone: purchase.supplierId
+          ? moduleState.suppliers.find((supplier) => supplier.id === purchase.supplierId)?.phone ?? ''
+          : '',
+        purchaseCount: 0,
+        totalCost: 0,
+        lastPurchaseLabel: '',
+        lastPurchaseAt: 0,
+        items: new Set(),
+      };
+      current.purchaseCount += 1;
+      current.totalCost += Number(purchase.totalCost || 0);
+      current.items.add(purchase.itemName || 'Sin nombre');
+      const purchaseAt = purchase.createdAt ? new Date(purchase.createdAt).getTime() : 0;
+      if (purchaseAt >= current.lastPurchaseAt) {
+        current.lastPurchaseAt = purchaseAt;
+        current.lastPurchaseLabel = purchase.purchaseDateLabel || (purchase.createdAt ? new Date(purchase.createdAt).toLocaleDateString('es-CL') : 'Sin fecha');
+      }
+      acc.set(key, current);
+      return acc;
+    }, new Map()).values()
+  )
+    .map((row) => ({
+      ...row,
+      items: Array.from(row.items),
+    }))
+    .sort((a, b) => b.totalCost - a.totalCost);
 
   const handleSaveCatalogItem = () => {
     const nextName = newCatalogName.trim() || 'Nuevo insumo';
@@ -2680,7 +2752,7 @@ export function InventarioInsumos({
     const now = new Date().toISOString();
     const unitCost = Math.round((totalCost / quantity) * 100) / 100;
     const purchase = {
-      id: `supply-purchase-${catalogItem.id}-${Date.now()}`,
+      id: editingPurchaseId || `supply-purchase-${catalogItem.id}-${Date.now()}`,
       itemId: catalogItem.id,
       itemName: catalogItem.name,
       itemBrand: catalogItem.brand ?? '',
@@ -2698,10 +2770,30 @@ export function InventarioInsumos({
 
     setModuleState((current) => ({
       ...current,
-      catalog: current.catalog.map((item) =>
-        item.id === catalogItem.id ? applyPurchaseToStock(item, purchase) : item
-      ),
-      purchases: [purchase, ...current.purchases],
+      catalog: current.catalog.map((item) => {
+        if (editingPurchaseId) {
+          const original = current.purchases.find((entry) => entry.id === editingPurchaseId);
+          if (!original) return item;
+          if (item.id === original.itemId && item.id === catalogItem.id) {
+            return adjustSupplyItemForPurchaseChange(
+              adjustSupplyItemForPurchaseChange(item, original, -1),
+              purchase,
+              1
+            );
+          }
+          if (item.id === original.itemId) {
+            return adjustSupplyItemForPurchaseChange(item, original, -1);
+          }
+          if (item.id === catalogItem.id) {
+            return adjustSupplyItemForPurchaseChange(item, purchase, 1);
+          }
+          return item;
+        }
+        return item.id === catalogItem.id ? adjustSupplyItemForPurchaseChange(item, purchase, 1) : item;
+      }),
+      purchases: editingPurchaseId
+        ? current.purchases.map((entry) => (entry.id === editingPurchaseId ? purchase : entry))
+        : [purchase, ...current.purchases],
     }));
     setPurchaseItemId('');
     setPurchaseQuantity(1);
@@ -2715,6 +2807,185 @@ export function InventarioInsumos({
       year: 'numeric',
     }).format(new Date()));
     setPurchaseNote('');
+    setEditingPurchaseId('');
+  };
+
+  const handleEditPurchase = (purchase) => {
+    setEditingPurchaseId(purchase.id);
+    setPurchaseItemId(purchase.itemId ?? '');
+    setPurchaseQuantity(purchase.quantityPurchased ?? 1);
+    setPurchaseTotalCost(purchase.totalCost ?? 0);
+    setPurchaseSupplierId(purchase.supplierId ?? '');
+    setPurchaseDateLabel(purchase.purchaseDateLabel ?? '');
+    setPurchaseDocumentType(purchase.documentType ?? 'boleta');
+    setPurchaseDocumentNumber(purchase.documentNumber ?? '');
+    setPurchaseNote(purchase.note ?? '');
+  };
+
+  const handleDeletePurchase = (purchaseId) => {
+    setModuleState((current) => {
+      const purchase = current.purchases.find((entry) => entry.id === purchaseId);
+      if (!purchase) return current;
+      const nextCatalog = current.catalog.map((item) => {
+        if (item.id !== purchase.itemId) return item;
+        return adjustSupplyItemForPurchaseChange(item, purchase, -1);
+      });
+      return {
+        ...current,
+        catalog: nextCatalog,
+        purchases: current.purchases.filter((entry) => entry.id !== purchaseId),
+      };
+    });
+    if (editingPurchaseId === purchaseId) {
+      setEditingPurchaseId('');
+      setPurchaseItemId('');
+      setPurchaseQuantity(1);
+      setPurchaseTotalCost(0);
+      setPurchaseSupplierId('');
+      setPurchaseDateLabel(new Intl.DateTimeFormat('es-CL', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }).format(new Date()));
+      setPurchaseDocumentType('boleta');
+      setPurchaseDocumentNumber('');
+      setPurchaseNote('');
+    }
+  };
+
+  const handleCancelPurchaseEdit = () => {
+    setEditingPurchaseId('');
+    setPurchaseItemId('');
+    setPurchaseQuantity(1);
+    setPurchaseTotalCost(0);
+    setPurchaseSupplierId('');
+    setPurchaseDateLabel(new Intl.DateTimeFormat('es-CL', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(new Date()));
+    setPurchaseDocumentType('boleta');
+    setPurchaseDocumentNumber('');
+    setPurchaseNote('');
+  };
+
+  const handleSaveSupplier = () => {
+    const nextName = supplierName.trim();
+    if (!nextName) return;
+    const nextSupplier = {
+      id: editingSupplierId || `prov_custom_${Date.now()}`,
+      name: nextName,
+      contactName: supplierContactName.trim(),
+      phone: supplierPhone.trim(),
+      email: supplierEmail.trim(),
+      address: supplierAddress.trim(),
+      website: supplierWebsite.trim(),
+      notes: supplierNotes.trim(),
+      active: supplierActive,
+    };
+
+    setModuleState((current) => {
+      const exists = current.suppliers.some((supplier) => supplier.id === nextSupplier.id);
+      return {
+        ...current,
+        suppliers: exists
+          ? current.suppliers.map((supplier) => (supplier.id === nextSupplier.id ? nextSupplier : supplier))
+          : [nextSupplier, ...current.suppliers],
+      };
+    });
+    setEditingSupplierId('');
+    setSupplierName('');
+    setSupplierContactName('');
+    setSupplierPhone('');
+    setSupplierEmail('');
+    setSupplierAddress('');
+    setSupplierWebsite('');
+    setSupplierNotes('');
+    setSupplierActive(true);
+  };
+
+  const handleEditSupplier = (supplier) => {
+    setEditingSupplierId(supplier.id);
+    setSupplierName(supplier.name ?? '');
+    setSupplierContactName(supplier.contactName ?? '');
+    setSupplierPhone(supplier.phone ?? '');
+    setSupplierEmail(supplier.email ?? '');
+    setSupplierAddress(supplier.address ?? '');
+    setSupplierWebsite(supplier.website ?? '');
+    setSupplierNotes(supplier.notes ?? '');
+    setSupplierActive(Boolean(supplier.active));
+    setShowSuppliers(true);
+  };
+
+  const handleCancelSupplierEdit = () => {
+    setEditingSupplierId('');
+    setSupplierName('');
+    setSupplierContactName('');
+    setSupplierPhone('');
+    setSupplierEmail('');
+    setSupplierAddress('');
+    setSupplierWebsite('');
+    setSupplierNotes('');
+    setSupplierActive(true);
+  };
+
+  const handleExportInventoryCsv = () => {
+    const columns = [
+      { label: 'Insumo', value: (row) => row.itemName || '' },
+      { label: 'Marca', value: (row) => row.itemBrand || '' },
+      { label: 'Cantidad', value: (row) => `${row.quantityPurchased ?? ''} ${row.itemUnit ?? ''}`.trim() },
+      { label: 'Fecha', value: (row) => row.purchaseDateLabel || '' },
+      { label: 'Proveedor', value: (row) => supplierById.get(row.supplierId)?.name ?? 'Sin proveedor' },
+      { label: 'Contacto proveedor', value: (row) => supplierById.get(row.supplierId)?.contactName || supplierById.get(row.supplierId)?.phone || supplierById.get(row.supplierId)?.address || '' },
+      { label: 'Documento', value: (row) => `${row.documentType || ''} ${row.documentNumber || ''}`.trim() },
+      { label: 'Costo total', value: (row) => row.totalCost ?? 0 },
+      { label: 'Costo unitario', value: (row) => row.unitCost ?? 0 },
+      { label: 'Nota', value: (row) => row.note || '' },
+    ];
+    const csv = buildCsv(columns, moduleState.purchases);
+    triggerDownload(`inventario-insumos-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+  };
+
+  const handleExportInventoryWorkbook = async () => {
+    const XLSX = await import('xlsx');
+    const purchasesSheet = moduleState.purchases.map((row) => ({
+      Insumo: row.itemName || '',
+      Marca: row.itemBrand || '',
+      Cantidad: row.quantityPurchased ?? 0,
+      Unidad: row.itemUnit ?? '',
+      Fecha: row.purchaseDateLabel || '',
+      Proveedor: supplierById.get(row.supplierId)?.name ?? 'Sin proveedor',
+      Contacto: supplierById.get(row.supplierId)?.contactName || supplierById.get(row.supplierId)?.phone || supplierById.get(row.supplierId)?.address || '',
+      Documento: `${row.documentType || ''} ${row.documentNumber || ''}`.trim(),
+      'Costo total': row.totalCost ?? 0,
+      'Costo unitario': row.unitCost ?? 0,
+      Nota: row.note || '',
+    }));
+    const suppliersSheet = moduleState.suppliers.map((supplier) => ({
+      Proveedor: supplier.name || '',
+      Contacto: supplier.contactName || '',
+      Telefono: supplier.phone || '',
+      Email: supplier.email || '',
+      Direccion: supplier.address || '',
+      Web: supplier.website || '',
+      Activo: supplier.active ? 'Si' : 'No',
+      Notas: supplier.notes || '',
+    }));
+    const comparisonSheet = priceComparisonRows.map((row) => ({
+      Insumo: row.itemName || '',
+      Marca: row.lastBrandName || '',
+      Min: row.minUnitCost ?? 0,
+      Promedio: row.averageUnitCost ?? 0,
+      Ultimo: row.lastUnitCost ?? 0,
+      Max: row.maxUnitCost ?? 0,
+      Fecha: row.lastPurchaseLabel || '',
+      Proveedor: row.lastSupplierName || '',
+    }));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(purchasesSheet), 'Compras');
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(comparisonSheet), 'Comparacion');
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(suppliersSheet), 'Proveedores');
+    XLSX.writeFile(workbook, `inventario-insumos-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   const supplierById = new Map(moduleState.suppliers.map((item) => [item.id, item]));
@@ -2728,6 +2999,14 @@ export function InventarioInsumos({
           <div className="documents-save-note">Compras, proveedores y trazabilidad fuera de la ficha del paciente.</div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary" type="button" onClick={handleExportInventoryCsv}>
+            <Icon.download />
+            Exportar CSV
+          </button>
+          <button className="btn btn-secondary" type="button" onClick={handleExportInventoryWorkbook}>
+            <Icon.download />
+            Exportar XLSX
+          </button>
           <button className="btn btn-secondary" type="button" onClick={() => setShowSuppliers((current) => !current)}>
             <Icon.edit />
             {showSuppliers ? 'Ocultar proveedores' : 'Ver proveedores'}
@@ -2863,9 +3142,15 @@ export function InventarioInsumos({
       <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
         <div className="budget-pricing-settings-head">
           <div>
-            <div className="bs-label">Registrar compra</div>
-            <div className="bs-help">Aqui vive el flujo de compra para que no quede dentro de la ficha del paciente.</div>
+            <div className="bs-label">{editingPurchaseId ? 'Editar compra' : 'Registrar compra'}</div>
+            <div className="bs-help">{editingPurchaseId ? 'Corrige la compra y guarda la version actualizada.' : 'Aqui vive el flujo de compra para que no quede dentro de la ficha del paciente.'}</div>
           </div>
+          {editingPurchaseId && (
+            <button className="btn btn-secondary" type="button" onClick={handleCancelPurchaseEdit}>
+              <Icon.edit />
+              Cancelar edicion
+            </button>
+          )}
         </div>
         <div className="budget-pricing-settings-grid">
           <label className="pricing-setting-field" style={{ gridColumn: '1 / span 2' }}>
@@ -2946,7 +3231,7 @@ export function InventarioInsumos({
               }
             >
               <Icon.plus />
-              Registrar compra
+              {editingPurchaseId ? 'Actualizar compra' : 'Registrar compra'}
             </button>
           </div>
         </div>
@@ -2982,6 +3267,7 @@ export function InventarioInsumos({
             <span>Proveedor</span>
             <span>Documento</span>
             <span>Costo c/u</span>
+            <span>Acciones</span>
           </div>
           {filteredPurchases.map((purchase) => {
             const supplier = supplierById.get(purchase.supplierId);
@@ -2995,10 +3281,25 @@ export function InventarioInsumos({
                 <span>{purchase.itemBrand || 'Sin marca'}</span>
                 <span>{purchase.quantityPurchased} {purchase.itemUnit ?? 'unidad'}</span>
                 <span>{purchaseDate}</span>
-                <span>{supplier?.name ?? 'Sin proveedor'}</span>
-                <span>{documentType} {purchase.documentNumber || 'Sin numero'}</span>
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <div>{supplier?.name ?? 'Sin proveedor'}</div>
+                  <small className="document-value">
+                    {supplier?.contactName || supplier?.phone || supplier?.address || 'Sin contacto'}
+                  </small>
+                </span>
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <div>{documentType} {purchase.documentNumber || 'Sin numero'}</div>
+                  {purchase.note ? <small className="document-value">{purchase.note}</small> : <small className="document-value">Sin nota</small>}
+                </span>
                 <span>{fmtCLP(purchase.unitCost || 0)}</span>
-                {purchase.note ? <span className="inventory-table-note">{purchase.note}</span> : null}
+                <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                  <button className="row-action" type="button" onClick={() => handleEditPurchase(purchase)} title="Editar compra">
+                    <Icon.edit />
+                  </button>
+                  <button className="row-action" type="button" onClick={() => handleDeletePurchase(purchase.id)} title="Eliminar compra">
+                    <Icon.trash />
+                  </button>
+                </span>
               </div>
             );
           })}
@@ -3033,7 +3334,12 @@ export function InventarioInsumos({
               <span>{fmtCLP(row.lastUnitCost || 0)}</span>
               <span>{fmtCLP(row.maxUnitCost || 0)}</span>
               <span>{row.lastPurchaseLabel || 'Sin fecha'}</span>
-              <span>{row.lastSupplierName || 'Sin proveedor'}</span>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div>{row.lastSupplierName || 'Sin proveedor'}</div>
+                <small className="document-value">
+                  {supplierById.get(row.lastSupplierId)?.contactName || supplierById.get(row.lastSupplierId)?.phone || supplierById.get(row.lastSupplierId)?.address || 'Sin contacto'}
+                </small>
+              </span>
             </div>
           ))}
           {!priceComparisonRows.length && <div className="finance-empty">Todavia no hay compras suficientes para comparar precios.</div>}
@@ -3044,29 +3350,143 @@ export function InventarioInsumos({
         <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
           <div className="budget-pricing-settings-head">
             <div>
-              <div className="bs-label">Proveedores</div>
-              <div className="bs-help">Catalogo maestro de proveedores para el inventario general.</div>
+              <div className="bs-label">{editingSupplierId ? 'Editar proveedor' : 'Proveedores'}</div>
+              <div className="bs-help">{editingSupplierId ? 'Modifica la ficha del proveedor y guarda los cambios.' : 'Catalogo maestro de proveedores para el inventario general.'}</div>
+            </div>
+            {editingSupplierId && (
+              <button className="btn btn-secondary" type="button" onClick={handleCancelSupplierEdit}>
+                <Icon.edit />
+                Cancelar
+              </button>
+            )}
+          </div>
+          <div className="budget-pricing-settings-grid" style={{ marginBottom: 14 }}>
+            <label className="pricing-setting-field" style={{ gridColumn: '1 / span 2' }}>
+              <span className="pricing-setting-label-row">
+                <span className="pricing-setting-label-text">Nombre proveedor</span>
+              </span>
+              <input value={supplierName} onChange={(event) => setSupplierName(event.target.value)} placeholder="Proveedor Dental X" />
+            </label>
+            <label className="pricing-setting-field">
+              <span className="pricing-setting-label-row">
+                <span className="pricing-setting-label-text">Contacto</span>
+              </span>
+              <input value={supplierContactName} onChange={(event) => setSupplierContactName(event.target.value)} placeholder="Persona de contacto" />
+            </label>
+            <label className="pricing-setting-field">
+              <span className="pricing-setting-label-row">
+                <span className="pricing-setting-label-text">Telefono</span>
+              </span>
+              <input value={supplierPhone} onChange={(event) => setSupplierPhone(event.target.value)} placeholder="+56 ..." />
+            </label>
+            <label className="pricing-setting-field">
+              <span className="pricing-setting-label-row">
+                <span className="pricing-setting-label-text">Email</span>
+              </span>
+              <input value={supplierEmail} onChange={(event) => setSupplierEmail(event.target.value)} placeholder="correo@proveedor.cl" />
+            </label>
+            <label className="pricing-setting-field">
+              <span className="pricing-setting-label-row">
+                <span className="pricing-setting-label-text">Direccion</span>
+              </span>
+              <input value={supplierAddress} onChange={(event) => setSupplierAddress(event.target.value)} placeholder="Direccion o comuna" />
+            </label>
+            <label className="pricing-setting-field">
+              <span className="pricing-setting-label-row">
+                <span className="pricing-setting-label-text">Web</span>
+              </span>
+              <input value={supplierWebsite} onChange={(event) => setSupplierWebsite(event.target.value)} placeholder="sitio web" />
+            </label>
+            <label className="pricing-setting-field" style={{ gridColumn: '1 / span 2' }}>
+              <span className="pricing-setting-label-row">
+                <span className="pricing-setting-label-text">Notas</span>
+              </span>
+              <input value={supplierNotes} onChange={(event) => setSupplierNotes(event.target.value)} placeholder="Condiciones, despacho, observaciones" />
+            </label>
+            <label className="pricing-setting-field">
+              <span className="pricing-setting-label-row">
+                <span className="pricing-setting-label-text">Estado</span>
+              </span>
+              <select value={supplierActive ? 'active' : 'inactive'} onChange={(event) => setSupplierActive(event.target.value === 'active')}>
+                <option value="active">Activo</option>
+                <option value="inactive">Inactivo</option>
+              </select>
+            </label>
+            <div style={{ display: 'flex', alignItems: 'end' }}>
+              <button className="btn btn-primary" type="button" onClick={handleSaveSupplier}>
+                <Icon.plus />
+                {editingSupplierId ? 'Actualizar proveedor' : 'Guardar proveedor'}
+              </button>
             </div>
           </div>
-          <div className="documents-list">
+          <div className="inventory-table-shell" style={{ marginTop: 10 }}>
+            <div className="inventory-table-head inventory-suppliers-head">
+              <span>Proveedor</span>
+              <span>Contacto</span>
+              <span>Telefono</span>
+              <span>Email</span>
+              <span>Direccion</span>
+              <span>Estado</span>
+              <span>Compras</span>
+              <span>Acciones</span>
+            </div>
             {moduleState.suppliers.map((supplier) => (
-              <div key={supplier.id} className="document-row">
-                <div className="document-main">
-                  <div className="document-head">
-                    <div className="document-title">{supplier.name}</div>
-                    <span className="count">{supplier.active ? 'Activo' : 'Inactivo'}</span>
-                  </div>
-                  <div className="document-meta-line">
-                    <span className="document-kind">{supplier.contactName || 'Sin contacto'}</span>
-                    <span>{supplier.address || 'Sin direccion'}{supplier.phone ? ` · ${supplier.phone}` : ''}</span>
-                  </div>
-                </div>
+              <div key={supplier.id} className="inventory-table-row inventory-suppliers-row">
+                <strong>{supplier.name}</strong>
+                <span>{supplier.contactName || 'Sin contacto'}</span>
+                <span>{supplier.phone || 'Sin telefono'}</span>
+                <span>{supplier.email || 'Sin email'}</span>
+                <span>{supplier.address || 'Sin direccion'}</span>
+                <span>{supplier.active ? 'Activo' : 'Inactivo'}</span>
+                <span>{moduleState.purchases.filter((purchase) => purchase.supplierId === supplier.id).length}</span>
+                <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                  <button className="row-action" type="button" onClick={() => handleEditSupplier(supplier)} title="Editar proveedor">
+                    <Icon.edit />
+                  </button>
+                  <button className="row-action" type="button" onClick={() => setFilterSupplierId(supplier.id)} title="Ver compras">
+                    <Icon.download />
+                  </button>
+                </span>
               </div>
             ))}
             {!moduleState.suppliers.length && <div className="finance-empty">No hay proveedores configurados.</div>}
           </div>
         </div>
       )}
+
+      <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
+        <div className="budget-pricing-settings-head">
+          <div>
+            <div className="bs-label">Historial por proveedor</div>
+            <div className="bs-help">Selecciona un proveedor para revisar su movimiento con más orden.</div>
+          </div>
+        </div>
+        <div className="inventory-table-shell">
+          <div className="inventory-table-head inventory-provider-history-head">
+            <span>Proveedor</span>
+            <span>Compras</span>
+            <span>Total</span>
+            <span>Ultima compra</span>
+            <span>Items</span>
+            <span>Accion</span>
+          </div>
+          {supplierHistoryRows.map((row) => (
+            <div key={row.supplierId || '__none__'} className="inventory-table-row inventory-provider-history-row">
+              <strong>{row.supplierName}</strong>
+              <span>{row.purchaseCount}</span>
+              <span>{fmtCLP(row.totalCost || 0)}</span>
+              <span>{row.lastPurchaseLabel || 'Sin fecha'}</span>
+              <span>{row.items.slice(0, 3).join(', ') || 'Sin items'}</span>
+              <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                <button className="btn btn-secondary" type="button" onClick={() => setFilterSupplierId(row.supplierId || 'all')}>
+                  Ver compras
+                </button>
+              </span>
+            </div>
+          ))}
+          {!supplierHistoryRows.length && <div className="finance-empty">No hay historial por proveedor para mostrar.</div>}
+        </div>
+      </div>
 
       <div style={{ marginTop: 14 }} className="finance-empty">
         Este panel concentra compras y proveedores para que la ficha del paciente quede clinica. El numero de documento es obligatorio para guardar una compra.

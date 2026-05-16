@@ -4834,6 +4834,16 @@ table.tx tfoot td {
   grid-template-columns: minmax(180px, 1.8fr) minmax(120px, 0.9fr) 110px 110px 110px 110px 120px minmax(150px, 1fr);
 }
 
+.inventory-suppliers-head,
+.inventory-suppliers-row {
+  grid-template-columns: minmax(180px, 1.5fr) minmax(140px, 1fr) 120px minmax(160px, 1fr) minmax(180px, 1.2fr) 100px 90px 110px;
+}
+
+.inventory-provider-history-head,
+.inventory-provider-history-row {
+  grid-template-columns: minmax(180px, 1.6fr) 90px 120px 120px minmax(220px, 1.4fr) 120px;
+}
+
 .inventory-table-note {
   grid-column: 1 / -1;
   color: var(--muted);

@@ -89,6 +89,11 @@
 - [x] Mover el alta de materiales del catalogo desde la ficha del paciente al inventario general
 - [x] Agregar campo de marca al catalogo de insumos del inventario general
 - [x] Convertir el historial y la comparacion del inventario en una tabla horizontal legible
+- [x] Permitir editar y eliminar compras desde el inventario general
+- [x] Aumentar la trazabilidad del proveedor en el historial del inventario
+- [x] Permitir editar proveedores desde el inventario general
+- [x] Exportar inventario a CSV/XLSX
+- [x] Agregar una vista de historial por proveedor mas navegable
 
 ## En curso / siguiente
 

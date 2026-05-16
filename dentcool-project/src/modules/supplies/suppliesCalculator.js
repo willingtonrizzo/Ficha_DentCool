@@ -198,6 +198,7 @@ export function buildSupplyPurchaseComparisonRows(purchases = [], suppliers = []
         averageUnitCost: roundCost(averageUnitCost),
         lastUnitCost: roundCost(row.lastUnitCost),
         lastPurchaseLabel: row.lastPurchaseLabel,
+        lastSupplierId: row.lastSupplierId,
         lastBrandName: row.lastBrandName,
         lastSupplierName: resolveSupplierName(suppliers, row.lastSupplierId),
         supplierCount: Array.from(row.supplierIds).filter(Boolean).length,
@@ -319,5 +320,25 @@ export function applyPurchaseToStock(item = {}, purchaseEntry = {}) {
     unitCost: calculateWeightedAverageCost(currentStock, item.unitCost, purchaseQuantity, purchaseUnitCost),
     purchaseQuantity: item.purchaseQuantity ?? purchaseQuantity,
     purchaseTotalCost: totalCost,
+  };
+}
+
+export function adjustSupplyItemForPurchaseChange(item = {}, purchaseEntry = {}, direction = 1) {
+  const currentStock = toNumber(item.currentStock, 0);
+  const currentUnitCost = toNumber(item.unitCost, 0);
+  const purchaseQuantity = toNumber(purchaseEntry.quantityPurchased, purchaseEntry.quantity ?? 0);
+  const purchaseUnitCost = purchaseEntry.unitCost != null
+    ? toNumber(purchaseEntry.unitCost, 0)
+    : calculateUnitCost(purchaseEntry.totalCost ?? 0, purchaseQuantity);
+  const currentValue = currentStock * currentUnitCost;
+  const deltaQuantity = purchaseQuantity * direction;
+  const deltaValue = purchaseQuantity * purchaseUnitCost * direction;
+  const nextStock = currentStock + deltaQuantity;
+  const nextValue = currentValue + deltaValue;
+
+  return {
+    ...item,
+    currentStock: nextStock < 0 ? 0 : nextStock,
+    unitCost: nextStock > 0 ? roundCost(nextValue / nextStock) : 0,
   };
 }

@@ -140,6 +140,9 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - `Inventario` ya permite filtrar el historial por proveedor e insumo.
 - `Inventario` ya incluye alta de materiales al catalogo general para que la ficha no concentre gestion de inventario.
 - `Inventario` ya puede capturar marca del material y conservarla en compras y comparacion historica.
+- `Inventario` ya puede editar y eliminar compras reajustando stock y costo promedio.
+- `Inventario` ya muestra trazabilidad ampliada del proveedor dentro del historial horizontal.
+- `Inventario` ya permite editar proveedores, exportar CSV/XLSX y navegar el historial por proveedor.
 
 ### Testing
 
