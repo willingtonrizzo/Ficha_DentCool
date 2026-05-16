@@ -28,15 +28,10 @@ jobs:
         working-directory: dentcool-project
         run: npm ci
 
-      - name: Build and publish Windows installer
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Windows installer artifact
+        uses: tauri-apps/tauri-action@v0.6.2
         with:
           projectPath: dentcool-project
-          tagName: dentcool-v__VERSION__
-          releaseName: DentCool v__VERSION__
-          releaseBody: Windows 11 installer for DentCool. Download the attached asset and install it on the client laptop.
-          releaseDraft: false
-          prerelease: false
-          args: ''
+          uploadWorkflowArtifacts: true
+          workflowArtifactNamePattern: DentCool-[platform]-[arch]-[bundle]
+          uploadUpdaterSignatures: true
