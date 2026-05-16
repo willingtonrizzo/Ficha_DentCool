@@ -143,6 +143,36 @@ Hecho:
 - el modulo de insumos ya pasa `npm test` y `npm run build`
 - el tab `Insumos` ahora se simplifico a alta de nuevos materiales con listado opcional del catalogo
 - el tab `Insumos` ahora explica la unidad de cantidad con ayudas `?` y muestra la base de compra del costo unitario
+- se cerro una capa mas de fase uno del modulo de insumos con registro simple de compras
+- registrar una compra ahora suma stock real al material, recalcula costo promedio ponderado y guarda historial local en `purchases`
+- el tab `Insumos` ya muestra ultimas compras registradas dentro del modulo local
+- se amplio la cobertura de storage de insumos para persistir compras
+- se verifico el bloque con `npm test -- --run`: `65` tests verdes
+- se verifico el bloque con `npm run build`: build correcto
+- se aclaro la nomenclatura del modulo: `receta` pasa a mostrarse como `lista base de insumos`
+- se decidio dejar `Registrar compra` dentro del tab `Insumos` solo como puente MVP para mostrar de donde salen stock, cantidades y precios
+- decision pendiente: mover compras a un modulo general de inventario en una etapa posterior, fuera de la ficha por paciente
+- el formulario de material ahora permite configurar `Stock minimo alerta`
+- el stock actual no se configura manualmente: se alimenta con compras registradas
+- `minimumStock: 0` ahora significa sin alerta configurada y no dispara stock bajo con stock `0`
+- se agrego login local MVP con roles `Admin`, `Dr` y `Staff`
+- `Staff` puede entrar a pacientes, datos/antecedentes/agenda/documentos y lista de precios sin ver finanzas, presupuesto interno ni insumos
+- se agrego vista `Lista precios` para recepcion con precio lista, descuento maximo recomendado y precio minimo sin mostrar costos internos
+- se agrego cierre de sesion local
+- se agregaron tests de auth local; verificacion actual: `68` tests verdes y `npm run build` correcto
+- se ajusto rol `Dr` para no ver `Insumos`, compras, proveedores ni configuracion financiera interna
+- `Dr` conserva presupuesto en vista simplificada: tratamiento, precio oficial, descuento, precio paciente y honorario doctor
+- se agrego `Bloque Funcionalidades - presupuesto pack simple`
+- `Presupuesto` ahora permite armar un pack de hasta 3 tratamientos desde el catalogo de pricing
+- el pack calcula precio base, precio paciente con descuento, minimo/sano/ideal, horas clinicas, sesiones y honorario doctor
+- el descuento del pack se limita por un maximo ponderado segun los tratamientos seleccionados
+- `Admin` ve una referencia interna de box y traslado estimado por sesiones; `Dr` solo ve referencia comercial sin costos internos
+- el boton `Agregar pack al plan` crea una linea de tratamiento tipo `Pack: ...` en el presupuesto del paciente
+- esa linea ahora queda marcada como `saleKind: pack` para poder contar packs vendidos sin depender solo del texto
+- la seleccion del pack queda persistida dentro del presupuesto local por paciente
+- se verifico el bloque con `npm test -- --run`: `70` tests verdes
+- se verifico el bloque con `npm run build`: build correcto
+- estado actual listo para prueba de la doctora en navegador local o despliegue GitHub/Render si esta conectado
 
 ## Como se hizo este bloque
 
@@ -153,6 +183,18 @@ Hecho:
 - se conecto la UI en `src/app.jsx` para mostrar comparativo de periodos, totales por paciente, totales por tratamiento y detalle filtrado
 - se ajustaron estilos en `styles.css` para sostener la nueva vista sin romper la navegacion actual
 - se agregaron pruebas en `src/__tests__/pricing.test.js` para cubrir reportes, snapshots y exportaciones
+- en el bloque de insumos se reutilizo `applyPurchaseToStock` para no duplicar la regla de costo promedio ponderado dentro de la UI
+- se mantuvo la persistencia en `localStorage` mediante `saveSupplyState`, sin introducir `SQLite` todavia
+- se mantuvo la compra dentro de la ficha solo por demostracion del flujo completo de fase uno
+- se ajusto `checkLowStock` para ignorar alertas cuando el minimo es `0`
+- se creo `src/auth.js` para login local, permisos por rol y sesion persistida en `localStorage`
+- se agrego una pantalla de login visual en `src/app.jsx`
+- se filtro navegacion, tabs de paciente y secciones internas segun rol
+- se separo `Presupuesto` en modo completo para `Admin` y modo simple para `Dr`
+- se agrego `calculateSimpleTreatmentPack` en `src/pricing.js` como motor puro para paquetes simples
+- se extendio `createBudgetRecord` para persistir seleccion, modalidad y descuento del pack
+- se permitio que `handleAddTreatment` reciba datos iniciales para agregar el pack como linea del plan
+- se agregaron tests unitarios para descuento ponderado, limite de 3 tratamientos y persistencia del pack
 
 ## Que tenemos ahora
 
@@ -165,21 +207,33 @@ Hecho:
 - lectura operativa real apoyada en tratamientos y citas visibles
 - entidades separadas para citas y cobros/abonos dentro del modelo local
 - cobertura automatizada que valida el bloque financiero sin romper lo anterior
+- un MVP de insumos fase uno con catalogo local, recetas, snapshots, stock bajo, alta/edicion simple de materiales y registro de compras persistente
+- las compras de insumos actualizan stock y costo unitario promedio sin tocar aun caja contable ni proveedores avanzados
+- la UI ya evita llamar `receta` a la lista clinica de materiales para no confundirla con receta medica
+- cada material puede definir un minimo para alertas; el stock real sigue entrando por compras
+- acceso local por rol para demo: `Admin`, `Dr` y `Staff`
+- lista de precios visible para recepcion sin exponer costos internos
+- presupuesto simplificado para `Dr` sin costos internos, pricing avanzado ni gestion de insumos
+- presupuesto pack simple para `Admin` y `Dr`, con maximo 3 tratamientos, modalidad por sesiones y descuento controlado
 
 ## Que falta antes de seguir
 
-- revisar el `md` financiero `dentcool_pricing_codex_skill.md`
-- documentar explicitamente las decisiones tomadas en ese `md` y por que se tomaron
-- cerrar el MVP chico de insumos con una UI minima mas adelante, sin mezclarlo aun con `SQLite`
-- dejar el editor de catalogo de insumos en la version actual: alta simple de materiales y lista opcional
+- validar con la doctora si el pack debe crear una sola linea comercial o tambien desglosar automaticamente cada tratamiento dentro del plan
+- definir si el descuento de pack requiere aprobacion explicita de `Admin` cuando lo aplica `Dr`
+- validar con la doctora si el flujo de compra necesita proveedor obligatorio, numero de boleta/factura, fecha editable o solo registro rapido
+- decidir si el siguiente paso de insumos es descuento de stock al confirmar atencion o editor de recetas por tratamiento
+- mover `Registrar compra` a inventario general cuando exista la vista global de insumos
+- fase dos de inventario debe permitir fecha editable, proveedor, direccion/contacto del proveedor, documento/boleta y analisis historico de compras por insumo
+- ejemplo esperado fase dos: Dental X compro `sombrilla` el `2026-05-10`, 50 unidades por $5.000; luego otra compra en otra fecha para comparar evolucion de precios
 - preparar la siguiente capa de persistencia para que esto deje de vivir solo en `localStorage`
 - seguir afinando la sincronizacion entre agenda, cobros, tratamientos y resumen financiero
 - preparar la migracion de esta capa separada a `SQLite`
+- reemplazar claves locales temporales por usuarios reales cuando exista persistencia segura
 
 ## Como se va a proceder
 
-1. revisar y cerrar el `md` financiero con las decisiones y su justificacion
-2. dejar el MVP chico de insumos en su corte actual: motor puro, tests, persistencia local y alta simple de materiales
+1. validar el flujo real de insumos con la doctora usando alta de material, compra, receta y snapshot
+2. decidir si fase dos parte por descuento de stock por atencion o por editor de recetas
 3. mantener el puente operativo solo mientras no rompa compatibilidad
 4. pasar la persistencia de este flujo a `SQLite` cuando el modelo ya este separado
 5. volver a verificar con tests despues de cada cambio relevante
@@ -219,6 +273,12 @@ Hecho:
 - lectura operativa desde citas visibles: funcional
 - cobranza pendiente por paciente: funcional
 - pipeline clinico operativo: funcional
+- insumos catalogo local: funcional
+- insumos compras y stock: funcional en fase uno local
+- insumos snapshots por paciente: funcional
+- login local MVP: funcional
+- lista de precios para staff: funcional
+- presupuesto doctor simplificado: funcional
 - UI conectada parcialmente al modelo clinico: si
 - backend: no
 - SQLite runtime: no
@@ -228,10 +288,12 @@ Hecho:
 
 ## Siguiente bloque recomendado
 
-1. separar una entidad real de citas y otra de cobros para no depender solo de `nextVisit` y `paid`
-2. limpiar el rol residual de `uiContext` global
-3. despues preparar la transicion a `SQLite` runtime
-4. evaluar cierre de caja, abonos y conciliacion con snapshots aceptados
+1. probar con la doctora el flujo `Agregar material` -> `Registrar compra` -> `Guardar snapshot`
+2. probar login con `Admin`, `Dr` y `Staff` antes de entregar demo, especialmente restricciones de presupuesto e insumos
+3. decidir si insumos fase dos sera descuento de stock por atencion confirmada o editor de recetas
+4. limpiar el rol residual de `uiContext` global
+5. despues preparar la transicion a `SQLite` runtime
+6. evaluar cierre de caja, abonos y conciliacion con snapshots aceptados
 
 ## Riesgos abiertos
 
@@ -246,4 +308,9 @@ Hecho:
 - aunque ya existe handoff persistente, sigue siendo necesario mantenerlo actualizado al cerrar cada bloque
 - la exportacion Excel ya existe y `xlsx` ya no infla el bundle principal porque se carga bajo demanda, pero el chunk separado sigue siendo pesado al momento de exportar
 - la agenda y los cobros ya dejaron de vivir solo en `nextVisit` y `paid`, pero aun conviven con ese puente para no romper los datos anteriores
-- el `md` financiero pendiente de revision es `dentcool_pricing_codex_skill.md`, y ahi deben quedar registradas las decisiones tomadas y el motivo de cada una
+- insumos ya registra compras y actualiza stock, pero todavia no descuenta stock automaticamente al cerrar una atencion
+- insumos todavia no tiene editor completo de recetas por tratamiento ni control avanzado de proveedores/documentos de compra
+- `Registrar compra` no debe quedarse definitivamente dentro de la ficha por paciente; queda ahi temporalmente para probar fase uno
+- falta historial analitico de compras para ver variacion de precios por proveedor, fecha e insumo
+- el login actual es una barrera local de MVP, no seguridad fuerte; no usar como seguridad real hasta tener usuarios/permisos persistidos de forma robusta
+- el modo `Dr` aun requiere validacion de negocio fina sobre descuentos y honorarios antes de uso real con doctores externos

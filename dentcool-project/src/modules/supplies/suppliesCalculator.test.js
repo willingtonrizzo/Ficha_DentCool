@@ -75,6 +75,7 @@ describe('supplies calculator', () => {
   it('flags low stock when the current stock reaches the minimum', () => {
     expect(checkLowStock({ currentStock: 18, minimumStock: 20 })).toBe(true);
     expect(checkLowStock({ currentStock: 21, minimumStock: 20 })).toBe(false);
+    expect(checkLowStock({ currentStock: 0, minimumStock: 0 })).toBe(false);
   });
 
   it('calculates agenda supply needs from upcoming appointments', () => {

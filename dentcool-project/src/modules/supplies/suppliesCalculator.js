@@ -166,6 +166,7 @@ export function createSupplySnapshot({
 export function checkLowStock(item = {}) {
   const currentStock = toNumber(item.currentStock, 0);
   const minimumStock = toNumber(item.minimumStock, 0);
+  if (minimumStock <= 0) return false;
   return currentStock <= minimumStock;
 }
 

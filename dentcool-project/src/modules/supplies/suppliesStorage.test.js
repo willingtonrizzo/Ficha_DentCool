@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   loadSupplyCatalog,
+  loadSupplyPurchases,
   loadSupplyRecipes,
   loadSupplySnapshots,
   loadSupplyState,
@@ -9,6 +10,7 @@ import {
   resetSupplySnapshots,
   resetSupplyState,
   saveSupplyCatalog,
+  saveSupplyPurchases,
   saveSupplyRecipes,
   saveSupplySnapshots,
   saveSupplyState,
@@ -32,10 +34,12 @@ describe('supplies storage', () => {
     saveSupplyCatalog([{ id: 'sup-test', name: 'Test', unitCost: 10 }]);
     saveSupplyRecipes([{ id: 'recipe-test', treatmentId: 'evaluacion', items: [] }]);
     saveSupplySnapshots([{ id: 'snap-test', totalSupplyCost: 100 }]);
+    saveSupplyPurchases([{ id: 'purchase-test', itemId: 'sup-test', quantityPurchased: 2 }]);
 
     expect(loadSupplyCatalog()[0].name).toBe('Test');
     expect(loadSupplyRecipes()[0].id).toBe('recipe-test');
     expect(loadSupplySnapshots()[0].id).toBe('snap-test');
+    expect(loadSupplyPurchases()[0].id).toBe('purchase-test');
   });
 
   it('persists and restores the whole supply state', () => {
@@ -43,6 +47,7 @@ describe('supplies storage', () => {
       catalog: [{ id: 'sup-one', name: 'One' }],
       recipes: [{ id: 'recipe-one', treatmentId: 'evaluacion', items: [] }],
       snapshots: [{ id: 'snap-one', totalSupplyCost: 42 }],
+      purchases: [{ id: 'purchase-one', itemId: 'sup-one', quantityPurchased: 1 }],
     });
 
     const state = loadSupplyState();
@@ -50,6 +55,7 @@ describe('supplies storage', () => {
     expect(state.catalog[0].id).toBe('sup-one');
     expect(state.recipes[0].id).toBe('recipe-one');
     expect(state.snapshots[0].id).toBe('snap-one');
+    expect(state.purchases[0].id).toBe('purchase-one');
   });
 
   it('persists explicit empty arrays in the supply state', () => {

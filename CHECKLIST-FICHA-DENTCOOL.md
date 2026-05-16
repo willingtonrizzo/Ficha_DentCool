@@ -63,10 +63,31 @@
 - [x] Agregar UI minima de alta de materiales dentro de la ficha
 - [x] Permitir mostrar el catalogo local de insumos bajo demanda
 - [x] Agregar ayudas contextuales para cantidad por unidad y origen del costo unitario
+- [x] Registrar compras de insumos con actualizacion de stock y costo promedio
+- [x] Persistir historial local de compras de insumos
+- [x] Renombrar en UI `receta` a `lista base de insumos`
+- [x] Permitir configurar stock minimo de alerta por material
+- [x] Evitar alerta de stock bajo cuando el minimo es `0`
+- [x] Agregar login local MVP con roles `Admin`, `Dr` y `Staff`
+- [x] Agregar vista `Lista precios` para recepcion sin costos internos
+- [x] Ocultar finanzas, presupuesto interno e insumos para `Staff`
+- [x] Ocultar insumos y configuracion financiera interna para `Dr`
+- [x] Crear presupuesto simplificado para `Dr`
+- [x] Agregar cierre de sesion local
+- [x] Agregar tests unitarios de auth local
+- [x] Agregar presupuesto pack simple de hasta 3 tratamientos para `Admin` y `Dr`
+- [x] Calcular descuento maximo ponderado, horas/sesiones y honorario doctor para packs
+- [x] Marcar la linea del pack como `saleKind: pack` para trazabilidad comercial
 
 ## En curso / siguiente
 
+- [ ] Probar flujo de entrega con login antes de instalar/demo
+- [ ] Validar con la doctora si el pack debe quedar como linea unica o desglose por tratamientos
+- [ ] Definir aprobacion de `Admin` para descuentos de pack aplicados por `Dr`
 - [ ] Refinar el flujo real de uso del modulo de insumos con la doctora
+- [ ] Decidir si insumos fase dos parte por descuento de stock por atencion o editor de listas base
+- [ ] Mover registro de compras de insumos a inventario general cuando exista esa vista
+- [ ] Fase dos inventario: historial de compras por insumo/proveedor con fecha, documento, direccion/contacto y evolucion de precios
 - [ ] Decidir e implementar primera integracion real de `SQLite`
 - [ ] Profundizar reportes financieros con datos mas operativos
 - [ ] Refinar componentes UX/UI uno por uno

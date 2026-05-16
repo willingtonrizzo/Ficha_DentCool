@@ -64,6 +64,9 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - El MVP chico de insumos ya tiene motor puro, seeds locales, storage local y tests automatizados.
 - El modulo de insumos ya puede entregar un `supplySnapshotId` al motor financiero como puente minimo.
 - El modulo de insumos ya tiene UI minima integrada en la ficha para agregar materiales nuevos y mostrar el catalogo solo bajo demanda.
+- `Presupuesto` ya tiene pack simple para `Admin` y `Dr` con maximo 3 tratamientos, descuento controlado, horas/sesiones y honorario doctor.
+- `Admin` ve la referencia de box y traslado estimado del pack; `Dr` no ve costos internos.
+- La linea del pack queda marcada como `saleKind: pack` para trazabilidad comercial.
 - Existen pruebas automatizadas base del odontograma y de persistencia local.
 - Existe un modelo clinico base y un esquema inicial de `SQLite`.
 
@@ -123,6 +126,12 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - La gestion financiera ya puede revisar detalle filtrado sin salir de la vista general.
 - La exportacion Excel ya existe y no penaliza el arranque porque `xlsx` se carga bajo demanda.
 - La gestion financiera ya puede leer operacion local real desde `treatments.cost`, `treatments.paid`, `treatments.coveragePercent`, `treatments.status` y `patient.nextVisit` sin abrir otra capa paralela.
+- El modulo de insumos ya existe como MVP local con catalogo, recetas, snapshots, stock bajo y persistencia.
+- El modulo de insumos ya permite alta/edicion simple de materiales y registro de compras.
+- Las compras de insumos actualizan stock y costo promedio ponderado, y quedan guardadas en historial local.
+- Existe login local MVP con roles `Admin`, `Dr` y `Staff`.
+- `Staff` puede ver pacientes, agenda/documentos basicos y lista de precios sin acceder a costos internos, finanzas, presupuesto interno ni insumos.
+- `Admin` y `Dr` pueden armar un pack simple desde el catalogo de pricing y agregarlo al plan del paciente como linea comercial.
 
 ### Testing
 
@@ -150,14 +159,18 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - Si no se revisa el `md` financiero y se documentan las decisiones tomadas y por que, el siguiente bloque puede repetir criterios ya resueltos.
 - Si se vuelve a mezclar valores manuales entre tratamientos del catalogo, los reportes financieros pierden confianza operativa.
 - Si se intenta cerrar UI de insumos antes de validar motor y persistencia, se corre el riesgo de mezclar una capa visual con una base que todavia esta madurando.
+- Si se empieza a descontar stock automaticamente sin definir que evento clinico confirma consumo real, los reportes de insumos pueden divergir de la operacion.
+- El login local actual solo es barrera de uso para demo; no debe tratarse como seguridad real hasta tener usuarios/permisos robustos.
+- El pack simple hoy no reemplaza agenda/caja real: crea una linea comercial unica y falta decidir si debe desglosar tratamientos, sesiones y cobros en fase posterior.
 
 ## Siguiente paso recomendado
 
-1. Separar entidad real de citas y entidad real de cobros-abonos.
-2. Revisar `dentcool_pricing_codex_skill.md` y dejar cerradas las decisiones financieras con su justificacion.
-3. Limpiar el rol residual de `uiContext` global frente al contexto por paciente.
-4. Recién despues preparar persistencia `SQLite` runtime para pacientes y fichas.
-5. Evaluar conciliacion futura entre snapshots aceptados, agenda y caja real.
+1. Probar login local y presupuesto pack simple con `Admin`, `Dr` y `Staff`.
+2. Validar con la doctora el flujo de insumos fase uno.
+3. Decidir si insumos fase dos parte por descuento de stock al confirmar atencion o por editor de recetas.
+4. Limpiar el rol residual de `uiContext` global frente al contexto por paciente.
+5. Recién despues preparar persistencia `SQLite` runtime para pacientes y fichas.
+6. Evaluar conciliacion futura entre snapshots aceptados, agenda y caja real.
 
 ## Archivos revisados
 
@@ -175,4 +188,7 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - `dentcool-project/src/patients.js`
 - `dentcool-project/src/__tests__/pricing.test.js`
 - `dentcool-project/src/__tests__/storage.test.js`
+- `dentcool-project/src/modules/supplies/suppliesCalculator.js`
+- `dentcool-project/src/modules/supplies/suppliesStorage.js`
+- `dentcool-project/src/modules/supplies/suppliesStorage.test.js`
 - `dentcool-project/db/schema.sql`

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { EVOLUTION, HISTORY, STORAGE_KEYS, TREATMENTS } from './data';
-import { FinanceDashboard, FloatingNewPatientButton, HomeDashboard, PatientsDirectoryView, Sidebar, TopbarInner, PatientHeader, PatientsSheet, Odontogram, ToothPanel } from './app';
+import { FinanceDashboard, FloatingNewPatientButton, HomeDashboard, LoginScreen, PatientsDirectoryView, PriceListView, Sidebar, TopbarInner, PatientHeader, PatientsSheet, Odontogram, ToothPanel } from './app';
 import { Tabs, Antecedentes, Motivo, Evolucion, Presupuesto, Insumos, Documentos, Historial, AgendaClinica, CobrosAbonos, TreatmentsTable, NextAppointments } from './tabs';
 import { updateToothSurfaceState } from './odontogram';
 import {
@@ -51,6 +51,13 @@ import {
   savePricingSettings,
   saveUiContext,
 } from './storage';
+import {
+  clearAuthSession,
+  getRolePermissions,
+  loadAuthSession,
+  saveAuthSession,
+  validateLocalLogin,
+} from './auth';
 
 function formatShortDateLabel(date = new Date()) {
   return new Intl.DateTimeFormat('es-CL', {
@@ -135,6 +142,7 @@ export default function App() {
   const hasLegacyTeethState =
     typeof window !== 'undefined' && window.localStorage.getItem(STORAGE_KEYS.odontogram) != null;
   const [activeView, setActiveView] = useState('home');
+  const [authSession, setAuthSession] = useState(() => loadAuthSession());
   const [financeFilters, setFinanceFilters] = useState({
     range: 'all',
     status: 'all',
@@ -175,6 +183,8 @@ export default function App() {
   const skipNextOdontogramPersistRef = useRef(false);
 
   const activePatient = patients.find((patient) => patient.id === activePatientId) ?? patients[0] ?? null;
+  const permissions = getRolePermissions(authSession?.roleId ?? 'staff');
+  const isStaff = authSession?.roleId === 'staff';
   const visibleActivePatient = patientDraftPreview?.id === activePatientId ? patientDraftPreview : activePatient;
   const agendaCount = patients.filter(
     (patient) => patient.nextVisit && patient.nextVisit !== 'Sin cita' && patient.nextVisit !== 'Sin agendar'
@@ -183,6 +193,29 @@ export default function App() {
   const handleSetState = (state) => {
     setSaveState('dirty');
     setTeeth((prev) => updateToothSurfaceState(prev, selected, selectedSurface, state));
+  };
+
+  const handleLogin = (roleId, password) => {
+    const session = validateLocalLogin(roleId, password);
+    if (!session) return { ok: false };
+    saveAuthSession(session);
+    setAuthSession(session);
+    setActiveView('home');
+    return { ok: true };
+  };
+
+  const handleLogout = () => {
+    clearAuthSession();
+    setAuthSession(null);
+    setActiveView('home');
+  };
+
+  const handleNavigate = (view) => {
+    if (!permissions.views.includes(view)) {
+      setActiveView('home');
+      return;
+    }
+    setActiveView(view);
   };
 
   const handleResetOdontogram = () => {
@@ -298,6 +331,25 @@ export default function App() {
   const handleClosePatientSheet = () => {
     setIsPatientSheetOpen(false);
   };
+
+  useEffect(() => {
+    if (!authSession) return;
+    if (!permissions.views.includes(activeView)) {
+      setActiveView('home');
+    }
+  }, [activeView, authSession, permissions.views]);
+
+  useEffect(() => {
+    if (!permissions.patientTabs.includes(activeTab)) {
+      setActiveTab(permissions.patientTabs[0] ?? 'antecedentes');
+    }
+  }, [activeTab, permissions.patientTabs]);
+
+  useEffect(() => {
+    if (!permissions.sheetSections.includes(patientSheetSection)) {
+      setPatientSheetSection(permissions.sheetSections[0] ?? 'datos');
+    }
+  }, [patientSheetSection, permissions.sheetSections]);
 
   useEffect(() => {
     setPatientDraftPreview(null);
@@ -641,7 +693,7 @@ export default function App() {
     }));
   };
 
-  const handleAddTreatment = () => {
+  const handleAddTreatment = (input = {}) => {
     updateActiveClinicalRecord((activeRecord) => {
       const today = new Intl.DateTimeFormat('en-GB').format(new Date()).replace(/\//g, '-');
       return {
@@ -661,6 +713,7 @@ export default function App() {
               cost: 0,
               paid: 0,
               coveragePercent: 0,
+              ...input,
             },
             activeRecord.treatments.length
           ),
@@ -1124,6 +1177,8 @@ export default function App() {
   const financeDashboard = buildFinanceDashboard(clinicalRecords, patients, pricingSettings, financeFilters);
 
   const renderSheetClinicalSection = (sectionId) => {
+    if (!permissions.sheetSections.includes(sectionId)) return null;
+
     if (sectionId === 'motivo') {
       return (
         <Motivo
@@ -1153,7 +1208,7 @@ export default function App() {
       );
     }
 
-    if (sectionId === 'presupuesto') {
+    if (sectionId === 'presupuesto' && !isStaff) {
       return (
         <Presupuesto
           budget={record.budget}
@@ -1178,6 +1233,7 @@ export default function App() {
           onAcceptPricingSnapshot={handleAcceptPricingSnapshot}
           onSetPricingSnapshotStatus={handleSetPricingSnapshotStatus}
           onOpenSection={handleOpenPatientSheet}
+          canManagePricing={permissions.canManagePricing}
         />
       );
     }
@@ -1242,19 +1298,26 @@ export default function App() {
     return null;
   };
 
+  if (!authSession) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
+
   return (
     <div className="app">
       <Sidebar
         activeView={activeView}
-        onNavigate={setActiveView}
+        onNavigate={handleNavigate}
         patientCount={patients.length}
         agendaCount={agendaCount}
+        currentUser={authSession}
+        permissions={permissions}
+        onLogout={handleLogout}
       />
       <div className="main">
-        <TopbarInner patientName={getPatientDisplayName(visibleActivePatient, 'Paciente')} activeView={activeView} />
+        <TopbarInner patientName={getPatientDisplayName(visibleActivePatient, 'Paciente')} activeView={activeView} currentUser={authSession} />
         <div className="content">
           {activeView === 'home' ? (
-            <HomeDashboard patients={patients} activePatient={visibleActivePatient} />
+            <HomeDashboard patients={patients} activePatient={visibleActivePatient} currentUser={authSession} />
           ) : activeView === 'patients' ? (
             <>
               <FloatingNewPatientButton onClick={handleCreatePatient} />
@@ -1282,9 +1345,12 @@ export default function App() {
                 onDeletePatient={handleDeletePatient}
                 onSectionChange={setPatientSheetSection}
                 renderClinicalSection={renderSheetClinicalSection}
+                allowedSections={permissions.sheetSections}
                 onClose={handleClosePatientSheet}
               />
             </>
+          ) : activeView === 'priceList' ? (
+            <PriceListView pricingCatalog={pricingCatalog} />
           ) : activeView === 'finance' ? (
             <FinanceDashboard
               financeDashboard={financeDashboard}
@@ -1313,6 +1379,7 @@ export default function App() {
                 onDeletePatient={handleDeletePatient}
                 onSectionChange={setPatientSheetSection}
                 renderClinicalSection={renderSheetClinicalSection}
+                allowedSections={permissions.sheetSections}
                 onClose={handleClosePatientSheet}
               />
               <PatientHeader patient={visibleActivePatient} onEditPatient={handleOpenPatientSheet} onOpenDirectory={handleOpenPatientSheet} />
@@ -1329,7 +1396,7 @@ export default function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
                   <Odontogram teeth={teeth} selected={selected} selectedSurface={selectedSurface} onSelect={setSelected} onSelectSurface={setSelectedSurface} />
                   <div className="card">
-                    <Tabs active={activeTab} onChange={setActiveTab} counts={counts} />
+                    <Tabs active={activeTab} onChange={setActiveTab} counts={counts} allowedTabs={permissions.patientTabs} />
                     <div className="tab-content">
                       {activeTab === 'antecedentes' && (
                         <Antecedentes patient={visibleActivePatient} onEditPatient={() => handleOpenPatientSheet('antecedentes')} />
@@ -1359,7 +1426,7 @@ export default function App() {
                           mirror
                         />
                       )}
-                      {activeTab === 'presupuesto' && (
+                      {activeTab === 'presupuesto' && !isStaff && (
                         <Presupuesto
                           budget={record.budget}
                           treatments={record.treatments}
@@ -1383,10 +1450,11 @@ export default function App() {
                           onAcceptPricingSnapshot={handleAcceptPricingSnapshot}
                           onSetPricingSnapshotStatus={handleSetPricingSnapshotStatus}
                           onOpenSection={handleOpenPatientSheet}
+                          canManagePricing={permissions.canManagePricing}
                           mirror
                         />
                       )}
-                      {activeTab === 'insumos' && (
+                      {activeTab === 'insumos' && !isStaff && (
                         <Insumos
                           patient={visibleActivePatient}
                           budget={record.budget}

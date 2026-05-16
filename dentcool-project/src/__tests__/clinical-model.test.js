@@ -76,6 +76,13 @@ describe('clinical model', () => {
           planTitle: 'Plan restaurador acotado',
           coverageLabel: 'Seguro Demo',
           dueDateLabel: '15-jun',
+          doctorDiscountPercent: 15,
+          doctorLaborCostByTreatmentId: {
+            'tx-1': 30000,
+          },
+          simplePackTreatmentIds: ['evaluacion', 'limpieza-standard', 'blanqueamiento-consulta'],
+          simplePackScheduleMode: 'split-days',
+          simplePackDiscountPercent: 10,
         },
         pricingBudgets: [
           {
@@ -147,6 +154,11 @@ describe('clinical model', () => {
     expect(result.record.historyEntries).toHaveLength(1);
     expect(result.record.historyEntries[0].category).toBe('control');
     expect(result.record.budget.planTitle).toBe('Plan restaurador acotado');
+    expect(result.record.budget.doctorDiscountPercent).toBe(15);
+    expect(result.record.budget.doctorLaborCostByTreatmentId['tx-1']).toBe(30000);
+    expect(result.record.budget.simplePackTreatmentIds).toEqual(['evaluacion', 'limpieza-standard', 'blanqueamiento-consulta']);
+    expect(result.record.budget.simplePackScheduleMode).toBe('split-days');
+    expect(result.record.budget.simplePackDiscountPercent).toBe(10);
     expect(result.record.pricingBudgets).toHaveLength(1);
     expect(result.record.pricingBudgets[0].status).toBe('accepted');
     expect(result.record.pricingBudgets[0].calculationSnapshot.finalPrice).toBe(60000);

@@ -4,9 +4,11 @@ import { Icon } from './app';
 import {
   DEFAULT_PRICING_SETTINGS,
   calculatePricingResult,
+  calculateSimpleTreatmentPack,
   findPricingTreatmentForProcedure,
 } from './pricing';
 import {
+  applyPurchaseToStock,
   calculatePatientSupplyUsageCost,
   checkAgendaSupplyNeeds,
   checkLowStock,
@@ -51,7 +53,7 @@ function PricingHelpButton({ label, text, compact = false, open, onToggle, place
   );
 }
 
-export function Tabs({ active, onChange, counts }) {
+export function Tabs({ active, onChange, counts, allowedTabs }) {
   const tabs = [
     { k: 'antecedentes', label: 'Antecedentes', count: counts.ant },
     { k: 'motivo', label: 'Motivo y diagnostico' },
@@ -60,7 +62,7 @@ export function Tabs({ active, onChange, counts }) {
     { k: 'insumos', label: 'Insumos' },
     { k: 'documentos', label: 'Documentos', count: counts.docs },
     { k: 'historial', label: 'Historial', count: counts.hist },
-  ];
+  ].filter((tab) => !allowedTabs || allowedTabs.includes(tab.k));
   return (
     <div className="tabs-bar">
       {tabs.map((t) => (
@@ -466,6 +468,7 @@ export function Presupuesto({
   onAcceptPricingSnapshot,
   onSetPricingSnapshotStatus,
   onOpenSection,
+  canManagePricing = true,
   mirror = false,
 }) {
   const total = treatments.reduce((s, t) => s + t.cost, 0);
@@ -711,6 +714,322 @@ export function Presupuesto({
       ? Math.round((operationalFiscalLoad / pricingResult.finalPrice) * 1000) / 10
       : 0;
   const softGreenLineLabels = new Set(['Insumos clinicos', 'Administracion', 'Reserva', 'Impuesto o retencion']);
+  const doctorDiscountPercent = Number(budget?.doctorDiscountPercent ?? 0) || 0;
+  const doctorLaborCostByTreatmentId = budget?.doctorLaborCostByTreatmentId ?? {};
+  const doctorBaseLaborCost =
+    pricingReferenceId && doctorLaborCostByTreatmentId[pricingReferenceId] != null
+      ? doctorLaborCostByTreatmentId[pricingReferenceId]
+      : pricingCatalogTreatment?.defaultLaborCost ?? 0;
+  const officialBasePrice = pricingCatalogTreatment?.basePrice ?? pricingReferenceTreatment?.cost ?? 0;
+  const doctorFinalPrice = Math.max(0, Math.round(officialBasePrice * (1 - doctorDiscountPercent / 100)));
+  const doctorMaxDiscountPercent = pricingCatalogTreatment?.maxRecommendedDiscountPercent ?? 0;
+  const doctorDiscountMultiplier = Math.max(0, 1 - doctorDiscountPercent / 100);
+  const doctorLaborCost = Math.round(Number(doctorBaseLaborCost || 0) * doctorDiscountMultiplier);
+  const doctorLaborPercent =
+    doctorFinalPrice > 0 ? Math.round((Number(doctorLaborCost || 0) / doctorFinalPrice) * 1000) / 10 : 0;
+  const handleDoctorDiscountChange = (value) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      onBudgetFieldChange('doctorDiscountPercent', 0);
+      return;
+    }
+    const clamped = Math.min(Math.max(parsed, 0), doctorMaxDiscountPercent);
+    onBudgetFieldChange('doctorDiscountPercent', clamped);
+  };
+  const activePricingOptions = editablePricingCatalog.filter((item) => item.active !== false);
+  const simplePackTreatmentIds = Array.isArray(budget?.simplePackTreatmentIds) ? budget.simplePackTreatmentIds.slice(0, 3) : [];
+  const normalizedSimplePackTreatmentIds = [...simplePackTreatmentIds, '', '', ''].slice(0, 3);
+  const simplePackScheduleMode = budget?.simplePackScheduleMode ?? 'same-day';
+  const simplePackDiscountPercent = Number(budget?.simplePackDiscountPercent ?? 0) || 0;
+  const simplePackResult = calculateSimpleTreatmentPack({
+    treatmentIds: normalizedSimplePackTreatmentIds,
+    catalog: editablePricingCatalog,
+    settings: pricingSettings ?? DEFAULT_PRICING_SETTINGS,
+    discountPercent: simplePackDiscountPercent,
+    scheduleMode: simplePackScheduleMode,
+  });
+  const handleSimplePackTreatmentChange = (index, value) => {
+    const next = [...normalizedSimplePackTreatmentIds];
+    next[index] = value;
+    onBudgetFieldChange('simplePackTreatmentIds', next.filter(Boolean));
+  };
+  const handleSimplePackDiscountChange = (value) => {
+    const parsed = Number(value);
+    const safeDiscount = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+    onBudgetFieldChange('simplePackDiscountPercent', Math.min(safeDiscount, simplePackResult.maxRecommendedDiscountPercent));
+  };
+  const handleApplySimplePack = () => {
+    if (!simplePackResult.selectedTreatments.length) return;
+    const label = `Pack: ${simplePackResult.treatmentNames.join(' + ')}`;
+    onBudgetFieldChange('planTitle', label);
+    onAddTreatment?.({
+      procedure: label,
+      cost: simplePackResult.finalPrice,
+      clinician: canManagePricing ? 'Dra. responsable' : 'Doctor',
+      status: 'planned',
+      priority: 'media',
+      saleKind: 'pack',
+    });
+  };
+  const renderSimplePackBuilder = () => (
+    <div className="budget-pricing-panel simple-pack-panel">
+      <div className="budget-pricing-head">
+        <div>
+          <div className="bs-label">Presupuesto pack</div>
+          <div className="budget-pricing-title">Pack simple</div>
+          <div className="budget-catalog-caption">
+            Hasta 3 tratamientos, con descuento controlado y tiempo clinico estimado.
+          </div>
+        </div>
+        <span className="budget-pricing-note">{canManagePricing ? 'Admin / Doctor' : 'Vista Doctor'}</span>
+      </div>
+
+      <div className="simple-pack-grid">
+        {normalizedSimplePackTreatmentIds.map((value, index) => (
+          <label key={index} className="pricing-setting-field">
+            <span>{`Opcion ${index + 1}`}</span>
+            <select value={value} onChange={(event) => handleSimplePackTreatmentChange(index, event.target.value)}>
+              <option value="">Sin tratamiento</option>
+              {activePricingOptions.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+        <label className="pricing-setting-field">
+          <span>Modalidad</span>
+          <select value={simplePackScheduleMode} onChange={(event) => onBudgetFieldChange('simplePackScheduleMode', event.target.value)}>
+            <option value="same-day">Mismo dia</option>
+            <option value="split-days">Dias separados</option>
+          </select>
+        </label>
+        <label className="pricing-setting-field">
+          <span>Descuento pack %</span>
+          <input
+            type="number"
+            min="0"
+            max={simplePackResult.maxRecommendedDiscountPercent}
+            step="0.5"
+            value={simplePackDiscountPercent}
+            onChange={(event) => handleSimplePackDiscountChange(event.target.value)}
+          />
+        </label>
+        <label className="pricing-setting-field">
+          <span>Maximo recomendado</span>
+          <input value={`${simplePackResult.maxRecommendedDiscountPercent}%`} readOnly />
+        </label>
+      </div>
+
+      <div className="simple-pack-summary">
+        <div className="budget-pricing-kpi">
+          <span>Precio base</span>
+          <strong>{fmtCLP(simplePackResult.basePrice)}</strong>
+          <small>Lista sumada</small>
+        </div>
+        <div className="budget-pricing-kpi tone-good">
+          <span>Precio paciente</span>
+          <strong>{fmtCLP(simplePackResult.finalPrice)}</strong>
+          <small>{fmtCLP(simplePackResult.discountAmount)} descuento</small>
+        </div>
+        <div className="budget-pricing-kpi">
+          <span>Minimo / sano / ideal</span>
+          <strong>{fmtCLP(simplePackResult.minPrice)}</strong>
+          <small>{fmtCLP(simplePackResult.healthyPrice)} / {fmtCLP(simplePackResult.idealPrice)}</small>
+        </div>
+        <div className="budget-pricing-kpi">
+          <span>Tiempo clinico</span>
+          <strong>{simplePackResult.durationHours} h</strong>
+          <small>{simplePackResult.sessions} sesion(es)</small>
+        </div>
+        <div className="budget-pricing-kpi">
+          <span>Honorario doctor</span>
+          <strong>{fmtCLP(simplePackResult.doctorLaborCost)}</strong>
+          <small>{fmtPercent(simplePackResult.doctorLaborPercent)}</small>
+        </div>
+      </div>
+
+      {!canManagePricing && (
+        <div className="budget-pricing-summary-help">
+          <strong>Solo referencia comercial</strong>
+          No muestra marketing, comisiones, insumos internos ni utilidad de la clinica.
+        </div>
+      )}
+      {canManagePricing && simplePackResult.selectedTreatments.length > 0 && (
+        <div className="budget-pricing-summary-help">
+          <strong>Costo de tiempo estimado</strong>
+          Box {fmtCLP(simplePackResult.estimatedBoxCost)} · traslado {fmtCLP(simplePackResult.estimatedTransportCost)}
+          {' '}segun {simplePackResult.sessions} sesion(es). El precio final sigue saliendo del catalogo base del pack.
+        </div>
+      )}
+
+      {simplePackResult.warnings.length > 0 && (
+        <div className="budget-pricing-alerts">
+          {simplePackResult.warnings.slice(0, 2).map((warning) => (
+            <div key={warning} className="budget-pricing-alert">
+              <Icon.alert />
+              <span>{warning}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!mirror && (
+        <div className="budget-actions compact-actions">
+          <button
+            className="btn btn-primary"
+            type="button"
+            disabled={!simplePackResult.selectedTreatments.length}
+            onClick={handleApplySimplePack}
+          >
+            <Icon.plus />
+            Agregar pack al plan
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  if (!canManagePricing) {
+    return (
+      <div className="budget-layout doctor-budget-layout">
+        <div className="budget-plan-card">
+          <div className="budget-plan-eyebrow">Presupuesto clinico</div>
+          <textarea
+            className="budget-plan-title-input"
+            value={budget.planTitle}
+            onChange={(event) => onBudgetFieldChange('planTitle', event.target.value)}
+            placeholder="Nombre del plan de tratamiento"
+          />
+          <div className="budget-plan-meta">
+            <span>{planned} planificados</span>
+            <span>{completed} realizados</span>
+          </div>
+          <div className="budget-save-note">{saveLabel}</div>
+          <div className="budget-plan-mirror">
+            {topItems.map((item) => (
+              <div key={item.id} className="mirror-plan-row">
+                <div>
+                  <div className="mirror-plan-title">{item.procedure || 'Sin procedimiento'}</div>
+                  <div className="mirror-plan-meta">{item.toothFdi} · {item.clinician || 'Sin profesional'}</div>
+                </div>
+                <span className={`status ${legacyStatusClass(item.status)}`}><span className="dot" />{labelForStatus(item.status)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="budget-summary">
+            <div className="bs-card"><div className="bs-label">Total paciente</div><div className="bs-value">{fmtCLP(total)}</div><div className="bs-sub">{treatments.length} tratamientos</div></div>
+            <div className="bs-card g"><div className="bs-label">Pagado</div><div className="bs-value">{fmtCLP(pagado)}</div><div className="bs-sub">registrado en ficha</div></div>
+            <div className="bs-card a"><div className="bs-label">Saldo paciente</div><div className="bs-value">{fmtCLP(Math.round(aPagar))}</div><input className="bs-edit-input" value={budget.dueDateLabel} onChange={(event) => onBudgetFieldChange('dueDateLabel', event.target.value)} /></div>
+          </div>
+
+          <div className="budget-pricing-panel doctor-pricing-panel">
+            <div className="budget-pricing-head">
+              <div>
+                <div className="bs-label">Referencia para presupuesto</div>
+                <div className="budget-pricing-title">{pricingReferenceTreatment?.procedure ?? 'Selecciona un tratamiento'}</div>
+              </div>
+              <span className="budget-pricing-note">Vista Doctor</span>
+            </div>
+
+            <div className="budget-pricing-settings">
+              <div className="budget-pricing-settings-grid">
+                <label className="pricing-setting-field" style={{ gridColumn: '1 / -1' }}>
+                  <span>Tratamiento</span>
+                  <select
+                    value={budget?.pricingReferenceTreatmentId ?? pricingReferenceTreatment?.id ?? ''}
+                    onChange={(event) => onBudgetFieldChange('pricingReferenceTreatmentId', event.target.value)}
+                  >
+                    <option value="">Selecciona tratamiento</option>
+                    {referenceOptions.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.procedure || 'Sin procedimiento'}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="pricing-setting-field">
+                  <span>Precio oficial</span>
+                  <input value={officialBasePrice} readOnly />
+                </label>
+                <label className="pricing-setting-field">
+                  <span>Descuento %</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max={doctorMaxDiscountPercent}
+                    step="1"
+                    value={doctorDiscountPercent}
+                    onChange={(event) => handleDoctorDiscountChange(event.target.value)}
+                  />
+                </label>
+                <label className="pricing-setting-field">
+                  <span>Descuento maximo</span>
+                  <input value={`${doctorMaxDiscountPercent}%`} readOnly />
+                </label>
+                <label className="pricing-setting-field">
+                  <span>Precio paciente</span>
+                  <input value={doctorFinalPrice} readOnly />
+                </label>
+                <label className="pricing-setting-field">
+                  <span>Honorario base</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1000"
+                    value={doctorBaseLaborCost}
+                    onChange={(event) =>
+                      onBudgetFieldChange('doctorLaborCostByTreatmentId', {
+                        ...doctorLaborCostByTreatmentId,
+                        [pricingReferenceId]: Number(event.target.value) || 0,
+                      })
+                    }
+                  />
+                </label>
+                <label className="pricing-setting-field">
+                  <span>Honorario Doctor</span>
+                  <input value={doctorLaborCost} readOnly />
+                </label>
+                <label className="pricing-setting-field">
+                  <span>Honorario %</span>
+                  <input value={`${doctorLaborPercent}%`} readOnly />
+                </label>
+                <div style={{ display: 'flex', alignItems: 'end' }}>
+                  <button
+                    className="btn btn-primary"
+                    type="button"
+                    disabled={!pricingReferenceTreatment}
+                    onClick={() => pricingReferenceTreatment && onTreatmentChange(pricingReferenceTreatment.id, 'cost', doctorFinalPrice)}
+                  >
+                    <Icon.check />
+                    Aplicar precio
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {doctorDiscountPercent > (pricingCatalogTreatment?.maxRecommendedDiscountPercent ?? 0) && (
+              <div className="budget-pricing-alert">
+                <Icon.alert />
+                <span>El descuento supera el maximo recomendado. Confirmar con Admin antes de ofrecerlo.</span>
+              </div>
+            )}
+          </div>
+
+          {renderSimplePackBuilder()}
+
+          <div className="budget-actions">
+            <button className="btn btn-secondary"><Icon.download />Exportar presupuesto PDF</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="budget-layout">
       <div className="budget-plan-card">
@@ -759,6 +1078,7 @@ export function Presupuesto({
                       onChange={(event) => onTreatmentChange(item.id, 'procedure', event.target.value)}
                       placeholder="Procedimiento"
                     />
+                    {item.saleKind === 'pack' && <span className="budget-pack-badge">Pack</span>}
                     <span className={`status ${legacyStatusClass(item.status)}`}>
                       <span className="dot" />
                       {labelForStatus(item.status)}
@@ -798,6 +1118,7 @@ export function Presupuesto({
         <div className="bs-card g"><div className="bs-label">Pagado</div><div className="bs-value">{fmtCLP(pagado)}</div><div className="bs-sub">2 cuotas</div></div>
         <div className="bs-card a"><div className="bs-label">Saldo paciente</div><div className="bs-value">{fmtCLP(Math.round(aPagar))}</div><input className="bs-edit-input" value={budget.dueDateLabel} onChange={(event) => onBudgetFieldChange('dueDateLabel', event.target.value)} /></div>
       </div>
+      {renderSimplePackBuilder()}
       <div className="budget-pricing-panel">
         <div className="budget-pricing-head">
           <div>
@@ -1830,8 +2151,14 @@ export function Insumos({
   const [newCatalogUnit, setNewCatalogUnit] = useState('unidad');
   const [newCatalogQuantity, setNewCatalogQuantity] = useState(1);
   const [newCatalogTotalCost, setNewCatalogTotalCost] = useState(0);
+  const [newCatalogMinimumStock, setNewCatalogMinimumStock] = useState(0);
   const [showCatalogList, setShowCatalogList] = useState(false);
   const [editingCatalogId, setEditingCatalogId] = useState('');
+  const [purchaseItemId, setPurchaseItemId] = useState('');
+  const [purchaseQuantity, setPurchaseQuantity] = useState(1);
+  const [purchaseTotalCost, setPurchaseTotalCost] = useState(0);
+  const [purchaseSupplierId, setPurchaseSupplierId] = useState('');
+  const [purchaseNote, setPurchaseNote] = useState('');
 
   useEffect(() => {
     saveSupplyState(moduleState);
@@ -1876,6 +2203,9 @@ export function Insumos({
   const agendaNeeds = checkAgendaSupplyNeeds(appointments ?? [], moduleState.recipes, moduleState.catalog);
   const lowStockItems = moduleState.catalog.filter(checkLowStock);
   const patientSnapshots = moduleState.snapshots.filter((snapshot) => snapshot.patientId === patient?.id);
+  const recentPurchases = [...moduleState.purchases]
+    .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime())
+    .slice(0, 5);
 
   const handleQtyChange = (itemId, value) => {
     const nextQuantity = Number(value) || 0;
@@ -1911,6 +2241,7 @@ export function Insumos({
     const nextName = newCatalogName.trim() || 'Nuevo insumo';
     const nextQuantity = Number(newCatalogQuantity) || 0;
     const nextTotalCost = Number(newCatalogTotalCost) || 0;
+    const nextMinimumStock = Number(newCatalogMinimumStock) || 0;
     const nextUnitCost = nextQuantity > 0 ? Math.round(nextTotalCost / nextQuantity) : 0;
 
     if (editingCatalogId) {
@@ -1925,6 +2256,7 @@ export function Insumos({
             purchaseQuantity: nextQuantity,
             purchaseTotalCost: nextTotalCost,
             unitCost: nextUnitCost,
+            minimumStock: nextMinimumStock,
           };
         }),
       }));
@@ -1944,7 +2276,7 @@ export function Insumos({
             purchaseTotalCost: nextTotalCost,
             unitCost: nextUnitCost,
             currentStock: 0,
-            minimumStock: 0,
+            minimumStock: nextMinimumStock,
             supplierId: '',
             defaultUsePerPatient: 1,
             active: true,
@@ -1958,6 +2290,7 @@ export function Insumos({
     setNewCatalogUnit('unidad');
     setNewCatalogQuantity(1);
     setNewCatalogTotalCost(0);
+    setNewCatalogMinimumStock(0);
     setEditingCatalogId('');
   };
 
@@ -1981,6 +2314,7 @@ export function Insumos({
     setNewCatalogUnit(item.unit ?? 'unidad');
     setNewCatalogQuantity(item.purchaseQuantity ?? 1);
     setNewCatalogTotalCost(item.purchaseTotalCost ?? 0);
+    setNewCatalogMinimumStock(item.minimumStock ?? 0);
     setShowCatalogList(false);
   };
 
@@ -1990,6 +2324,7 @@ export function Insumos({
     setNewCatalogUnit('unidad');
     setNewCatalogQuantity(1);
     setNewCatalogTotalCost(0);
+    setNewCatalogMinimumStock(0);
   };
 
   const handleResetModule = () => {
@@ -2000,6 +2335,41 @@ export function Insumos({
         ...item,
       })) ?? []
     );
+  };
+
+  const handleRegisterPurchase = () => {
+    const catalogItem = moduleState.catalog.find((item) => item.id === purchaseItemId);
+    const quantity = Number(purchaseQuantity) || 0;
+    const totalCost = Number(purchaseTotalCost) || 0;
+    if (!catalogItem || quantity <= 0 || totalCost <= 0) return;
+
+    const now = new Date().toISOString();
+    const unitCost = Math.round((totalCost / quantity) * 100) / 100;
+    const purchase = {
+      id: `supply-purchase-${catalogItem.id}-${Date.now()}`,
+      itemId: catalogItem.id,
+      itemName: catalogItem.name,
+      itemUnit: catalogItem.unit ?? 'unidad',
+      quantityPurchased: quantity,
+      totalCost,
+      unitCost,
+      supplierId: purchaseSupplierId,
+      note: purchaseNote.trim(),
+      createdAt: now,
+    };
+
+    setModuleState((current) => ({
+      ...current,
+      catalog: current.catalog.map((item) =>
+        item.id === catalogItem.id ? applyPurchaseToStock(item, purchase) : item
+      ),
+      purchases: [purchase, ...current.purchases],
+    }));
+    setPurchaseItemId('');
+    setPurchaseQuantity(1);
+    setPurchaseTotalCost(0);
+    setPurchaseSupplierId('');
+    setPurchaseNote('');
   };
 
   const handleSaveSnapshot = () => {
@@ -2030,20 +2400,20 @@ export function Insumos({
       <div className="documents-toolbar">
         <div>
           <div className="muted" style={{ fontSize: 12.5 }}>
-            {patient?.fullName ?? 'Sin paciente seleccionado'} · {patientSnapshots.length} snapshots locales
+            {patient?.fullName ?? 'Sin paciente seleccionado'} · {patientSnapshots.length} costos guardados
           </div>
           <div className="documents-save-note">
-            {selectedRecipe ? selectedRecipe.name : 'Selecciona un tratamiento con receta para ver insumos'}
+            {selectedRecipe ? selectedRecipe.name : 'Selecciona un tratamiento con lista base para ver insumos'}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn btn-secondary" type="button" onClick={handleResetModule}>
             <Icon.edit />
-            Restaurar modulo
+            Restaurar panel
           </button>
           <button className="btn btn-primary" type="button" onClick={handleSaveSnapshot} disabled={!selectedRecipe}>
             <Icon.plus />
-            Guardar snapshot
+            Guardar costo
           </button>
         </div>
       </div>
@@ -2055,7 +2425,7 @@ export function Insumos({
           <small>items cargados</small>
         </div>
         <div className="budget-pricing-kpi budget-pricing-kpi-small tone-good">
-          <div className="budget-pricing-kpi-head"><span>Recetas</span></div>
+          <div className="budget-pricing-kpi-head"><span>Listas base</span></div>
           <strong>{moduleState.recipes.length}</strong>
           <small>tratamientos mapeados</small>
         </div>
@@ -2065,9 +2435,9 @@ export function Insumos({
           <small>alertas activas</small>
         </div>
         <div className="budget-pricing-kpi budget-pricing-kpi-small tone-good">
-          <div className="budget-pricing-kpi-head"><span>Snapshot</span></div>
+          <div className="budget-pricing-kpi-head"><span>Costo guardado</span></div>
           <strong>{usageResult.totalCost > 0 ? fmtCLP(usageResult.totalCost) : '$0'}</strong>
-          <small>costo de receta actual</small>
+          <small>costo de lista actual</small>
         </div>
       </div>
 
@@ -2117,6 +2487,12 @@ export function Insumos({
             </span>
             <input type="number" min="0" step="1" value={newCatalogTotalCost} onChange={(event) => setNewCatalogTotalCost(event.target.value)} />
           </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Stock minimo alerta</span>
+            </span>
+            <input type="number" min="0" step="1" value={newCatalogMinimumStock} onChange={(event) => setNewCatalogMinimumStock(event.target.value)} />
+          </label>
           <div style={{ display: 'flex', alignItems: 'end', gap: 8 }}>
             <button className="btn btn-primary" type="button" onClick={handleSaveCatalogItem}>
               <Icon.plus />
@@ -2163,8 +2539,87 @@ export function Insumos({
       <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
         <div className="budget-pricing-settings-head">
           <div>
+            <div className="bs-label">Registrar compra</div>
+            <div className="bs-help">Puente MVP: suma stock y recalcula costo promedio. Luego esta accion ira en inventario general.</div>
+          </div>
+        </div>
+        <div className="budget-pricing-settings-grid">
+          <label className="pricing-setting-field" style={{ gridColumn: '1 / span 2' }}>
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Insumo comprado</span>
+            </span>
+            <select value={purchaseItemId} onChange={(event) => setPurchaseItemId(event.target.value)}>
+              <option value="">Selecciona un insumo</option>
+              {moduleState.catalog.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} · stock {item.currentStock ?? 0} {item.unit ?? 'unidad'}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Cantidad comprada</span>
+            </span>
+            <input type="number" min="0" step="1" value={purchaseQuantity} onChange={(event) => setPurchaseQuantity(event.target.value)} />
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Costo total</span>
+            </span>
+            <input type="number" min="0" step="1" value={purchaseTotalCost} onChange={(event) => setPurchaseTotalCost(event.target.value)} />
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Proveedor</span>
+            </span>
+            <select value={purchaseSupplierId} onChange={(event) => setPurchaseSupplierId(event.target.value)}>
+              <option value="">Sin proveedor</option>
+              {moduleState.suppliers.map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="pricing-setting-field" style={{ gridColumn: 'span 2' }}>
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Nota</span>
+            </span>
+            <input value={purchaseNote} onChange={(event) => setPurchaseNote(event.target.value)} placeholder="Boleta, compra semanal o detalle breve" />
+          </label>
+          <div style={{ display: 'flex', alignItems: 'end' }}>
+            <button className="btn btn-primary" type="button" onClick={handleRegisterPurchase} disabled={!purchaseItemId || Number(purchaseQuantity) <= 0 || Number(purchaseTotalCost) <= 0}>
+              <Icon.plus />
+              Registrar compra
+            </button>
+          </div>
+        </div>
+        <div className="documents-list" style={{ marginTop: 14 }}>
+          {recentPurchases.map((purchase) => {
+            const supplier = moduleState.suppliers.find((item) => item.id === purchase.supplierId);
+            return (
+              <div key={purchase.id} className="document-row">
+                <div className="document-main">
+                  <div className="document-head">
+                    <div className="document-title">{purchase.itemName || 'Compra de insumo'}</div>
+                    <span className="count">{fmtCLP(purchase.totalCost || 0)}</span>
+                  </div>
+                  <div className="document-meta-line">
+                    <span className="document-kind">{purchase.quantityPurchased} {purchase.itemUnit ?? 'unidad'}</span>
+                    <span>{supplier?.name ?? 'Sin proveedor'} · costo unitario {fmtCLP(purchase.unitCost || 0)}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {!recentPurchases.length && <div className="finance-empty">Todavia no hay compras registradas.</div>}
+        </div>
+      </div>
+
+      <div className="budget-pricing-settings" style={{ marginBottom: 14 }}>
+        <div className="budget-pricing-settings-head">
+          <div>
             <div className="bs-label">Referencia de insumos</div>
-            <div className="bs-help">Elige un tratamiento del paciente para ver su receta, ajustar cantidades y congelar un snapshot local.</div>
+            <div className="bs-help">Elige un tratamiento del paciente para ver su lista base de insumos, ajustar cantidades y guardar el costo usado.</div>
           </div>
         </div>
         <div className="budget-pricing-settings-grid">
@@ -2177,7 +2632,7 @@ export function Insumos({
                 const mapped = item.procedure ? findPricingTreatmentForProcedure(item.procedure, pricingCatalog ?? []) : null;
                 return (
                   <option key={item.id} value={item.id}>
-                    {item.procedure || 'Sin procedimiento'}{mapped ? ` · ${mapped.name}` : ' · sin receta'}
+                    {item.procedure || 'Sin procedimiento'}{mapped ? ` · ${mapped.name}` : ' · sin lista base'}
                   </option>
                 );
               })}
@@ -2186,21 +2641,21 @@ export function Insumos({
         </div>
         <div className="budget-pricing-kpi-row" style={{ marginTop: 12 }}>
           <div className="budget-pricing-kpi budget-pricing-kpi-small">
-            <div className="budget-pricing-kpi-head"><span>Receta</span></div>
-            <strong>{selectedRecipe?.name ?? 'Sin receta'}</strong>
+            <div className="budget-pricing-kpi-head"><span>Lista base</span></div>
+            <strong>{selectedRecipe?.name ?? 'Sin lista base'}</strong>
             <small>{mappedPricingTreatment?.name ?? 'Sin mapeo a pricing'}</small>
           </div>
           <div className="budget-pricing-kpi budget-pricing-kpi-small">
             <div className="budget-pricing-kpi-head"><span>Agenda</span></div>
             <strong>{agendaNeeds.lines.length}</strong>
-            <small>citas futuras con receta</small>
+            <small>citas futuras con lista base</small>
           </div>
         </div>
 
         <div className="budget-pricing-settings-head" style={{ marginTop: 14 }}>
           <div>
             <div className="bs-label">Agregar insumo</div>
-            <div className="bs-help">Si la receta necesita algo mas, sumalo aqui antes de congelar el snapshot.</div>
+            <div className="bs-help">Si este caso necesita algo mas que la lista base, sumalo aqui antes de guardar el costo.</div>
           </div>
         </div>
         <div className="budget-pricing-settings-grid">
@@ -2307,14 +2762,14 @@ export function Insumos({
             })}
             {!draftItems.length && (
               <tr>
-                <td colSpan="5" className="finance-table-empty">No hay receta vinculada a este tratamiento.</td>
+                <td colSpan="5" className="finance-table-empty">No hay lista base vinculada a este tratamiento.</td>
               </tr>
             )}
           </tbody>
           {draftItems.length > 0 && (
             <tfoot>
               <tr>
-                <td colSpan="4" style={{ textAlign: 'right', color: 'var(--muted)' }}>Total receta</td>
+                <td colSpan="4" style={{ textAlign: 'right', color: 'var(--muted)' }}>Total lista base</td>
                 <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmtCLP(usageResult.totalCost)}</td>
               </tr>
             </tfoot>
@@ -2352,8 +2807,8 @@ export function Insumos({
         <div className="budget-pricing-settings">
           <div className="budget-pricing-settings-head">
             <div>
-              <div className="bs-label">Snapshots locales</div>
-              <div className="bs-help">Historico guardado solo para este modulo de prueba local.</div>
+              <div className="bs-label">Costos guardados</div>
+              <div className="bs-help">Historico local de costos de insumos guardados para este paciente.</div>
             </div>
           </div>
           <div className="documents-list">
@@ -2361,7 +2816,7 @@ export function Insumos({
               <div key={snapshot.id} className="document-row">
                 <div className="document-main">
                   <div className="document-head">
-                    <div className="document-title">{snapshot.recipeName || 'Snapshot'}</div>
+                    <div className="document-title">{snapshot.recipeName || 'Costo guardado'}</div>
                     <span className="count">{fmtCLP(snapshot.totalSupplyCost || 0)}</span>
                   </div>
                   <div className="document-meta-line">
@@ -2371,13 +2826,13 @@ export function Insumos({
                 </div>
               </div>
             ))}
-            {!patientSnapshots.length && <div className="finance-empty">Todavia no hay snapshots guardados para este paciente.</div>}
+            {!patientSnapshots.length && <div className="finance-empty">Todavia no hay costos de insumos guardados para este paciente.</div>}
           </div>
         </div>
       </div>
 
       <div style={{ marginTop: 14 }} className="finance-empty">
-        Este panel es el MVP chico de insumos: receta, ajuste por paciente, stock bajo y snapshot local. No usa SQLite todavia.
+        Este panel es el MVP chico de insumos: lista base, ajuste por paciente, stock bajo, compra puente y costo guardado local. No usa SQLite todavia.
       </div>
     </div>
   );

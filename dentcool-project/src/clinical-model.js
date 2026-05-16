@@ -370,6 +370,7 @@ export function createTreatmentEntry(input = {}, index = 0) {
     cost: Number.isFinite(Number(input.cost)) ? Number(input.cost) : 0,
     paid: Number.isFinite(Number(input.paid)) ? Number(input.paid) : 0,
     coveragePercent: Number.isFinite(Number(input.coveragePercent)) ? Number(input.coveragePercent) : 0,
+    saleKind: input.saleKind ?? 'single',
   };
 }
 
@@ -404,6 +405,11 @@ export function createBudgetRecord(input = {}) {
     pricingReferenceSuppliesCostByTreatmentId: input.pricingReferenceSuppliesCostByTreatmentId ?? {},
     pricingReferenceMarketingCostByTreatmentId: input.pricingReferenceMarketingCostByTreatmentId ?? {},
     pricingReferencePaymentFeePercentByTreatmentId: input.pricingReferencePaymentFeePercentByTreatmentId ?? {},
+    doctorDiscountPercent: Number(input.doctorDiscountPercent) || 0,
+    doctorLaborCostByTreatmentId: input.doctorLaborCostByTreatmentId ?? {},
+    simplePackTreatmentIds: Array.isArray(input.simplePackTreatmentIds) ? input.simplePackTreatmentIds.filter(Boolean).slice(0, 3) : [],
+    simplePackScheduleMode: input.simplePackScheduleMode === 'split-days' ? 'split-days' : 'same-day',
+    simplePackDiscountPercent: Number(input.simplePackDiscountPercent) || 0,
   };
 }
 

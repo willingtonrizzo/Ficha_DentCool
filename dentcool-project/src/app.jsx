@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import logoUrl from '../logo.png';
+import { USER_ROLES } from './auth';
 import {
   STATES,
   UPPER_RIGHT,
@@ -154,7 +155,108 @@ export const Icon = {
   clock: (p) => <svg className={p?.cls || "icon"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>,
 };
 
-export function Sidebar({ activeView = 'patients', onNavigate, patientCount = 0, agendaCount = 0 }) {
+export function LoginScreen({ onLogin }) {
+  const [roleId, setRoleId] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (!roleId) {
+      setError('Selecciona un perfil.');
+      return;
+    }
+    const result = onLogin?.(roleId, password);
+    if (!result?.ok) {
+      setError('Clave incorrecta para este perfil.');
+      return;
+    }
+    setError('');
+  };
+
+  return (
+    <main className="login-shell">
+      <form className="login-card" onSubmit={handleSubmit}>
+        <div className="login-avatar-hero">
+          <div className="login-avatar">
+            <div className="login-avatar-head" />
+            <div className="login-avatar-body" />
+          </div>
+        </div>
+        <div className="login-brand">
+          <img src={logoUrl} alt="DentCool" />
+          <div>
+            <div className="login-eyebrow">Ficha clinica</div>
+          </div>
+        </div>
+        <label className="login-field">
+          <select
+            value={roleId}
+            className={roleId ? '' : 'is-placeholder'}
+            onChange={(event) => {
+              setRoleId(event.target.value);
+              setError('');
+            }}
+          >
+            <option value="" disabled>Seleccionar perfil</option>
+            {Object.values(USER_ROLES).map((role) => (
+              <option key={role.id} value={role.id}>{role.label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="login-field">
+          <div className="login-password-wrap">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Ingresa la clave"
+              autoFocus
+            />
+            <button
+              type="button"
+              className="login-password-toggle"
+              onClick={() => setShowPassword((current) => !current)}
+              aria-label={showPassword ? 'Ocultar clave' : 'Mostrar clave'}
+              title={showPassword ? 'Ocultar clave' : 'Mostrar clave'}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                {showPassword ? (
+                  <>
+                    <path d="M3 3l18 18" />
+                    <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                    <path d="M9.9 4.2A9.8 9.8 0 0 1 12 4c5 0 9 5 9 8a10.9 10.9 0 0 1-3 4.6" />
+                    <path d="M6.6 6.6C4.4 8.1 3 10.3 3 12c0 3 4 8 9 8 1.5 0 2.9-.4 4.1-1" />
+                  </>
+                ) : (
+                  <>
+                    <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </>
+                )}
+              </svg>
+            </button>
+          </div>
+        </label>
+        {error && <div className="login-error">{error}</div>}
+        <button className="btn btn-primary login-submit" type="submit">
+          Ingresar
+        </button>
+      </form>
+    </main>
+  );
+}
+
+export function Sidebar({
+  activeView = 'patients',
+  onNavigate,
+  patientCount = 0,
+  agendaCount = 0,
+  currentUser,
+  permissions,
+  onLogout,
+}) {
   const items1 = [
     { ic: 'home', label: 'Inicio', view: 'home' },
     { ic: 'users', label: 'Pacientes', badge: patientCount > 0 ? String(patientCount) : null, view: 'patients' },
@@ -162,11 +264,12 @@ export function Sidebar({ activeView = 'patients', onNavigate, patientCount = 0,
     { ic: 'tooth', label: 'Tratamientos' },
   ];
   const items2 = [
+    { ic: 'doc', label: 'Lista precios', view: 'priceList' },
     { ic: 'chart', label: 'Reportes', view: 'finance' },
     { ic: 'cash', label: 'Facturacion', view: 'finance' },
     { ic: 'doc', label: 'Documentos' },
     { ic: 'cog', label: 'Configuracion' },
-  ];
+  ].filter((item) => !item.view || permissions?.views?.includes(item.view));
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -206,12 +309,15 @@ export function Sidebar({ activeView = 'patients', onNavigate, patientCount = 0,
       })}
       <div className="sidebar-foot">
         <div className="user-card">
-          <div className="avatar">CN</div>
+          <div className="avatar">{currentUser?.initials ?? 'DC'}</div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div className="user-name">Dra. F. Khorramian</div>
-            <div className="user-role">Odontologa · jefe</div>
+            <div className="user-name">{currentUser?.name ?? 'DentCool'}</div>
+            <div className="user-role">{currentUser?.roleLabel ?? 'Sesion local'}</div>
           </div>
         </div>
+        <button className="sidebar-logout" type="button" onClick={onLogout}>
+          Cerrar sesion
+        </button>
       </div>
     </aside>
   );
@@ -221,7 +327,8 @@ export function Topbar() {
   return <TopbarInner patientName="" />;
 }
 
-export function TopbarInner({ patientName, activeView = 'patients' }) {
+export function TopbarInner({ patientName, activeView = 'patients', currentUser }) {
+  const welcomeText = getWelcomeText(currentUser);
   return (
     <div className="topbar">
       <div className="crumbs">
@@ -229,13 +336,19 @@ export function TopbarInner({ patientName, activeView = 'patients' }) {
           <>
             <span>Inicio</span>
             <span className="sep">/</span>
-            <strong>Bienvenida</strong>
+            <strong>{welcomeText}</strong>
           </>
         ) : activeView === 'patients' ? (
           <>
             <span>Pacientes</span>
             <span className="sep">/</span>
             <strong>Directorio general</strong>
+          </>
+        ) : activeView === 'priceList' ? (
+          <>
+            <span>Gestion</span>
+            <span className="sep">/</span>
+            <strong>Lista de precios</strong>
           </>
         ) : activeView === 'finance' ? (
           <>
@@ -261,6 +374,58 @@ export function TopbarInner({ patientName, activeView = 'patients' }) {
       <button className="topbar-btn"><Icon.msg /></button>
       <button className="topbar-btn"><Icon.bell /><span className="dot" /></button>
     </div>
+  );
+}
+
+function getWelcomeText(currentUser) {
+  if (currentUser?.roleId === 'dr') return 'Bienvenido Doctor';
+  if (currentUser?.roleId === 'staff') return 'Bienvenido Staff';
+  if (currentUser?.roleId === 'admin') return 'Bienvenido Admin';
+  return 'Bienvenido';
+}
+
+export function PriceListView({ pricingCatalog = [] }) {
+  const visibleItems = pricingCatalog.filter((item) => item.active !== false);
+
+  return (
+    <section className="price-list-view">
+      <div className="price-list-header">
+        <div>
+          <div className="section-eyebrow">Referencia para recepcion</div>
+          <h2>Lista de precios</h2>
+          <p>Valores visibles sin costos internos, margenes ni reportes financieros.</p>
+        </div>
+      </div>
+      <div className="price-list-table">
+        <table className="tx">
+          <thead>
+            <tr>
+              <th>Tratamiento</th>
+              <th>Categoria</th>
+              <th style={{ textAlign: 'right' }}>Precio lista</th>
+              <th style={{ textAlign: 'right' }}>Descuento max.</th>
+              <th style={{ textAlign: 'right' }}>Precio minimo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleItems.map((item) => (
+              <tr key={item.id}>
+                <td style={{ fontWeight: 700 }}>{item.name}</td>
+                <td>{item.category || 'General'}</td>
+                <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmtCLP(item.basePrice || 0)}</td>
+                <td style={{ textAlign: 'right' }}>{item.maxRecommendedDiscountPercent || 0}%</td>
+                <td style={{ textAlign: 'right' }}>{fmtCLP(item.minPrice || 0)}</td>
+              </tr>
+            ))}
+            {!visibleItems.length && (
+              <tr>
+                <td colSpan="5" className="finance-table-empty">No hay precios visibles configurados.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -765,8 +930,9 @@ export function FinanceDashboard({
   );
 }
 
-export function HomeDashboard({ patients, activePatient }) {
+export function HomeDashboard({ patients, activePatient, currentUser }) {
   const [showFinance, setShowFinance] = useState(false);
+  const welcomeText = getWelcomeText(currentUser);
   const pendingAlerts = patients.reduce((total, patient) => total + patient.alerts.length, 0);
   const upcomingPatients = patients
     .filter((patient) => patient.nextVisit && patient.nextVisit !== 'Sin cita' && patient.nextVisit !== 'Sin agendar')
@@ -819,7 +985,7 @@ export function HomeDashboard({ patients, activePatient }) {
       <div className="home-hero card">
         <div className="home-hero-copy">
           <div className="patients-eyebrow">Bienvenida</div>
-          <h2>Bienvenida, Dra. Fereshteh Khorramian</h2>
+          <h2>{welcomeText}</h2>
           <p>Vista rapida para abrir la jornada, revisar agenda, detectar alertas y volver a la ficha clinica sin perder el hilo.</p>
           <div className="home-hero-tags">
             <span className="patient-chip">{patients.length} pacientes locales</span>
@@ -1316,6 +1482,7 @@ export function PatientsSheet({
   onDeletePatient,
   onSectionChange,
   renderClinicalSection,
+  allowedSections,
   onClose,
 }) {
   if (!open) return null;
@@ -1334,7 +1501,7 @@ export function PatientsSheet({
     { id: 'presupuesto', label: 'Presupuesto', status: 'ready' },
     { id: 'documentos', label: 'Documentos', status: 'ready' },
     { id: 'historial', label: 'Historial', status: 'ready' },
-  ];
+  ].filter((section) => !allowedSections || allowedSections.includes(section.id));
   const filteredPatients = patients.filter((patient) => {
     const search = query.trim().toLowerCase();
     if (!search) return true;

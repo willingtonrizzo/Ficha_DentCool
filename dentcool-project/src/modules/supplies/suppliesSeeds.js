@@ -257,7 +257,7 @@ export const DEFAULT_SUPPLY_RECIPES = [
   {
     id: 'recipe_evaluacion',
     treatmentId: 'evaluacion',
-    name: 'Receta estandar Evaluacion',
+    name: 'Lista base Evaluacion',
     active: true,
     includesBaseDisposablePack: true,
     includesExamPack: true,
@@ -273,7 +273,7 @@ export const DEFAULT_SUPPLY_RECIPES = [
   {
     id: 'recipe_limpieza_standard',
     treatmentId: 'limpieza-standard',
-    name: 'Receta estandar Limpieza standard',
+    name: 'Lista base Limpieza standard',
     active: true,
     includesBaseDisposablePack: true,
     includesExamPack: true,
@@ -291,7 +291,7 @@ export const DEFAULT_SUPPLY_RECIPES = [
   {
     id: 'recipe_limpieza_vip',
     treatmentId: 'limpieza-vip',
-    name: 'Receta estandar Limpieza VIP',
+    name: 'Lista base Limpieza VIP',
     active: true,
     includesBaseDisposablePack: true,
     includesExamPack: true,
@@ -311,7 +311,7 @@ export const DEFAULT_SUPPLY_RECIPES = [
   {
     id: 'recipe_blanqueamiento_consulta',
     treatmentId: 'blanqueamiento-consulta',
-    name: 'Receta estandar Blanqueamiento en consulta',
+    name: 'Lista base Blanqueamiento en consulta',
     active: true,
     includesBaseDisposablePack: true,
     includesExamPack: true,
@@ -328,7 +328,7 @@ export const DEFAULT_SUPPLY_RECIPES = [
   {
     id: 'recipe_restauracion_simple',
     treatmentId: 'restauracion-simple',
-    name: 'Receta estandar Restauracion simple',
+    name: 'Lista base Restauracion simple',
     active: true,
     includesBaseDisposablePack: true,
     includesExamPack: true,
@@ -347,7 +347,7 @@ export const DEFAULT_SUPPLY_RECIPES = [
   {
     id: 'recipe_sellantes',
     treatmentId: 'sellantes',
-    name: 'Receta estandar Sellantes',
+    name: 'Lista base Sellantes',
     active: true,
     includesBaseDisposablePack: true,
     includesExamPack: true,

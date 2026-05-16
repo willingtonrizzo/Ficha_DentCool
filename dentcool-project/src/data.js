@@ -218,4 +218,5 @@ export const STORAGE_KEYS = {
   suppliesUnits: 'ficha-dentcool.supplies-units.v1',
   suppliesSuppliers: 'ficha-dentcool.supplies-suppliers.v1',
   suppliesPurchases: 'ficha-dentcool.supplies-purchases.v1',
+  authSession: 'ficha-dentcool.auth-session.v1',
 };

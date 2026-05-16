@@ -19,14 +19,14 @@ Ruta activa del proyecto:
 - sostener el modulo financiero ya operativo sobre snapshots por paciente
 - seguir afinando reportes financieros avanzados ya conectados a tratamientos y citas visibles sin mezclar todavia `SQLite`
 - dejar documentado el estado actual antes de subir para prueba de la doctora
-- revisar `dentcool_pricing_codex_skill.md` y registrar ahi las decisiones tomadas y por que
+- cerrar y validar fase uno del modulo de insumos antes de escalar a `SQLite`
 - mantener documentacion viva para retomar sesiones sin perder contexto
 - GitHub queda como fuente de despliegue para Render si el servicio esta conectado a `main` con auto-deploy
 
 ## Lo ultimo verificado
 
 - `npm test` pasa
-- `50` tests verdes
+- `68` tests verdes
 - `npm run build` pasa
 - ya existen persistencias locales por paciente para:
   - `Motivo y diagnostico`
@@ -68,6 +68,26 @@ Ruta activa del proyecto:
 - el modulo de insumos ya paso `npm test` y `npm run build`
 - el tab `Insumos` ya permite crear nuevos materiales y mostrar el catalogo local solo cuando se solicita
 - el tab `Insumos` ya muestra ayuda contextual para cantidad por unidad y origen del costo unitario
+- el tab `Insumos` ya permite registrar compras simples por material
+- registrar una compra suma stock, recalcula costo promedio ponderado y persiste historial local de compras
+- el historial de compras recientes ya aparece dentro del tab `Insumos`
+- la ultima verificacion del bloque de insumos paso con `npm test -- --run` y `npm run build`
+- se acordo que `Registrar compra` no corresponde definitivamente a la ficha por paciente; queda ahi solo como puente MVP para demostrar origen de cantidades, stock y precios
+- la UI de insumos debe hablar de `lista base de insumos`, no de `receta`, para evitar confusion con receta medica
+- el formulario de materiales ya permite configurar `Stock minimo alerta`
+- el stock actual de un material se alimenta por compras; no se digita como stock inicial manual
+- `minimumStock: 0` queda interpretado como sin alerta configurada
+- existe login local MVP con roles `Admin`, `Dr` y `Staff`
+- claves temporales locales: `admin123`, `dr123`, `staff123`
+- `Staff` ve pacientes, datos/antecedentes/agenda/documentos y una `Lista precios`; no ve finanzas, presupuesto interno ni insumos
+- `Dr` no ve insumos, compras/proveedores ni configuracion financiera interna
+- `Dr` ve presupuesto simplificado con tratamiento, precio oficial, descuento, precio paciente y honorario doctor
+- `Presupuesto` ahora tiene pack simple para `Admin` y `Dr`: hasta 3 tratamientos, modalidad mismo dia/dias separados, descuento maximo ponderado, precio paciente, minimo/sano/ideal, horas/sesiones y honorario doctor
+- `Admin` ve ademas costo estimado de box y traslado por sesiones para el pack; `Dr` no ve costos internos
+- `Agregar pack al plan` crea una linea comercial `Pack: ...` dentro de tratamientos del paciente
+- esa linea queda marcada como `saleKind: pack` para poder distinguir venta de pack sin depender solo del texto
+- `Lista precios` muestra precio lista, descuento maximo recomendado y precio minimo sin costos internos
+- el login local es barrera de uso para demo, no seguridad fuerte definitiva
 
 ## Decision de producto vigente
 
@@ -85,11 +105,16 @@ Razon:
 
 ## Siguiente paso recomendado
 
-1. revisar `dentcool_pricing_codex_skill.md` y dejar documentadas las decisiones tomadas y el motivo de cada una
-2. seguir limpiando el `uiContext` global residual
-3. seguir refinando la operacion local antes de `SQLite runtime`
-4. preparar la futura transicion a `SQLite` sin mezclar demasiados frentes
-5. subir el estado actual para prueba de la doctora cuando quede confirmado el bloque financiero
+1. entregar la build actual para prueba de la doctora, validando login, permisos y presupuesto pack simple
+2. probar login local con `Admin`, `Dr` y `Staff` antes de entrega, validando que `Dr` no vea insumos ni costos internos
+3. probar presupuesto pack simple con ejemplos reales: `Limpieza VIP + Blanqueamiento` y `Evaluacion + Limpieza standard + Blanqueamiento`
+4. validar con la doctora si el pack debe quedar como linea unica o desglosar automaticamente tratamientos
+5. validar con la doctora el flujo de insumos fase uno: alta de material, compra, lista base y snapshot
+6. decidir si fase dos de insumos parte por descuento de stock al confirmar atencion o por editor de listas base
+7. para fase dos de inventario, contemplar historial de compras por insumo/proveedor con fecha, documento, direccion/contacto y comparacion de precios
+8. seguir limpiando el `uiContext` global residual
+9. seguir refinando la operacion local antes de `SQLite runtime`
+10. preparar la futura transicion a `SQLite` sin mezclar demasiados frentes
 
 ## Riesgos abiertos
 
@@ -97,11 +122,17 @@ Razon:
 - parte del flujo clinico sigue compartiendo mocks
 - aun no hay runtime real de `SQLite`
 - falta protocolo de backup local antes de escalar uso real
-- el pricing ya tiene settings, catalogo, snapshots, estados refinados, vista general, objetivo editable, exportacion CSV, exportacion Excel y filtros/reportes avanzados completos, y ahora cruza tratamientos/citas visibles, pero aun no existe agenda estructurada ni libro real de cobros-abonos
+- el pricing ya tiene settings, catalogo, snapshots, estados refinados, vista general, objetivo editable, exportacion CSV, exportacion Excel y filtros/reportes avanzados completos, y ahora cruza tratamientos/citas visibles
 - seguir usando `nextVisit` y `paid` como puente por mucho tiempo hara mas costosa la separacion de agenda y caja
 - la separacion existe en modelo y UI, pero el puente legado sigue activo para compatibilidad
 - el bloque visual del catalogo de pricing ya quedo estabilizado y no debe volver a mezclar valores entre tratamientos
-- el modulo de insumos ya tiene UI minima de alta de materiales y una lista opcional de catalogo; falta seguir refinando el flujo real de uso
+- el modulo de insumos ya tiene UI minima de alta de materiales, stock minimo de alerta, lista opcional de catalogo, compras, stock y costo promedio; falta validar flujo real de uso con la doctora
+- insumos todavia no descuenta stock automaticamente por atencion confirmada ni tiene editor completo de recetas
+- compras de insumos debe moverse a una vista general de inventario cuando se abra esa etapa
+- falta historial analitico de compras para comparar precios por proveedor, fecha e insumo
+- login local no reemplaza usuarios reales ni permisos robustos; requiere rediseño al pasar a SQLite/Tauri
+- modo `Dr` simplificado debe validarse con flujo real de descuentos y honorarios
+- el pack simple hoy agrega una linea comercial unica al plan; falta decidir si en fase siguiente debe desglosar tratamientos y agenda/cobros separados
 - el despliegue demo conectado a GitHub debe refrescarse desde el push a `main` si Render esta apuntando a ese repo
 
 ## Instruccion de retoma

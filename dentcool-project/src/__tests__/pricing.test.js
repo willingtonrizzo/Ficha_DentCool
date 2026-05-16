@@ -5,6 +5,7 @@ import {
   buildFinanceDashboard,
   calculatePricingResult,
   calculateRecommendedPrice,
+  calculateSimpleTreatmentPack,
   createPatientPricingBudget,
   exportAcceptedSnapshotsCsv,
   exportFinanceSummaryCsv,
@@ -150,6 +151,40 @@ describe('pricing', () => {
 
     expect(result.laborCost).toBe(30000);
     expect(result.laborCostPercent).toBe(30);
+  });
+
+  it('calculates a simple pack with weighted max discount and reduced doctor labor', () => {
+    const result = calculateSimpleTreatmentPack({
+      treatmentIds: ['limpieza-vip', 'blanqueamiento-consulta'],
+      catalog: DEFAULT_PRICING_TREATMENTS,
+      discountPercent: 15,
+      scheduleMode: 'same-day',
+    });
+
+    expect(result.basePrice).toBe(180000);
+    expect(result.minPrice).toBe(145000);
+    expect(result.healthyPrice).toBe(190000);
+    expect(result.idealPrice).toBe(220000);
+    expect(result.durationHours).toBe(2.5);
+    expect(result.sessions).toBe(1);
+    expect(result.maxRecommendedDiscountPercent).toBeCloseTo(13.33, 2);
+    expect(result.discountPercent).toBe(13.33);
+    expect(result.finalPrice).toBe(156006);
+    expect(result.doctorLaborCost).toBe(41602);
+    expect(result.doctorLaborPercent).toBeCloseTo(26.67, 2);
+    expect(result.warnings).toContain('El descuento fue ajustado al maximo recomendado del pack.');
+  });
+
+  it('limits simple packs to the first three selected treatments', () => {
+    const result = calculateSimpleTreatmentPack({
+      treatmentIds: ['evaluacion', 'limpieza-standard', 'blanqueamiento-consulta', 'sellantes'],
+      catalog: DEFAULT_PRICING_TREATMENTS,
+      scheduleMode: 'split-days',
+    });
+
+    expect(result.treatmentIds).toEqual(['evaluacion', 'limpieza-standard', 'blanqueamiento-consulta']);
+    expect(result.sessions).toBe(3);
+    expect(result.warnings).not.toContain('El pack simple permite maximo 3 tratamientos.');
   });
 
   it('raises recommended price when fixed costs go up', () => {

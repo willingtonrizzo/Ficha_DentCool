@@ -431,6 +431,82 @@ export function findPricingTreatmentForProcedure(procedure, catalog = DEFAULT_PR
   }) ?? null;
 }
 
+export function calculateSimpleTreatmentPack({
+  treatmentIds = [],
+  catalog = DEFAULT_PRICING_TREATMENTS,
+  settings = DEFAULT_PRICING_SETTINGS,
+  discountPercent = 0,
+  scheduleMode = 'same-day',
+} = {}) {
+  const safeCatalog = createPricingCatalog(catalog).filter((item) => item.active !== false);
+  const uniqueIds = [...new Set(treatmentIds.filter(Boolean))].slice(0, 3);
+  const selectedTreatments = uniqueIds
+    .map((id) => safeCatalog.find((item) => item.id === id))
+    .filter(Boolean);
+  const safeSettings = createPricingSettings(settings);
+
+  const basePrice = roundCurrency(selectedTreatments.reduce((sum, item) => sum + item.basePrice, 0));
+  const minPrice = roundCurrency(selectedTreatments.reduce((sum, item) => sum + item.minPrice, 0));
+  const healthyPrice = roundCurrency(selectedTreatments.reduce((sum, item) => sum + item.healthyPrice, 0));
+  const idealPrice = roundCurrency(selectedTreatments.reduce((sum, item) => sum + item.idealPrice, 0));
+  const durationHours = roundPercent(selectedTreatments.reduce((sum, item) => sum + item.durationHours, 0));
+  const sessions = scheduleMode === 'split-days' ? Math.max(1, selectedTreatments.length) : selectedTreatments.length > 0 ? 1 : 0;
+  const weightedMaxDiscountPercent = basePrice > 0
+    ? roundPercent(
+        selectedTreatments.reduce(
+          (sum, item) => sum + item.basePrice * Math.max(0, item.maxRecommendedDiscountPercent),
+          0
+        ) / basePrice
+      )
+    : 0;
+  const appliedDiscountPercent = Math.min(Math.max(toNumber(discountPercent, 0), 0), weightedMaxDiscountPercent);
+  const discountAmount = roundCurrency(basePrice * (appliedDiscountPercent / 100));
+  const finalPrice = roundCurrency(Math.max(0, basePrice - discountAmount));
+  const defaultLaborCost = roundCurrency(selectedTreatments.reduce((sum, item) => sum + item.defaultLaborCost, 0));
+  const discountMultiplier = basePrice > 0 ? finalPrice / basePrice : 0;
+  const doctorLaborCost = roundCurrency(defaultLaborCost * discountMultiplier);
+  const doctorLaborPercent = finalPrice > 0 ? roundPercent((doctorLaborCost / finalPrice) * 100) : 0;
+  const estimatedBoxCost = roundCurrency(durationHours * safeSettings.boxHourlyCost);
+  const estimatedTransportCost = roundCurrency(sessions * safeSettings.transportCostPerSession);
+
+  const warnings = [];
+  if (uniqueIds.length > 3) {
+    warnings.push('El pack simple permite maximo 3 tratamientos.');
+  }
+  if (selectedTreatments.length === 0) {
+    warnings.push('Selecciona al menos un tratamiento para calcular el pack.');
+  }
+  if (toNumber(discountPercent, 0) > weightedMaxDiscountPercent) {
+    warnings.push('El descuento fue ajustado al maximo recomendado del pack.');
+  }
+  if (finalPrice > 0 && minPrice > 0 && finalPrice < minPrice) {
+    warnings.push('El precio final del pack queda bajo el minimo sugerido.');
+  }
+
+  return {
+    selectedTreatments,
+    treatmentIds: selectedTreatments.map((item) => item.id),
+    treatmentNames: selectedTreatments.map((item) => item.name),
+    scheduleMode,
+    sessions,
+    basePrice,
+    minPrice,
+    healthyPrice,
+    idealPrice,
+    durationHours,
+    maxRecommendedDiscountPercent: weightedMaxDiscountPercent,
+    discountPercent: appliedDiscountPercent,
+    discountAmount,
+    finalPrice,
+    defaultLaborCost,
+    doctorLaborCost,
+    doctorLaborPercent,
+    estimatedBoxCost,
+    estimatedTransportCost,
+    warnings,
+  };
+}
+
 export function calculatePricingResult({
   treatment,
   settings = DEFAULT_PRICING_SETTINGS,
