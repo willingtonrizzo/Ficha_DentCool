@@ -118,7 +118,7 @@
 - [x] Ajustar el modal de ficha de paciente para mejor densidad vertical en escritorio
 - [x] Preparar workflow de GitHub Actions para compilar el instalador de Windows
 - [ ] Ejecutar el workflow y descargar el instalador de Windows
-- [ ] Validar el workflow de GitHub Actions en modo artifact con `tauri-action@v0.6.2`
+- [ ] Validar el workflow de GitHub Actions con build separado + `actions/upload-artifact@v4`
 - [ ] Descargar el instalador desde el artifact de Actions y probarlo en Windows
 - [ ] Profundizar reportes financieros con datos mas operativos
 - [ ] Refinar componentes UX/UI uno por uno
