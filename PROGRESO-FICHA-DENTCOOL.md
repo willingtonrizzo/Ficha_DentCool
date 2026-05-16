@@ -354,7 +354,7 @@ Hecho:
 - la primera migracion real de pacientes y ficha clinica a SQLite ya pasa `npm test -- --run` y `npm run build`
 - se completo la escritura de las tablas clinicas hijas en SQLite: odontograma, tratamientos, evoluciones, historial, agenda, cobros, documentos, presupuesto y snapshots de presupuesto
 - se completo tambien la lectura de esas tablas clinicas desde SQLite en el puente actual
-- el workflow de GitHub Actions para Windows ya paso a `tauri-action@v1` para volver a probar la publicacion del instalador con la version actual de la accion
+- el workflow de GitHub Actions para Windows volvio a `tauri-action@v0` porque `@v1` no se resolvia como ref publicado en GitHub Actions
 - la verificacion actual sigue en verde con `npm test -- --run`: `74` tests y `npm run build`
 - la fecha de nacimiento en la ficha de paciente paso a un selector dia/mes/anio para evitar el picker nativo recortado en Tauri
 - el formulario del paciente quedo con mejor distribucion vertical para que el footer no se corte en escritorio
