@@ -147,6 +147,19 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - `Inventario` ya puede editar y eliminar compras reajustando stock y costo promedio.
 - `Inventario` ya muestra trazabilidad ampliada del proveedor dentro del historial horizontal.
 - `Inventario` ya permite editar proveedores, exportar CSV/XLSX y navegar el historial por proveedor.
+- En la rama `ajustes-validacion-doctora`, los precios minimos vigentes quedan: `Evaluacion` $20.000, `Limpieza standard` $37.990, `Sellantes` $39.990 y `Restauracion simple` $39.990, sin cambiar precio lista ni costos internos.
+- En la rama `ajustes-validacion-doctora`, `Evolucion clinica` tiene guardado explicito con boton `Guardar y ver historial` y un campo de texto mas alto para notas extensas.
+- En la rama `ajustes-validacion-doctora`, el guardado automatico de ficha clinica queda diferido para reducir escrituras por tecla, y `Guardar y ver historial` sincroniza la evolucion como eventos visibles en `Historial`.
+- En la rama `ajustes-validacion-doctora`, los eventos de historial generados desde evolucion incluyen boton `Editar evolucion` para volver a la nota original, y la categoria del historial se conserva si se edita.
+- En la rama `ajustes-validacion-doctora`, `Historial` conserva el diseno de timeline con punto azul y linea clinica.
+- En la rama `ajustes-validacion-doctora`, `Historial` muestra la fecha arriba de cada evento para liberar ancho horizontal en los campos.
+- En la rama `ajustes-validacion-doctora`, `Inventario` muestra `Agregar proveedor` como formulario visible y selecciona automaticamente el proveedor nuevo para la compra actual.
+- En la rama `ajustes-validacion-doctora`, `Registrar compra` incluye un formulario rapido de proveedor dentro del mismo bloque para guardar y seleccionar sin buscar otro panel.
+- El repositorio local tiene remoto GitHub `https://github.com/willingtonrizzo/Ficha_DentCool.git`; se puede clonar desde ahi si el usuario tiene acceso.
+- El inventario parte con un proveedor semilla (`Proveedor Dental X`) y permite crear/editar proveedores, pero la accion esta dentro de `Ver proveedores` y puede quedar poco visible.
+- El motor de insumos ya contiene una funcion de costo amortizado y categorias de equipos amortizables, pero la UI aun no explica de forma suficiente como calcular el costo por uso de espejo, rotor, aeropulidor u otros reutilizables.
+- `Insumos` por paciente ya distingue lista base del tratamiento e insumos extra agregados al caso, pero queda pendiente validar si esa diferencia es clara para la doctora.
+- No se encontro un limite `maxLength` directo en notas clinicas; en la rama `ajustes-validacion-doctora` se agrego contador de caracteres, se corrigio el refresco del borrador y `Notas rapidas` paso a historial por control/fecha con vista de lectura y edicion por entrada dentro de `Editar ficha`.
 
 ### Testing
 
@@ -180,6 +193,11 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - El inventario general todavia necesita validacion de flujo: comparacion historica completa y reglas de documento obligatorio.
 - `SQLite` ya dejo de ser solo scaffold: falta validar el arranque desktop nativo con datos reales y seguir puliendo casos borde de la lectura relacional.
 - Ya quedo preparado un workflow de GitHub Actions para generar el instalador de Windows como release descargable.
+- Las notas largas deben validarse de punta a punta para evitar perdida o recorte de contenido en guardado, vista resumida, exportacion o feedback.
+- El flujo de proveedores puede percibirse incompleto si la creacion no esta visible al momento de registrar una compra.
+- El costo de materiales reutilizables puede quedar mal estimado si no se captura vida util/usos estimados y mantenimiento/esterilizacion cuando aplique.
+- Queda pendiente prueba manual con texto largo en Tauri/navegador para confirmar la experiencia real, aunque `npm test -- --run` y `npm run build` ya pasaron.
+- Queda pendiente prueba manual de multiples entradas para confirmar que una nueva nota rapida no pisa la anterior.
 
 ## Siguiente paso recomendado
 

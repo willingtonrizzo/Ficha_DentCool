@@ -170,6 +170,7 @@ export default function App() {
   const [isPatientSheetOpen, setIsPatientSheetOpen] = useState(false);
   const [patientSheetSection, setPatientSheetSection] = useState('datos');
   const [patientDraftPreview, setPatientDraftPreview] = useState(null);
+  const [focusedEvolutionNoteId, setFocusedEvolutionNoteId] = useState('');
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const [lastPatientSavedAt, setLastPatientSavedAt] = useState(null);
   const [lastClinicalSavedAt, setLastClinicalSavedAt] = useState(null);
@@ -182,6 +183,7 @@ export default function App() {
   const didMigrateLegacyTeethRef = useRef(false);
   const didHydratePatientOdontogramRef = useRef(false);
   const skipNextOdontogramPersistRef = useRef(false);
+  const clinicalPersistTimeoutRef = useRef(null);
 
   const activePatient = patients.find((patient) => patient.id === activePatientId) ?? patients[0] ?? null;
   const permissions = getRolePermissions(authSession?.roleId ?? 'staff');
@@ -464,6 +466,67 @@ export default function App() {
       ...activeRecord,
       evolutionNotes: activeRecord.evolutionNotes.filter((note) => note.id !== noteId),
     }));
+  };
+
+  const handleSaveEvolutionAndOpenHistory = () => {
+    setClinicalSaveState('dirty');
+    if (!activePatient) return;
+    if (clinicalPersistTimeoutRef.current) {
+      clearTimeout(clinicalPersistTimeoutRef.current);
+      clinicalPersistTimeoutRef.current = null;
+    }
+
+    setClinicalRecords((current) => {
+      const activeRecord = createClinicalPatientRecord(current[activePatient.id], activePatient);
+      const historyByEvolutionId = new Map(
+        activeRecord.historyEntries
+          .filter((entry) => typeof entry.id === 'string' && entry.id.startsWith('hist-from-evo-'))
+          .map((entry) => [entry.id.replace('hist-from-evo-', ''), entry])
+      );
+      const evolutionHistoryEntries = activeRecord.evolutionNotes
+        .filter((note) => note.title || note.text)
+        .map((note, index) => {
+          const existingHistoryEntry = historyByEvolutionId.get(note.id);
+          return createHistoryEntry(
+            {
+              ...existingHistoryEntry,
+              id: `hist-from-evo-${note.id}`,
+              patientId: activePatient.id,
+              dateLabel: note.dateLabel,
+              title: note.title || 'Evolucion clinica',
+              clinician: note.author || 'Dra. responsable',
+              category: existingHistoryEntry?.category || 'control',
+              summary: note.text || 'Evolucion clinica guardada sin detalle adicional.',
+            },
+            index
+          );
+        });
+      const manualHistoryEntries = activeRecord.historyEntries.filter(
+        (entry) => !(typeof entry.id === 'string' && entry.id.startsWith('hist-from-evo-'))
+      );
+      const nextRecord = {
+        ...activeRecord,
+        historyEntries: [...evolutionHistoryEntries, ...manualHistoryEntries],
+      };
+      const nextRecords = {
+        ...current,
+        [activePatient.id]: nextRecord,
+      };
+
+      saveClinicalRecords(nextRecords);
+      void flushStorageWrites().then(() => {
+        setClinicalSaveState('saved');
+        setLastClinicalSavedAt(new Date());
+        setPatientSheetSection('historial');
+      });
+
+      return nextRecords;
+    });
+  };
+
+  const handleEditEvolutionFromHistory = (noteId) => {
+    setFocusedEvolutionNoteId(noteId);
+    setPatientSheetSection('evolucion');
   };
 
   const handleHistoryEntryChange = (entryId, field, value) => {
@@ -1067,9 +1130,21 @@ export default function App() {
       didMountClinicalRef.current = true;
       return;
     }
-    saveClinicalRecords(clinicalRecords);
-    setClinicalSaveState('saved');
-    setLastClinicalSavedAt(new Date());
+    if (clinicalPersistTimeoutRef.current) clearTimeout(clinicalPersistTimeoutRef.current);
+    clinicalPersistTimeoutRef.current = setTimeout(() => {
+      saveClinicalRecords(clinicalRecords);
+      void flushStorageWrites().then(() => {
+        setClinicalSaveState('saved');
+        setLastClinicalSavedAt(new Date());
+      });
+    }, 700);
+
+    return () => {
+      if (clinicalPersistTimeoutRef.current) {
+        clearTimeout(clinicalPersistTimeoutRef.current);
+        clinicalPersistTimeoutRef.current = null;
+      }
+    };
   }, [clinicalRecords]);
 
   useEffect(() => {
@@ -1230,7 +1305,9 @@ export default function App() {
           onNoteChange={handleEvolutionNoteChange}
           onAddNote={handleAddEvolutionNote}
           onRemoveNote={handleRemoveEvolutionNote}
+          onSave={handleSaveEvolutionAndOpenHistory}
           onOpenSection={handleOpenPatientSheet}
+          focusedNoteId={focusedEvolutionNoteId}
         />
       );
     }
@@ -1288,6 +1365,7 @@ export default function App() {
           onEntryChange={handleHistoryEntryChange}
           onAddEntry={handleAddHistoryEntry}
           onRemoveEntry={handleRemoveHistoryEntry}
+          onEditEvolutionEntry={handleEditEvolutionFromHistory}
           onOpenSection={handleOpenPatientSheet}
         />
       );

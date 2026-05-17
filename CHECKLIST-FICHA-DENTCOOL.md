@@ -120,6 +120,36 @@
 - [ ] Ejecutar el workflow y descargar el instalador de Windows
 - [ ] Validar el workflow de GitHub Actions con build separado + `actions/upload-artifact@v4`
 - [ ] Descargar el instalador desde el artifact de Actions y probarlo en Windows
+- [ ] Confirmar acceso de clonado desde `https://github.com/willingtonrizzo/Ficha_DentCool.git` en el equipo donde se instalara o probara
+- [x] Revisar `notas rapidas` / `detalle` / `feedback` y confirmar que no existe limite artificial de caracteres en el modelo ni en los campos
+- [x] Mejorar visualizacion de notas largas con contador de caracteres y refresco correcto al cambiar datos de notas
+- [x] Convertir `Notas rapidas` en vista de lectura con accion de editar
+- [x] Permitir multiples notas rapidas por paciente/control/fecha
+- [x] Revertir ubicacion de `Notas rapidas` y dejarla dentro de `Editar ficha > Secciones internas del paciente`
+- [ ] Validar manualmente en navegador/Tauri una nota larga cambiando entre pacientes
+- [ ] Validar manualmente que una segunda nota rapida no pisa la primera
+- [ ] Validar visualmente `Notas rapidas` dentro de `Editar ficha` con roles `Admin` y `Dr`
+- [x] Actualizar solo precios minimos de Evaluacion, Limpieza standard, Sellantes y Restauracion simple
+- [ ] Validar visualmente los precios minimos nuevos en `Lista precios` y `Presupuesto`
+- [x] Agregar boton `Guardar y ver historial` en `Evolucion clinica`
+- [x] Ampliar campo de texto de evolucion para parrafos largos
+- [x] Hacer que `Guardar y ver historial` cree eventos visibles en `Historial` desde `Evolucion clinica`
+- [x] Reducir escrituras de ficha clinica para evitar guardado por cada tecla
+- [x] Agregar `Editar evolucion` desde eventos de historial generados por evolucion clinica
+- [x] Conservar categoria editada en historial al resincronizar desde evolucion
+- [x] Recuperar diseno visual de timeline con punto azul en `Historial`
+- [x] Mover fecha de evento arriba en `Historial` para ampliar campos
+- [ ] Validar manualmente que `Guardar y ver historial` guarda, cambia a `Historial` y muestra la evolucion
+- [ ] Validar manualmente que `Editar evolucion` vuelve a la nota correcta
+- [x] Hacer visible `Agregar proveedor` en `Inventario`
+- [x] Seleccionar automaticamente el proveedor recien creado al registrar compra
+- [x] Reordenar inventario para dejar `Proveedor` arriba de `Registrar compra`, `Agregar material`, `Comparacion de precios`, `Ultimas compras` e `Historial por proveedor`
+- [x] Simplificar la ficha de proveedor a `Nombre proveedor`, `Telefono`, `Web`, `Direccion`, `Despacho` y `Estado`
+- [ ] Validar manualmente crear proveedor y usarlo en una compra
+- [ ] Validar manualmente que el formulario de proveedor vive arriba y ya no depende del formulario inline dentro de compras
+- [ ] Mejorar insumos amortizables: espejo, rotor, aeropulidor y otros equipos deben calcular costo por uso/vida util, no como dosis simple
+- [ ] Mostrar en UI como se obtiene el precio unitario de un material comprado, incluyendo cantidad comprada, costo total y costo amortizado si corresponde
+- [ ] Validar la separacion entre lista base comun del tratamiento e insumos especificos agregados para un caso/paciente
 - [ ] Profundizar reportes financieros con datos mas operativos
 - [ ] Refinar componentes UX/UI uno por uno
 - [ ] Ajustar funcionalidades de negocio vivas

@@ -2,7 +2,7 @@
 
 ## Fecha de referencia
 
-`2026-05-16`
+`2026-05-17`
 
 ## Estado resumido
 
@@ -24,6 +24,7 @@ Ruta activa del proyecto:
 - cerrar y validar fase uno del modulo de insumos antes de escalar a `SQLite`
 - mantener documentacion viva para retomar sesiones sin perder contexto
 - GitHub queda como fuente de despliegue para Render si el servicio esta conectado a `main` con auto-deploy
+- anotar y resolver observaciones de validacion de la doctora sobre notas largas, proveedores, insumos amortizables y lista base vs insumos especificos
 
 ## Lo ultimo verificado
 
@@ -108,6 +109,40 @@ Ruta activa del proyecto:
 - `Inventario` ahora permite editar proveedores, exportar a CSV/XLSX y revisar un historial por proveedor mas navegable
 - `Lista precios` muestra precio lista, descuento maximo recomendado y precio minimo sin costos internos
 - el login local es barrera de uso para demo, no seguridad fuerte definitiva
+- el repo local esta limpio y tiene remoto `origin` apuntando a `https://github.com/willingtonrizzo/Ficha_DentCool.git`, por lo que se puede clonar si hay credenciales/acceso
+- proveedores ya existe como maestro editable dentro de `Inventario`, pero parte desde una semilla unica `Proveedor Dental X`
+- el motor de insumos ya tiene calculo de amortizacion y semillas de equipos amortizables, pero falta una UI clara para explicar/capturar costo de espejo, rotor, aeropulidor u otros materiales reutilizables
+- no se encontro `maxLength` explicito en notas clinicas; queda pendiente ubicar la pantalla exacta de `notas rapidas`, `detalle` o `feedback` donde el texto se corta o se pierde
+- en la rama `ajustes-validacion-doctora`, `Notas rapidas` ya refresca el borrador cuando cambia cualquier campo de notas y muestra contador de caracteres para nota rapida, detalle y feedback
+- la prueba automatica del modelo clinico ahora cubre notas rapidas largas sin truncar
+- verificacion actual del bloque de notas largas: `npm test -- --run` paso con `77` tests y `npm run build` paso correctamente
+- `Notas rapidas` ahora funciona como historial por control/fecha: vista de lectura primero, boton `Nueva nota rapida`, boton `Editar` por entrada y multiples entradas por paciente
+- verificacion actual del bloque multiple: `npm test -- --run` paso con `78` tests y `npm run build` paso correctamente
+- servidor local activo para revision en `http://127.0.0.1:5173/`
+- se descarto la reubicacion de `Notas rapidas` bajo el odontograma por validacion visual del usuario
+- `Notas rapidas` vuelve a vivir dentro de `Editar ficha > Secciones internas del paciente`, conservando multiples entradas por control/fecha
+- verificacion actual tras revertir ubicacion: `npm test -- --run` paso con `78` tests y `npm run build` paso correctamente
+- en la rama `ajustes-validacion-doctora` se ajustaron solo precios minimos: `Evaluacion` $20.000, `Limpieza standard` $37.990, `Sellantes` $39.990 y `Restauracion simple` $39.990
+- el ajuste de precios minimos tambien se aplica al cargar catalogo persistido para que no queden valores antiguos en el navegador local
+- verificacion actual de precios minimos: `npm test -- --run` paso con `78` tests y `npm run build` paso correctamente
+- `Evolucion clinica` ahora tiene boton explicito `Guardar y ver historial`; guarda la ficha y lleva a la seccion `Historial`
+- el textarea de evolucion quedo mas alto para ingresar parrafos clinicos largos con mejor legibilidad
+- verificacion actual de evolucion clinica: `npm test -- --run` paso con `78` tests y `npm run build` paso correctamente
+- se corrigio el guardado automatico de ficha clinica para que espere brevemente antes de persistir y no escriba por cada tecla
+- `Guardar y ver historial` ahora sincroniza las notas de evolucion como eventos visibles en `Historial`
+- verificacion actual de persistencia/historial de evolucion: `npm test -- --run` paso con `78` tests y `npm run build` paso correctamente
+- `Historial` ahora muestra boton `Editar evolucion` en eventos generados desde evolucion clinica; vuelve a la nota original y la resalta
+- las categorias editadas en `Historial` se conservan al resincronizar evolucion
+- verificacion actual del enlace historial-evolucion: `npm test -- --run` paso con `78` tests y `npm run build` paso correctamente
+- se recupero el diseno de timeline de `Historial` con punto azul y linea clinica
+- verificacion actual del estilo de historial: `npm test -- --run` paso con `78` tests y `npm run build` paso correctamente
+- la fecha de cada evento de `Historial` quedo arriba de la entrada para que titulo, categoria, acciones y texto tengan mas ancho
+- verificacion actual del layout ancho de historial: `npm test -- --run` paso con `78` tests y `npm run build` paso correctamente
+- `Inventario` ahora muestra `Agregar proveedor` como formulario visible y no solo detras de `Ver proveedores`
+- `Registrar compra` ahora tiene boton directo `Agregar proveedor`, y al guardar proveedor queda seleccionado en la compra
+- verificacion actual de proveedores visibles: `npm test -- --run` paso con `78` tests y `npm run build` paso correctamente
+- `Registrar compra` ahora despliega un formulario rapido de proveedor dentro del mismo bloque, con `Guardar y seleccionar`
+- verificacion actual de proveedor rapido: `npm test -- --run` paso con `78` tests y `npm run build` paso correctamente
 
 ## Decision de producto vigente
 
@@ -135,6 +170,7 @@ Razon:
 8. seguir limpiando el `uiContext` global residual
 9. seguir refinando la operacion local antes de `SQLite runtime` completo
 10. preparar la futura transicion a `SQLite` sin mezclar demasiados frentes
+11. convertir las observaciones rapidas levantadas el `2026-05-17` en un bloque corto de ajustes de producto antes de ampliar inventario
 
 ## Riesgos abiertos
 
@@ -175,6 +211,24 @@ Razon:
 - el correo se valida con presencia de `@` y de punto despues del dominio
 - el RUT mantiene validacion basica y unicidad
 - ya quedo preparado el workflow de GitHub Actions para sacar el instalador de Windows sin compilarlo a mano en la laptop de la clienta
+- si las notas largas se cortan o solo muestran una parte, se pierde informacion clinica/operativa relevante; hay que validar guardado y visualizacion completa
+- si proveedores queda escondido detras de `Ver proveedores`, la doctora puede creer que solo existe `Proveedor Dental X`
+- si espejo, rotor o aeropulidor se cargan como unidad/dosis sin amortizacion visible, el costo por tratamiento queda poco confiable
+- si no queda clara la diferencia entre lista base de insumos del tratamiento e insumos especificos del caso, la ficha puede mezclar costos transversales con excepciones clinicas
+- queda pendiente validacion manual en Tauri/navegador con texto largo real y cambio de paciente, aunque la cobertura automatizada y build ya estan verdes
+- queda pendiente validar manualmente que una segunda entrada de otro dia no reemplaza la anterior y que la vista de lectura muestra las tres partes completas
+- queda pendiente validar manualmente que `Notas rapidas` aparece correctamente dentro de `Editar ficha` en `Admin` y `Dr`
+- queda pendiente validar manualmente los nuevos precios minimos en `Lista precios` y `Presupuesto`
+- queda pendiente validar manualmente con dos parrafos largos en `Evolucion clinica`
+- queda pendiente validar visualmente que la evolucion aparece como evento en `Historial` y que el estado de guardado no parpadea por cada letra
+- queda pendiente validar visualmente el boton `Editar evolucion` desde `Historial`
+- queda pendiente validar visualmente que el punto azul y la linea del historial se ven bien en la ventana real
+- queda pendiente validar visualmente que el nuevo ancho del historial queda comodo en la ventana real
+- inventario se esta reordenando para que `Proveedor` quede primero y el resto siga el orden operativo pedido por la doctora
+- la ficha de proveedor se simplifico a los campos operativos que pidio: nombre, telefono, web, direccion, despacho y estado
+- el formulario inline rapido de proveedor dentro de compras se elimino para evitar duplicidad y confusion
+- queda pendiente validar manualmente crear proveedor y usarlo en una compra real de inventario
+- queda pendiente validar manualmente que el formulario de proveedor se vea arriba y que el boton `Agregar proveedor` lleve a esa ficha
 
 ## Instruccion de retoma
 

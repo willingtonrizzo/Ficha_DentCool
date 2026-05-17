@@ -32,12 +32,10 @@ export const DEFAULT_SUPPLY_SUPPLIERS = [
   {
     id: 'prov_dental_001',
     name: 'Proveedor Dental X',
-    contactName: '',
     phone: '',
-    email: '',
     address: '',
     website: '',
-    notes: 'Proveedor base para insumos desechables y bioseguridad',
+    dispatch: 'Proveedor base para insumos desechables y bioseguridad',
     active: true,
   },
 ];

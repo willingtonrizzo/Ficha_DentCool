@@ -14,7 +14,7 @@ Objetivo inmediato:
 
 ## Ultimo avance realizado
 
-Fecha de referencia: `2026-05-16`
+Fecha de referencia: `2026-05-17`
 
 Hecho:
 
@@ -205,6 +205,62 @@ Hecho:
 - el historial del inventario ahora muestra mas trazabilidad del proveedor en la misma fila horizontal
 - se verifico la separacion con `npm test -- --run`: `72` tests verdes
 - se verifico la separacion con `npm run build`: build correcto
+- se levanto una lista rapida de observaciones de producto para revisar antes de la siguiente entrega:
+  - el proyecto ya tiene remoto GitHub en `https://github.com/willingtonrizzo/Ficha_DentCool.git`, por lo que se puede clonar desde ese origen si el acceso esta autorizado
+  - revisar que `notas rapidas`, campos de `detalle` y campos de `feedback` guarden el texto completo sin cortar palabras ni contenido largo
+  - en codigo no aparece un `maxLength` explicito para notas clinicas, pero hay vistas con `slice(...)` que limitan cuantos registros se muestran; falta ubicar la pantalla exacta donde el usuario percibe el corte
+  - en insumos/proveedores existe maestro editable de proveedores en `Inventario`, pero la semilla trae solo `Proveedor Dental X`; falta hacer mas evidente que se puede crear proveedor y luego elegirlo en compras
+  - los materiales reutilizables o equipos como espejo, rotor y aeropulidor no deben tratarse como dosis simples; deben modelarse como costos amortizados por uso, esterilizacion o vida util estimada
+  - ya existe `calculateAmortizedCost(totalCost, estimatedUses)` en el motor de insumos y seeds con `Equipos amortizables`, pero la UI no muestra todavia una captura clara para calcular el costo de comprar un espejo y repartirlo por usos
+  - en `Insumos` por paciente ya existe lista base del tratamiento y tambien se pueden agregar insumos extra para el caso especifico; falta validar si esa separacion se entiende bien en el flujo real de la doctora
+- se inicio el bloque `Bloque Funcionalidades - notas rapidas largas`
+- se reviso `Notas rapidas` y no se encontro limite artificial de caracteres en nota rapida, nota detallada ni feedback
+- se corrigio el refresco del borrador de `Notas rapidas` para que se actualice cuando cambie cualquier campo de notas, no solo `updatedAt`
+- se agrego contador de caracteres visible en nota rapida, nota detallada y feedback para validar que el texto largo sigue completo en pantalla
+- se amplio el test del modelo clinico para conservar notas rapidas, descripcion y feedback largos sin truncar
+- verificacion del bloque: `npm test -- --run` paso con `77` tests verdes
+- verificacion del bloque: `npm run build` paso correctamente
+- se amplio `Notas rapidas` para funcionar como historial por controles/fechas dentro del paciente
+- la seccion ahora abre en modo lectura y muestra las tres partes guardadas: `Nota rapida`, `Nota detallada` y `Feedback`
+- se agrego accion `Nueva nota rapida` para crear una entrada nueva sin pisar la anterior
+- cada entrada guardada tiene accion `Editar`; si no se edita, la vista queda solo de lectura
+- el modelo clinico conserva compatibilidad con la nota rapida anterior y ahora normaliza multiples `entries`
+- se agrego test para multiples entradas de notas rapidas por paciente/control
+- verificacion del bloque multiple: `npm test -- --run` paso con `78` tests verdes
+- verificacion del bloque multiple: `npm run build` paso correctamente
+- servidor local levantado para revision en `http://127.0.0.1:5173/`
+- se probo mover `Notas rapidas` a las tabs clinicas bajo el odontograma, pero se descarto por validacion visual del usuario
+- se revirtio esa reubicacion: `Notas rapidas` vuelve a vivir dentro de `Editar ficha > Secciones internas del paciente`
+- se conserva la mejora funcional de multiples entradas por control/fecha, vista de lectura y edicion por entrada
+- verificacion tras revertir ubicacion: `npm test -- --run` paso con `78` tests verdes y `npm run build` paso correctamente
+- se ajustaron solo precios minimos visibles en `Lista precios` y `Presupuesto`: `Evaluacion` $20.000, `Limpieza standard` $37.990, `Sellantes` $39.990 y `Restauracion simple` $39.990
+- se mantuvieron sin cambios precio lista, precio sano, precio ideal, costos internos y descuentos
+- se agrego aplicacion de esos minimos al cargar catalogo persistido para que el navegador local los refleje aunque hubiera valores antiguos guardados
+- verificacion de precios minimos: `npm test -- --run` paso con `78` tests verdes y `npm run build` paso correctamente
+- se agrego boton explicito `Guardar y ver historial` en `Evolucion clinica`
+- el boton guarda la ficha clinica y luego lleva a la seccion `Historial` de la ficha interna
+- se amplio el campo de texto de evolucion para soportar parrafos largos con mejor comodidad visual
+- verificacion de evolucion clinica: `npm test -- --run` paso con `78` tests verdes y `npm run build` paso correctamente
+- se corrigio el guardado de `Evolucion clinica` para no escribir por cada tecla; ahora el guardado automatico de ficha clinica queda con espera breve antes de persistir
+- `Guardar y ver historial` ahora crea/actualiza entradas visibles en `Historial` desde las notas de evolucion clinica, usando fecha, titulo, profesional y texto de la evolucion
+- al borrar una nota de evolucion y volver a guardar, se limpian las entradas historicas generadas desde evoluciones anteriores y se recrean con las actuales
+- verificacion del ajuste de persistencia/historial de evolucion: `npm test -- --run` paso con `78` tests verdes y `npm run build` paso correctamente
+- se agrego boton `Editar evolucion` dentro de `Historial` para los eventos generados desde `Evolucion clinica`
+- ese boton vuelve a `Evolucion clinica` y resalta la nota original que se eligio editar
+- si se cambia la categoria del evento en `Historial` (`Control`, `Protesis`, etc.), esa categoria se conserva en siguientes sincronizaciones desde evolucion
+- verificacion de enlace historial-evolucion: `npm test -- --run` paso con `78` tests verdes y `npm run build` paso correctamente
+- se recupero el estilo visual de timeline en `Historial`: punto azul, linea clinica y separacion elegante entre eventos
+- verificacion visual/codigo de estilo de historial: `npm test -- --run` paso con `78` tests verdes y `npm run build` paso correctamente
+- se movio la fecha de cada evento de `Historial` arriba de la tarjeta para liberar ancho de los campos principales
+- verificacion del layout ancho de historial: `npm test -- --run` paso con `78` tests verdes y `npm run build` paso correctamente
+- en `Inventario`, el formulario `Agregar proveedor` queda visible sin depender de abrir un listado oculto
+- en `Registrar compra`, se agrego boton directo `Agregar proveedor`
+- al guardar un proveedor nuevo, queda seleccionado automaticamente en la compra actual para que pueda usarse de inmediato
+- el boton superior ahora distingue `Ver listado proveedores` de la accion real de crear proveedor
+- verificacion de proveedores visibles: `npm test -- --run` paso con `78` tests verdes y `npm run build` paso correctamente
+- se agrego formulario rapido de proveedor dentro de `Registrar compra` para escribir nombre/contacto sin bajar al bloque maestro
+- el formulario rapido tiene accion `Guardar y seleccionar`
+- verificacion de proveedor rapido en compra: `npm test -- --run` paso con `78` tests verdes y `npm run build` paso correctamente
 
 ## Como se hizo este bloque
 
@@ -267,6 +323,22 @@ Hecho:
 - seguir afinando la sincronizacion entre agenda, cobros, tratamientos y resumen financiero
 - preparar la migracion de esta capa separada a `SQLite`
 - reemplazar claves locales temporales por usuarios reales cuando exista persistencia segura
+- confirmar el flujo de clonado desde GitHub en el equipo de prueba
+- revisar la pantalla exacta donde `notas rapidas`, `detalle` o `feedback` se cortan para corregir guardado/visualizacion completa
+- hacer mas visible el alta de proveedor antes o durante `Registrar compra`
+- agregar soporte visible para costo amortizado de espejo, rotor, aeropulidor y otros reutilizables
+- explicar mejor en UI la diferencia entre lista base comun de tratamiento e insumos especificos agregados al caso
+- validar manualmente en navegador/Tauri una nota muy larga cambiando entre pacientes para confirmar que el editor muestra siempre el paciente correcto
+- validar manualmente que una segunda nota rapida de otro dia queda como entrada nueva y no reemplaza la anterior
+- validar visualmente que `Notas rapidas` queda solo dentro de `Editar ficha > Secciones internas del paciente`
+- validar visualmente en `Lista precios` y `Presupuesto` que los cuatro precios minimos nuevos aparecen correctamente
+- validar manualmente `Evolucion clinica`: escribir dos parrafos largos, guardar y confirmar que abre `Historial`
+- validar que el mensaje de guardado ya no parpadea por cada tecla y que la evolucion aparece como evento en `Historial`
+- validar que `Editar evolucion` desde `Historial` vuelve a la nota correcta en `Evolucion clinica`
+- validar visualmente que el timeline de `Historial` conserva el punto azul y la jerarquia anterior
+- validar visualmente que los campos de `Historial` quedan mas anchos con la fecha arriba
+- validar manualmente en `Inventario`: crear proveedor nuevo y registrar compra seleccionandolo
+- validar manualmente que `Agregar proveedor` dentro de `Registrar compra` abre el formulario rapido en el mismo bloque
 
 ## Como se va a proceder
 
@@ -374,3 +446,6 @@ Hecho:
 - el correo del paciente ahora se rechaza si no tiene `@` o si no tiene punto despues del `@`
 - la validacion de RUT sigue activa con formato basico y control de duplicados
 - se preparo el workflow de GitHub Actions para generar un instalador de Windows desde `dentcool-project`
+- inventario general reordenado: `Proveedor` arriba, luego `Registrar compra`, `Agregar material`, `Comparacion de precios`, `Ultimas compras` y `Historial por proveedor`
+- ficha de proveedor recortada a campos operativos reales: `Nombre proveedor`, `Telefono`, `Web`, `Direccion`, `Despacho` y `Estado`
+- se elimino el formulario inline duplicado de proveedor dentro de compras para que el alta viva en la ficha superior

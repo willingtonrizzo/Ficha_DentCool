@@ -235,10 +235,25 @@ export function loadPricingCatalog() {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return fallback;
 
-    return createPricingCatalog(parsed);
+    return applyCurrentMinimumPrices(createPricingCatalog(parsed));
   } catch {
     return fallback;
   }
+}
+
+function applyCurrentMinimumPrices(catalog) {
+  const currentMinimums = {
+    evaluacion: 20000,
+    'limpieza-standard': 37990,
+    sellantes: 39990,
+    'restauracion-simple': 39990,
+  };
+
+  return catalog.map((item) => (
+    Object.hasOwn(currentMinimums, item.id)
+      ? { ...item, minPrice: currentMinimums[item.id] }
+      : item
+  ));
 }
 
 export function savePricingCatalog(catalog) {

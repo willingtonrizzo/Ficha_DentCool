@@ -588,7 +588,37 @@ export function resolveDocuments(patient, storedDocuments) {
   return createSeedDocuments(patient);
 }
 
+function hasQuickNoteContent(input = {}) {
+  return Boolean(
+    (typeof input.quickNotes === 'string' && input.quickNotes.trim()) ||
+    (typeof input.description === 'string' && input.description.trim()) ||
+    (typeof input.feedbackDetail === 'string' && input.feedbackDetail.trim()) ||
+    (typeof input.reason === 'string' && input.reason.trim())
+  );
+}
+
+export function createQuickNoteEntry(input = {}, index = 0) {
+  const fallbackDate = typeof input.dateLabel === 'string' && input.dateLabel ? input.dateLabel : '';
+  return {
+    id: typeof input.id === 'string' && input.id ? input.id : `quick-note-${Date.now()}-${index + 1}`,
+    dateLabel: fallbackDate,
+    reason: typeof input.reason === 'string' ? input.reason : '',
+    quickNotes: typeof input.quickNotes === 'string' ? input.quickNotes : '',
+    description: typeof input.description === 'string' ? input.description : '',
+    feedbackTopic: typeof input.feedbackTopic === 'string' ? input.feedbackTopic : 'general',
+    feedbackDetail: typeof input.feedbackDetail === 'string' ? input.feedbackDetail : '',
+    createdAt: typeof input.createdAt === 'string' ? input.createdAt : '',
+    updatedAt: typeof input.updatedAt === 'string' ? input.updatedAt : '',
+  };
+}
+
 export function createQuickNotesRecord(input = {}) {
+  const entries = Array.isArray(input.entries)
+    ? input.entries.map((entry, index) => createQuickNoteEntry(entry, index))
+    : hasQuickNoteContent(input)
+      ? [createQuickNoteEntry(input, 0)]
+      : [];
+
   return {
     dateLabel: typeof input.dateLabel === 'string' ? input.dateLabel : '',
     reason: typeof input.reason === 'string' ? input.reason : '',
@@ -596,6 +626,7 @@ export function createQuickNotesRecord(input = {}) {
     description: typeof input.description === 'string' ? input.description : '',
     feedbackTopic: typeof input.feedbackTopic === 'string' ? input.feedbackTopic : 'general',
     feedbackDetail: typeof input.feedbackDetail === 'string' ? input.feedbackDetail : '',
+    entries,
     updatedAt: typeof input.updatedAt === 'string' ? input.updatedAt : '',
   };
 }

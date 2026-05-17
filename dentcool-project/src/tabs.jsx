@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fmtCLP } from './data';
 import { Icon } from './app';
 import {
@@ -385,7 +385,9 @@ export function Evolucion({
   onNoteChange,
   onAddNote,
   onRemoveNote,
+  onSave,
   onOpenSection,
+  focusedNoteId = '',
   mirror = false,
 }) {
   const saveLabel =
@@ -409,12 +411,23 @@ export function Evolucion({
               Editar ficha
             </button>
           )}
-          {!mirror && <button className="btn btn-primary" onClick={onAddNote}><Icon.plus />Nueva nota clinica</button>}
+          {!mirror && (
+            <>
+              <button className="btn btn-secondary" type="button" onClick={onSave}>
+                <Icon.check />
+                Guardar y ver historial
+              </button>
+              <button className="btn btn-primary" type="button" onClick={onAddNote}>
+                <Icon.plus />
+                Nueva nota clinica
+              </button>
+            </>
+          )}
         </div>
       </div>
       <div className="evol-list">
         {evolutionNotes.map((e) => (
-          <div key={e.id} className="evol-item editable">
+          <div key={e.id} className={`evol-item editable ${focusedNoteId === e.id ? 'focused' : ''}`}>
             <div className="evol-date"><strong>{extractDateParts(e.dateLabel).day}</strong>{extractDateParts(e.dateLabel).month} <br />{extractDateParts(e.dateLabel).year}</div>
             <div className="evol-body">
               {mirror ? (
@@ -1830,6 +1843,7 @@ export function Historial({
   onEntryChange,
   onAddEntry,
   onRemoveEntry,
+  onEditEvolutionEntry,
   onOpenSection,
   mirror = false,
 }) {
@@ -1858,21 +1872,26 @@ export function Historial({
         </div>
       </div>
       <div className="history-list">
-        {historyEntries.map((h) => (
-          <div key={h.id} className="history-row editable">
-            <div className="history-date">
-              {mirror ? (
-                <span className="mirror-date">{h.dateLabel || 'Sin fecha'}</span>
-              ) : (
-                <input
-                  className="history-date-input"
-                  value={h.dateLabel}
-                  onChange={(event) => onEntryChange(h.id, 'dateLabel', event.target.value)}
-                  placeholder="11-05-2026"
-                />
-              )}
-            </div>
+        {historyEntries.map((h) => {
+          const evolutionNoteId = typeof h.id === 'string' && h.id.startsWith('hist-from-evo-')
+            ? h.id.replace('hist-from-evo-', '')
+            : '';
+
+          return (
+          <div key={h.id} className={`history-row editable ${evolutionNoteId ? 'from-evolution' : ''}`}>
             <div className="history-main">
+              <div className="history-date">
+                {mirror ? (
+                  <span className="mirror-date">{h.dateLabel || 'Sin fecha'}</span>
+                ) : (
+                  <input
+                    className="history-date-input"
+                    value={h.dateLabel}
+                    onChange={(event) => onEntryChange(h.id, 'dateLabel', event.target.value)}
+                    placeholder="11-05-2026"
+                  />
+                )}
+              </div>
               {mirror ? (
                 <>
                   <div className="history-entry-head">
@@ -1903,6 +1922,12 @@ export function Historial({
                       <option value="prevencion">Prevencion</option>
                       <option value="administrativo">Administrativo</option>
                     </select>
+                    {evolutionNoteId && (
+                      <button className="btn btn-secondary" type="button" onClick={() => onEditEvolutionEntry?.(evolutionNoteId)}>
+                        <Icon.edit />
+                        Editar evolucion
+                      </button>
+                    )}
                     <button className="btn btn-ghost" onClick={() => onRemoveEntry(h.id)}><Icon.trash /></button>
                   </div>
                   <input
@@ -1921,7 +1946,8 @@ export function Historial({
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -2012,6 +2038,10 @@ function QuickNumberedNotes({ value = '', onChange }) {
   );
 }
 
+function getTextLength(value) {
+  return typeof value === 'string' ? value.length : 0;
+}
+
 export function NotasRapidas({
   notes = {},
   saveState = 'loaded',
@@ -2024,13 +2054,26 @@ export function NotasRapidas({
     month: '2-digit',
     year: 'numeric',
   }).format(new Date());
-  const buildDraft = (source = {}) => ({
-    ...source,
+  const buildEntryDraft = (source = {}) => ({
+    id: source.id || `quick-note-${Date.now()}`,
     dateLabel: source.dateLabel || today,
+    reason: source.reason || '',
     quickNotes: source.quickNotes || '1.- ',
+    description: source.description || '',
     feedbackTopic: source.feedbackTopic || 'general',
+    feedbackDetail: source.feedbackDetail || '',
+    createdAt: source.createdAt || '',
+    updatedAt: source.updatedAt || '',
   });
-  const [draft, setDraft] = useState(() => buildDraft(notes));
+  const hasLegacyNote = Boolean(notes.quickNotes || notes.description || notes.feedbackDetail || notes.reason);
+  const entries = Array.isArray(notes.entries) && notes.entries.length
+    ? notes.entries
+    : hasLegacyNote
+      ? [buildEntryDraft(notes)]
+      : [];
+  const sortedEntries = [...entries].sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
+  const [editingEntryId, setEditingEntryId] = useState(() => (sortedEntries.length ? null : `quick-note-${Date.now()}`));
+  const [draft, setDraft] = useState(() => buildEntryDraft(sortedEntries[0]));
   const saveLabel =
     saveState === 'dirty'
       ? 'Guardando notas rapidas...'
@@ -2039,17 +2082,63 @@ export function NotasRapidas({
         : 'Notas rapidas listas para edicion por paciente.';
 
   useEffect(() => {
-    setDraft(buildDraft(notes));
-  }, [notes.updatedAt]);
+    if (!entries.length && !editingEntryId) {
+      const nextEntry = buildEntryDraft({ id: `quick-note-${Date.now()}`, quickNotes: '1.- ' });
+      setDraft(nextEntry);
+      setEditingEntryId(nextEntry.id);
+      return;
+    }
+
+    const currentEntry = entries.find((entry) => entry.id === editingEntryId) ?? sortedEntries[0];
+    setDraft((current) => {
+      if (editingEntryId && current.id === editingEntryId && !entries.some((entry) => entry.id === editingEntryId)) {
+        return current;
+      }
+      return buildEntryDraft(currentEntry);
+    });
+  }, [
+    editingEntryId,
+    JSON.stringify(entries),
+    notes.updatedAt,
+  ]);
 
   const update = (field, value) => {
     setDraft((current) => ({ ...current, [field]: value }));
   };
+  const startNewEntry = () => {
+    const nextEntry = buildEntryDraft({ id: `quick-note-${Date.now()}`, quickNotes: '1.- ' });
+    setDraft(nextEntry);
+    setEditingEntryId(nextEntry.id);
+    setActiveNotePanel('rapida');
+  };
+  const startEditEntry = (entry) => {
+    setDraft(buildEntryDraft(entry));
+    setEditingEntryId(entry.id);
+    setActiveNotePanel('rapida');
+  };
+  const cancelEdit = () => {
+    setEditingEntryId(null);
+    setDraft(buildEntryDraft(sortedEntries[0]));
+  };
   const saveNow = () => {
-    onSave?.({
+    const now = new Date().toISOString();
+    const nextEntry = {
       ...draft,
-      updatedAt: new Date().toISOString(),
+      id: draft.id || `quick-note-${Date.now()}`,
+      createdAt: draft.createdAt || now,
+      updatedAt: now,
+    };
+    const exists = entries.some((entry) => entry.id === nextEntry.id);
+    const nextEntries = exists
+      ? entries.map((entry) => (entry.id === nextEntry.id ? nextEntry : entry))
+      : [nextEntry, ...entries];
+
+    onSave?.({
+      ...nextEntry,
+      entries: nextEntries,
+      updatedAt: now,
     });
+    setEditingEntryId(null);
   };
   const panelItems = [
     { id: 'rapida', label: 'Nota rapida' },
@@ -2061,11 +2150,54 @@ export function NotasRapidas({
     <div className="quick-notes-editor">
       <div className="documents-toolbar">
         <div>
-          <div className="muted" style={{ fontSize: 12.5 }}>Registro agil de la atencion</div>
+          <div className="muted" style={{ fontSize: 12.5 }}>Registro agil de la atencion · {entries.length} controles</div>
           <div className="documents-save-note">{saveLabel}</div>
         </div>
+        <button className="btn btn-primary" type="button" onClick={startNewEntry}>
+          <Icon.plus />
+          Nueva nota rapida
+        </button>
       </div>
 
+      {!editingEntryId && (
+        <div className="quick-notes-read-list">
+          {sortedEntries.map((entry) => (
+            <article key={entry.id} className="quick-notes-read-card">
+              <div className="quick-notes-read-head">
+                <div>
+                  <div className="quick-notes-read-date">{entry.dateLabel || 'Sin fecha'}</div>
+                  <div className="quick-notes-read-reason">{entry.reason || 'Sin motivo registrado'}</div>
+                </div>
+                <button className="btn btn-secondary" type="button" onClick={() => startEditEntry(entry)}>
+                  <Icon.edit />
+                  Editar
+                </button>
+              </div>
+              <div className="quick-notes-read-grid">
+                <section>
+                  <h4>Nota rapida</h4>
+                  <p>{entry.quickNotes || 'Sin nota rapida registrada.'}</p>
+                </section>
+                <section>
+                  <h4>Nota detallada</h4>
+                  <p>{entry.description || 'Sin nota detallada registrada.'}</p>
+                </section>
+                <section>
+                  <h4>Feedback</h4>
+                  <small>{entry.feedbackTopic || 'general'}</small>
+                  <p>{entry.feedbackDetail || 'Sin feedback registrado.'}</p>
+                </section>
+              </div>
+            </article>
+          ))}
+          {!sortedEntries.length && (
+            <div className="finance-empty">Aun no hay notas rapidas guardadas para este paciente.</div>
+          )}
+        </div>
+      )}
+
+      {editingEntryId && (
+        <>
       <div className="quick-note-tabs" role="tablist" aria-label="Tipos de notas">
         {panelItems.map((panel) => (
           <button
@@ -2107,8 +2239,10 @@ export function NotasRapidas({
             value={draft.quickNotes || '1.- '}
             onChange={(value) => update('quickNotes', value)}
           />
+          <div className="quick-notes-count">{getTextLength(draft.quickNotes || '1.- ')} caracteres</div>
           <div className="quick-notes-actions">
             <button className="btn btn-primary" type="button" onClick={saveNow}><Icon.check />Guardar nota rapida</button>
+            <button className="btn btn-secondary" type="button" onClick={cancelEdit}>Volver a lectura</button>
           </div>
         </section>
       )}
@@ -2143,8 +2277,10 @@ export function NotasRapidas({
             onChange={(event) => update('description', event.target.value)}
             placeholder="Anota con mas calma lo que paso, decisiones tomadas, contexto y pendientes clinicos."
           />
+          <div className="quick-notes-count">{getTextLength(draft.description)} caracteres</div>
           <div className="quick-notes-actions">
             <button className="btn btn-primary" type="button" onClick={saveNow}><Icon.check />Guardar nota detallada</button>
+            <button className="btn btn-secondary" type="button" onClick={cancelEdit}>Volver a lectura</button>
           </div>
         </section>
       )}
@@ -2195,10 +2331,14 @@ export function NotasRapidas({
             onChange={(event) => update('feedbackDetail', event.target.value)}
             placeholder="Ej: tarde mucho explicando y eso atraso la agenda; revisar pauta de tiempos. No recorde lentes. Paciente pregunto por anestesia que no tenia disponible."
           />
+          <div className="quick-notes-count">{getTextLength(draft.feedbackDetail)} caracteres</div>
           <div className="quick-notes-actions">
             <button className="btn btn-primary" type="button" onClick={saveNow}><Icon.check />Guardar feedback</button>
+            <button className="btn btn-secondary" type="button" onClick={cancelEdit}>Volver a lectura</button>
           </div>
         </section>
+      )}
+        </>
       )}
     </div>
   );
@@ -2861,15 +3001,13 @@ export function InventarioInsumos({
   const [purchaseNote, setPurchaseNote] = useState('');
   const [editingPurchaseId, setEditingPurchaseId] = useState('');
   const [editingSupplierId, setEditingSupplierId] = useState('');
+  const supplierPanelRef = useRef(null);
   const [supplierName, setSupplierName] = useState('');
-  const [supplierContactName, setSupplierContactName] = useState('');
   const [supplierPhone, setSupplierPhone] = useState('');
-  const [supplierEmail, setSupplierEmail] = useState('');
   const [supplierAddress, setSupplierAddress] = useState('');
   const [supplierWebsite, setSupplierWebsite] = useState('');
-  const [supplierNotes, setSupplierNotes] = useState('');
+  const [supplierDispatch, setSupplierDispatch] = useState('');
   const [supplierActive, setSupplierActive] = useState(true);
-  const [showSuppliers, setShowSuppliers] = useState(false);
   const [filterSupplierId, setFilterSupplierId] = useState('all');
   const [filterItemId, setFilterItemId] = useState('all');
 
@@ -2891,11 +3029,17 @@ export function InventarioInsumos({
         supplierName: purchase.supplierId
           ? moduleState.suppliers.find((supplier) => supplier.id === purchase.supplierId)?.name ?? 'Sin proveedor'
           : 'Sin proveedor',
-        contactName: purchase.supplierId
-          ? moduleState.suppliers.find((supplier) => supplier.id === purchase.supplierId)?.contactName ?? ''
-          : '',
         phone: purchase.supplierId
           ? moduleState.suppliers.find((supplier) => supplier.id === purchase.supplierId)?.phone ?? ''
+          : '',
+        website: purchase.supplierId
+          ? moduleState.suppliers.find((supplier) => supplier.id === purchase.supplierId)?.website ?? ''
+          : '',
+        address: purchase.supplierId
+          ? moduleState.suppliers.find((supplier) => supplier.id === purchase.supplierId)?.address ?? ''
+          : '',
+        dispatch: purchase.supplierId
+          ? moduleState.suppliers.find((supplier) => supplier.id === purchase.supplierId)?.dispatch ?? ''
           : '',
         purchaseCount: 0,
         totalCost: 0,
@@ -3152,12 +3296,10 @@ export function InventarioInsumos({
     const nextSupplier = {
       id: editingSupplierId || `prov_custom_${Date.now()}`,
       name: nextName,
-      contactName: supplierContactName.trim(),
       phone: supplierPhone.trim(),
-      email: supplierEmail.trim(),
       address: supplierAddress.trim(),
       website: supplierWebsite.trim(),
-      notes: supplierNotes.trim(),
+      dispatch: supplierDispatch.trim(),
       active: supplierActive,
     };
 
@@ -3172,37 +3314,37 @@ export function InventarioInsumos({
     });
     setEditingSupplierId('');
     setSupplierName('');
-    setSupplierContactName('');
     setSupplierPhone('');
-    setSupplierEmail('');
     setSupplierAddress('');
     setSupplierWebsite('');
-    setSupplierNotes('');
+    setSupplierDispatch('');
     setSupplierActive(true);
+    setPurchaseSupplierId(nextSupplier.id);
+  };
+
+  const handleStartSupplierCreate = () => {
+    handleCancelSupplierEdit();
+    supplierPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const handleEditSupplier = (supplier) => {
     setEditingSupplierId(supplier.id);
     setSupplierName(supplier.name ?? '');
-    setSupplierContactName(supplier.contactName ?? '');
     setSupplierPhone(supplier.phone ?? '');
-    setSupplierEmail(supplier.email ?? '');
     setSupplierAddress(supplier.address ?? '');
     setSupplierWebsite(supplier.website ?? '');
-    setSupplierNotes(supplier.notes ?? '');
+    setSupplierDispatch(supplier.dispatch ?? supplier.notes ?? '');
     setSupplierActive(Boolean(supplier.active));
-    setShowSuppliers(true);
+    supplierPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const handleCancelSupplierEdit = () => {
     setEditingSupplierId('');
     setSupplierName('');
-    setSupplierContactName('');
     setSupplierPhone('');
-    setSupplierEmail('');
     setSupplierAddress('');
     setSupplierWebsite('');
-    setSupplierNotes('');
+    setSupplierDispatch('');
     setSupplierActive(true);
   };
 
@@ -3213,7 +3355,10 @@ export function InventarioInsumos({
       { label: 'Cantidad', value: (row) => `${row.quantityPurchased ?? ''} ${row.itemUnit ?? ''}`.trim() },
       { label: 'Fecha', value: (row) => row.purchaseDateLabel || '' },
       { label: 'Proveedor', value: (row) => supplierById.get(row.supplierId)?.name ?? 'Sin proveedor' },
-      { label: 'Contacto proveedor', value: (row) => supplierById.get(row.supplierId)?.contactName || supplierById.get(row.supplierId)?.phone || supplierById.get(row.supplierId)?.address || '' },
+      { label: 'Telefono proveedor', value: (row) => supplierById.get(row.supplierId)?.phone || '' },
+      { label: 'Web proveedor', value: (row) => supplierById.get(row.supplierId)?.website || '' },
+      { label: 'Direccion proveedor', value: (row) => supplierById.get(row.supplierId)?.address || '' },
+      { label: 'Despacho proveedor', value: (row) => supplierById.get(row.supplierId)?.dispatch || '' },
       { label: 'Documento', value: (row) => `${row.documentType || ''} ${row.documentNumber || ''}`.trim() },
       { label: 'Costo total', value: (row) => row.totalCost ?? 0 },
       { label: 'Costo unitario', value: (row) => row.unitCost ?? 0 },
@@ -3232,7 +3377,10 @@ export function InventarioInsumos({
       Unidad: row.itemUnit ?? '',
       Fecha: row.purchaseDateLabel || '',
       Proveedor: supplierById.get(row.supplierId)?.name ?? 'Sin proveedor',
-      Contacto: supplierById.get(row.supplierId)?.contactName || supplierById.get(row.supplierId)?.phone || supplierById.get(row.supplierId)?.address || '',
+      Telefono: supplierById.get(row.supplierId)?.phone || '',
+      Web: supplierById.get(row.supplierId)?.website || '',
+      Direccion: supplierById.get(row.supplierId)?.address || '',
+      Despacho: supplierById.get(row.supplierId)?.dispatch || '',
       Documento: `${row.documentType || ''} ${row.documentNumber || ''}`.trim(),
       'Costo total': row.totalCost ?? 0,
       'Costo unitario': row.unitCost ?? 0,
@@ -3240,13 +3388,11 @@ export function InventarioInsumos({
     }));
     const suppliersSheet = moduleState.suppliers.map((supplier) => ({
       Proveedor: supplier.name || '',
-      Contacto: supplier.contactName || '',
       Telefono: supplier.phone || '',
-      Email: supplier.email || '',
-      Direccion: supplier.address || '',
       Web: supplier.website || '',
+      Direccion: supplier.address || '',
+      Despacho: supplier.dispatch || '',
       Activo: supplier.active ? 'Si' : 'No',
-      Notas: supplier.notes || '',
     }));
     const comparisonSheet = priceComparisonRows.map((row) => ({
       Insumo: row.itemName || '',
@@ -3284,10 +3430,6 @@ export function InventarioInsumos({
             <Icon.download />
             Exportar XLSX
           </button>
-          <button className="btn btn-secondary" type="button" onClick={() => setShowSuppliers((current) => !current)}>
-            <Icon.edit />
-            {showSuppliers ? 'Ocultar proveedores' : 'Ver proveedores'}
-          </button>
         </div>
       </div>
 
@@ -3311,6 +3453,100 @@ export function InventarioInsumos({
           <div className="budget-pricing-kpi-head"><span>Compras</span></div>
           <strong>{filteredPurchases.length}</strong>
           <small>recientes</small>
+        </div>
+      </div>
+
+      <div ref={supplierPanelRef} className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
+        <div className="budget-pricing-settings-head">
+          <div>
+            <div className="bs-label">{editingSupplierId ? 'Editar proveedor' : 'Proveedor'}</div>
+            <div className="bs-help">Ficha del proveedor para registrar compras, comparar precios y revisar historial.</div>
+          </div>
+          {editingSupplierId && (
+            <button className="btn btn-secondary" type="button" onClick={handleCancelSupplierEdit}>
+              <Icon.edit />
+              Cancelar
+            </button>
+          )}
+        </div>
+        <div className="budget-pricing-settings-grid" style={{ marginBottom: 14 }}>
+          <label className="pricing-setting-field" style={{ gridColumn: '1 / span 2' }}>
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Nombre proveedor</span>
+            </span>
+            <input value={supplierName} onChange={(event) => setSupplierName(event.target.value)} placeholder="Proveedor Dental X" />
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Telefono</span>
+            </span>
+            <input value={supplierPhone} onChange={(event) => setSupplierPhone(event.target.value)} placeholder="+56 ..." />
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Web</span>
+            </span>
+            <input value={supplierWebsite} onChange={(event) => setSupplierWebsite(event.target.value)} placeholder="sitio web" />
+          </label>
+          <label className="pricing-setting-field" style={{ gridColumn: '1 / span 2' }}>
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Direccion</span>
+            </span>
+            <input value={supplierAddress} onChange={(event) => setSupplierAddress(event.target.value)} placeholder="Direccion o comuna" />
+          </label>
+          <label className="pricing-setting-field" style={{ gridColumn: '1 / span 2' }}>
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Despacho</span>
+            </span>
+            <input value={supplierDispatch} onChange={(event) => setSupplierDispatch(event.target.value)} placeholder="Condiciones de despacho" />
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Estado</span>
+            </span>
+            <select value={supplierActive ? 'active' : 'inactive'} onChange={(event) => setSupplierActive(event.target.value === 'active')}>
+              <option value="active">Activo</option>
+              <option value="inactive">Inactivo</option>
+            </select>
+          </label>
+          <div style={{ display: 'flex', alignItems: 'end' }}>
+            <button className="btn btn-primary" type="button" onClick={handleSaveSupplier} disabled={!supplierName.trim()}>
+              <Icon.plus />
+              {editingSupplierId ? 'Actualizar proveedor' : 'Guardar proveedor'}
+            </button>
+          </div>
+        </div>
+        <div className="inventory-table-shell" style={{ marginTop: 10 }}>
+          <div className="inventory-table-head inventory-suppliers-head">
+            <span>Proveedor</span>
+            <span>Telefono</span>
+            <span>Web</span>
+            <span>Direccion</span>
+            <span>Despacho</span>
+            <span>Estado</span>
+            <span>Compras</span>
+            <span>Acciones</span>
+          </div>
+          {moduleState.suppliers.map((supplier) => (
+            <div key={supplier.id} className="inventory-table-row inventory-suppliers-row">
+              <strong>{supplier.name}</strong>
+              <span>{supplier.phone || 'Sin telefono'}</span>
+              <span>{supplier.website || 'Sin web'}</span>
+              <span>{supplier.address || 'Sin direccion'}</span>
+              <span>{supplier.dispatch || 'Sin despacho'}</span>
+              <span>{supplier.active ? 'Activo' : 'Inactivo'}</span>
+              <span>{moduleState.purchases.filter((purchase) => purchase.supplierId === supplier.id).length}</span>
+              <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                <button className="row-action" type="button" onClick={() => handleEditSupplier(supplier)} title="Editar proveedor">
+                  <Icon.edit />
+                </button>
+                <button className="row-action" type="button" onClick={() => setFilterSupplierId(supplier.id)} title="Ver compras">
+                  <Icon.download />
+                </button>
+              </span>
+            </div>
+          ))}
+          {!moduleState.suppliers.length && <div className="finance-empty">No hay proveedores configurados.</div>}
         </div>
       </div>
 
@@ -3422,12 +3658,18 @@ export function InventarioInsumos({
             <div className="bs-label">{editingPurchaseId ? 'Editar compra' : 'Registrar compra'}</div>
             <div className="bs-help">{editingPurchaseId ? 'Corrige la compra y guarda la version actualizada.' : 'Aqui vive el flujo de compra para que no quede dentro de la ficha del paciente.'}</div>
           </div>
-          {editingPurchaseId && (
-            <button className="btn btn-secondary" type="button" onClick={handleCancelPurchaseEdit}>
-              <Icon.edit />
-              Cancelar edicion
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary" type="button" onClick={handleStartSupplierCreate}>
+              <Icon.plus />
+              Agregar proveedor
             </button>
-          )}
+            {editingPurchaseId && (
+              <button className="btn btn-secondary" type="button" onClick={handleCancelPurchaseEdit}>
+                <Icon.edit />
+                Cancelar edicion
+              </button>
+            )}
+          </div>
         </div>
         <div className="budget-pricing-settings-grid">
           <label className="pricing-setting-field" style={{ gridColumn: '1 / span 2' }}>
@@ -3465,6 +3707,7 @@ export function InventarioInsumos({
                 <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
               ))}
             </select>
+            <small className="document-value">Si no aparece, usa Agregar proveedor y quedara seleccionado para esta compra.</small>
           </label>
           <label className="pricing-setting-field">
             <span className="pricing-setting-label-row">
@@ -3517,6 +3760,45 @@ export function InventarioInsumos({
       <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
         <div className="budget-pricing-settings-head">
           <div>
+            <div className="bs-label">Comparacion de precios</div>
+            <div className="bs-help">Lectura basica del costo unitario por insumo segun el historial local guardado.</div>
+          </div>
+        </div>
+        <div className="inventory-table-shell">
+          <div className="inventory-table-head inventory-comparison-head">
+            <span>Insumo</span>
+            <span>Marca</span>
+            <span>Min</span>
+            <span>Prom</span>
+            <span>Ultimo</span>
+            <span>Max</span>
+            <span>Fecha</span>
+            <span>Proveedor</span>
+          </div>
+          {priceComparisonRows.map((row) => (
+            <div key={row.itemId} className="inventory-table-row inventory-comparison-row">
+              <strong>{row.itemName}</strong>
+              <span>{row.lastBrandName || 'Sin marca'}</span>
+              <span>{fmtCLP(row.minUnitCost || 0)}</span>
+              <span>{fmtCLP(row.averageUnitCost || 0)}</span>
+              <span>{fmtCLP(row.lastUnitCost || 0)}</span>
+              <span>{fmtCLP(row.maxUnitCost || 0)}</span>
+              <span>{row.lastPurchaseLabel || 'Sin fecha'}</span>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div>{row.lastSupplierName || 'Sin proveedor'}</div>
+                <small className="document-value">
+                  {supplierById.get(row.lastSupplierId)?.phone || supplierById.get(row.lastSupplierId)?.website || supplierById.get(row.lastSupplierId)?.address || supplierById.get(row.lastSupplierId)?.dispatch || 'Sin contacto'}
+                </small>
+              </span>
+            </div>
+          ))}
+          {!priceComparisonRows.length && <div className="finance-empty">Todavia no hay compras suficientes para comparar precios.</div>}
+        </div>
+      </div>
+
+      <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
+        <div className="budget-pricing-settings-head">
+          <div>
             <div className="bs-label">Ultimas compras</div>
             <div className="bs-help">Historial reciente para revisar cantidades, proveedores y costo unitario.</div>
           </div>
@@ -3561,7 +3843,7 @@ export function InventarioInsumos({
                 <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <div>{supplier?.name ?? 'Sin proveedor'}</div>
                   <small className="document-value">
-                    {supplier?.contactName || supplier?.phone || supplier?.address || 'Sin contacto'}
+                    {supplier?.phone || supplier?.website || supplier?.address || supplier?.dispatch || 'Sin contacto'}
                   </small>
                 </span>
                 <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -3583,153 +3865,6 @@ export function InventarioInsumos({
           {!filteredPurchases.length && <div className="finance-empty">Todavia no hay compras registradas para ese filtro.</div>}
         </div>
       </div>
-
-      <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
-        <div className="budget-pricing-settings-head">
-          <div>
-            <div className="bs-label">Comparacion de precios</div>
-            <div className="bs-help">Lectura basica del costo unitario por insumo segun el historial local guardado.</div>
-          </div>
-        </div>
-        <div className="inventory-table-shell">
-          <div className="inventory-table-head inventory-comparison-head">
-            <span>Insumo</span>
-            <span>Marca</span>
-            <span>Min</span>
-            <span>Prom</span>
-            <span>Ultimo</span>
-            <span>Max</span>
-            <span>Fecha</span>
-            <span>Proveedor</span>
-          </div>
-          {priceComparisonRows.map((row) => (
-            <div key={row.itemId} className="inventory-table-row inventory-comparison-row">
-              <strong>{row.itemName}</strong>
-              <span>{row.lastBrandName || 'Sin marca'}</span>
-              <span>{fmtCLP(row.minUnitCost || 0)}</span>
-              <span>{fmtCLP(row.averageUnitCost || 0)}</span>
-              <span>{fmtCLP(row.lastUnitCost || 0)}</span>
-              <span>{fmtCLP(row.maxUnitCost || 0)}</span>
-              <span>{row.lastPurchaseLabel || 'Sin fecha'}</span>
-              <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <div>{row.lastSupplierName || 'Sin proveedor'}</div>
-                <small className="document-value">
-                  {supplierById.get(row.lastSupplierId)?.contactName || supplierById.get(row.lastSupplierId)?.phone || supplierById.get(row.lastSupplierId)?.address || 'Sin contacto'}
-                </small>
-              </span>
-            </div>
-          ))}
-          {!priceComparisonRows.length && <div className="finance-empty">Todavia no hay compras suficientes para comparar precios.</div>}
-        </div>
-      </div>
-
-      {showSuppliers && (
-        <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
-          <div className="budget-pricing-settings-head">
-            <div>
-              <div className="bs-label">{editingSupplierId ? 'Editar proveedor' : 'Proveedores'}</div>
-              <div className="bs-help">{editingSupplierId ? 'Modifica la ficha del proveedor y guarda los cambios.' : 'Catalogo maestro de proveedores para el inventario general.'}</div>
-            </div>
-            {editingSupplierId && (
-              <button className="btn btn-secondary" type="button" onClick={handleCancelSupplierEdit}>
-                <Icon.edit />
-                Cancelar
-              </button>
-            )}
-          </div>
-          <div className="budget-pricing-settings-grid" style={{ marginBottom: 14 }}>
-            <label className="pricing-setting-field" style={{ gridColumn: '1 / span 2' }}>
-              <span className="pricing-setting-label-row">
-                <span className="pricing-setting-label-text">Nombre proveedor</span>
-              </span>
-              <input value={supplierName} onChange={(event) => setSupplierName(event.target.value)} placeholder="Proveedor Dental X" />
-            </label>
-            <label className="pricing-setting-field">
-              <span className="pricing-setting-label-row">
-                <span className="pricing-setting-label-text">Contacto</span>
-              </span>
-              <input value={supplierContactName} onChange={(event) => setSupplierContactName(event.target.value)} placeholder="Persona de contacto" />
-            </label>
-            <label className="pricing-setting-field">
-              <span className="pricing-setting-label-row">
-                <span className="pricing-setting-label-text">Telefono</span>
-              </span>
-              <input value={supplierPhone} onChange={(event) => setSupplierPhone(event.target.value)} placeholder="+56 ..." />
-            </label>
-            <label className="pricing-setting-field">
-              <span className="pricing-setting-label-row">
-                <span className="pricing-setting-label-text">Email</span>
-              </span>
-              <input value={supplierEmail} onChange={(event) => setSupplierEmail(event.target.value)} placeholder="correo@proveedor.cl" />
-            </label>
-            <label className="pricing-setting-field">
-              <span className="pricing-setting-label-row">
-                <span className="pricing-setting-label-text">Direccion</span>
-              </span>
-              <input value={supplierAddress} onChange={(event) => setSupplierAddress(event.target.value)} placeholder="Direccion o comuna" />
-            </label>
-            <label className="pricing-setting-field">
-              <span className="pricing-setting-label-row">
-                <span className="pricing-setting-label-text">Web</span>
-              </span>
-              <input value={supplierWebsite} onChange={(event) => setSupplierWebsite(event.target.value)} placeholder="sitio web" />
-            </label>
-            <label className="pricing-setting-field" style={{ gridColumn: '1 / span 2' }}>
-              <span className="pricing-setting-label-row">
-                <span className="pricing-setting-label-text">Notas</span>
-              </span>
-              <input value={supplierNotes} onChange={(event) => setSupplierNotes(event.target.value)} placeholder="Condiciones, despacho, observaciones" />
-            </label>
-            <label className="pricing-setting-field">
-              <span className="pricing-setting-label-row">
-                <span className="pricing-setting-label-text">Estado</span>
-              </span>
-              <select value={supplierActive ? 'active' : 'inactive'} onChange={(event) => setSupplierActive(event.target.value === 'active')}>
-                <option value="active">Activo</option>
-                <option value="inactive">Inactivo</option>
-              </select>
-            </label>
-            <div style={{ display: 'flex', alignItems: 'end' }}>
-              <button className="btn btn-primary" type="button" onClick={handleSaveSupplier}>
-                <Icon.plus />
-                {editingSupplierId ? 'Actualizar proveedor' : 'Guardar proveedor'}
-              </button>
-            </div>
-          </div>
-          <div className="inventory-table-shell" style={{ marginTop: 10 }}>
-            <div className="inventory-table-head inventory-suppliers-head">
-              <span>Proveedor</span>
-              <span>Contacto</span>
-              <span>Telefono</span>
-              <span>Email</span>
-              <span>Direccion</span>
-              <span>Estado</span>
-              <span>Compras</span>
-              <span>Acciones</span>
-            </div>
-            {moduleState.suppliers.map((supplier) => (
-              <div key={supplier.id} className="inventory-table-row inventory-suppliers-row">
-                <strong>{supplier.name}</strong>
-                <span>{supplier.contactName || 'Sin contacto'}</span>
-                <span>{supplier.phone || 'Sin telefono'}</span>
-                <span>{supplier.email || 'Sin email'}</span>
-                <span>{supplier.address || 'Sin direccion'}</span>
-                <span>{supplier.active ? 'Activo' : 'Inactivo'}</span>
-                <span>{moduleState.purchases.filter((purchase) => purchase.supplierId === supplier.id).length}</span>
-                <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                  <button className="row-action" type="button" onClick={() => handleEditSupplier(supplier)} title="Editar proveedor">
-                    <Icon.edit />
-                  </button>
-                  <button className="row-action" type="button" onClick={() => setFilterSupplierId(supplier.id)} title="Ver compras">
-                    <Icon.download />
-                  </button>
-                </span>
-              </div>
-            ))}
-            {!moduleState.suppliers.length && <div className="finance-empty">No hay proveedores configurados.</div>}
-          </div>
-        </div>
-      )}
 
       <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
         <div className="budget-pricing-settings-head">

@@ -173,32 +173,87 @@ describe('clinical model', () => {
     expect(result.record.documents[0].kind).toBe('consentimiento');
     expect(result.record.quickNotes.feedbackTopic).toBe('general');
     expect(result.record.quickNotes.quickNotes).toBe('');
+    expect(result.record.quickNotes.entries).toEqual([]);
   });
 
   it('normalizes quick notes as part of the patient clinical record', () => {
+    const longDescription = [
+      'Paciente comenta una evolucion extensa posterior al tratamiento.',
+      'Se registran indicaciones clinicas, decisiones conversadas, dudas pendientes y acuerdos administrativos.',
+      'Este texto simula una nota larga que debe conservarse completa sin truncarse en el modelo clinico.',
+    ].join(' ');
+    const longFeedback = [
+      'Feedback operativo con detalle amplio.',
+      'La atencion tomo mas tiempo por explicacion de costos, preparacion de insumos y coordinacion de agenda.',
+      'Debe quedar guardado completo para revisar mejoras del flujo.',
+    ].join(' ');
+
     const record = createClinicalPatientRecord(
       {
         quickNotes: {
           dateLabel: '16-05-2026',
           reason: 'Control de restauracion',
-          quickNotes: '1.- mandar correo',
-          description: 'Descripcion posterior a la atencion.',
+          quickNotes: '1.- mandar correo\n2.- confirmar disponibilidad de insumos antes de la proxima cita',
+          description: longDescription,
           feedbackTopic: 'agenda',
-          feedbackDetail: 'Ajustar tiempos para proximo control.',
+          feedbackDetail: longFeedback,
         },
       },
       PATIENT
     );
 
-    expect(record.quickNotes).toEqual({
+    expect(record.quickNotes).toMatchObject({
       dateLabel: '16-05-2026',
       reason: 'Control de restauracion',
-      quickNotes: '1.- mandar correo',
-      description: 'Descripcion posterior a la atencion.',
+      quickNotes: '1.- mandar correo\n2.- confirmar disponibilidad de insumos antes de la proxima cita',
+      description: longDescription,
       feedbackTopic: 'agenda',
-      feedbackDetail: 'Ajustar tiempos para proximo control.',
+      feedbackDetail: longFeedback,
       updatedAt: '',
     });
+    expect(record.quickNotes.entries).toHaveLength(1);
+    expect(record.quickNotes.entries[0]).toMatchObject({
+      dateLabel: '16-05-2026',
+      reason: 'Control de restauracion',
+      quickNotes: '1.- mandar correo\n2.- confirmar disponibilidad de insumos antes de la proxima cita',
+      description: longDescription,
+      feedbackTopic: 'agenda',
+      feedbackDetail: longFeedback,
+    });
+  });
+
+  it('keeps multiple quick note entries by patient control', () => {
+    const record = createClinicalPatientRecord(
+      {
+        quickNotes: {
+          entries: [
+            {
+              id: 'quick-note-control-1',
+              dateLabel: '16-05-2026',
+              reason: 'Control inicial',
+              quickNotes: '1.- primera indicacion',
+              description: 'Detalle del primer control.',
+              feedbackTopic: 'general',
+              feedbackDetail: 'Primer feedback.',
+            },
+            {
+              id: 'quick-note-control-2',
+              dateLabel: '20-05-2026',
+              reason: 'Segundo control',
+              quickNotes: '1.- revisar evolucion',
+              description: 'Detalle del segundo control.',
+              feedbackTopic: 'agenda',
+              feedbackDetail: 'Segundo feedback.',
+            },
+          ],
+        },
+      },
+      PATIENT
+    );
+
+    expect(record.quickNotes.entries).toHaveLength(2);
+    expect(record.quickNotes.entries[0].id).toBe('quick-note-control-1');
+    expect(record.quickNotes.entries[1].reason).toBe('Segundo control');
   });
 
   it('preserves patient specific odontogram and patient ui context', () => {
