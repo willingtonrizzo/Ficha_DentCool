@@ -348,7 +348,7 @@ export function Sidebar({
     { ic: 'doc', label: 'Lista precios', view: 'priceList' },
     { ic: 'cash', label: 'Inventario', view: 'inventory' },
     { ic: 'chart', label: 'Reportes', view: 'finance' },
-    { ic: 'cash', label: 'Facturacion', view: 'finance' },
+    { ic: 'cash', label: 'Facturacion', view: 'billing' },
     { ic: 'doc', label: 'Documentos' },
     { ic: 'cog', label: 'Configuracion' },
   ].filter((item) => !item.view || permissions?.views?.includes(item.view));
@@ -444,6 +444,12 @@ export function TopbarInner({ patientName, activeView = 'patients', currentUser 
             <span className="sep">/</span>
             <strong>Finanzas</strong>
           </>
+        ) : activeView === 'billing' ? (
+          <>
+            <span>Gestion</span>
+            <span className="sep">/</span>
+            <strong>Facturacion</strong>
+          </>
         ) : (
           <>
             <span>Pacientes</span>
@@ -532,6 +538,323 @@ function labelForOperationalStatus(status) {
     pending_review: 'Por evaluar',
   };
   return map[status] ?? 'Planificado';
+}
+
+function normalizePaymentMethod(method) {
+  const labels = {
+    cash: 'Efectivo',
+    card: 'Tarjeta',
+    transfer: 'Transferencia',
+    mixed: 'Mixto',
+    other: 'Otro',
+  };
+  return labels[method] ?? method ?? 'Sin metodo';
+}
+
+function parseBillingDateLabel(value, fallbackDate = null) {
+  if (!value) return fallbackDate;
+  const normalized = normalizeText(value).replaceAll('-', '/');
+  const numeric = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (numeric) {
+    const date = new Date(Number(numeric[3]), Number(numeric[2]) - 1, Number(numeric[1]));
+    return Number.isNaN(date.getTime()) ? fallbackDate : date;
+  }
+  return parseVisitDate(value) ?? fallbackDate;
+}
+
+function isSameCalendarDay(a, b) {
+  return Boolean(a && b) &&
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+}
+
+export function buildBillingDashboard(clinicalRecords = {}, patients = [], now = new Date()) {
+  const patientById = new Map(patients.map((patient) => [patient.id, patient]));
+  const payments = [];
+  const pendingCollections = [];
+
+  Object.entries(clinicalRecords ?? {}).forEach(([patientId, record]) => {
+    const patient = patientById.get(patientId);
+    const patientName = getPatientDisplayName(patient, 'Paciente sin nombre');
+    const treatments = Array.isArray(record?.treatments) ? record.treatments : [];
+    const treatmentsById = new Map(treatments.map((treatment) => [treatment.id, treatment]));
+
+    (Array.isArray(record?.paymentEntries) ? record.paymentEntries : []).forEach((payment) => {
+      const treatment = treatmentsById.get(payment.treatmentId);
+      const paymentDate = parseBillingDateLabel(payment.dateLabel, payment.createdAt ? new Date(payment.createdAt) : null);
+      payments.push({
+        id: payment.id,
+        patientId,
+        patientName,
+        recordNumber: patient?.recordNumber ?? '',
+        treatmentId: payment.treatmentId ?? '',
+        treatmentName: treatment?.procedure ?? 'Sin tratamiento asociado',
+        dateLabel: payment.dateLabel || '',
+        paymentDate,
+        amount: Number(payment.amount) || 0,
+        method: payment.method || 'cash',
+        methodLabel: normalizePaymentMethod(payment.method || 'cash'),
+        concept: payment.concept || 'Abono',
+        notes: payment.notes || '',
+        status: payment.status || 'received',
+      });
+    });
+
+    treatments.forEach((treatment) => {
+      const cost = Number(treatment.cost) || 0;
+      const paid = Number(treatment.paid) || 0;
+      const pending = Math.max(0, cost - paid);
+      if (pending <= 0) return;
+      pendingCollections.push({
+        id: treatment.id,
+        patientId,
+        patientName,
+        treatmentName: treatment.procedure || 'Sin procedimiento',
+        cost,
+        paid,
+        pending,
+        status: treatment.status || 'planned',
+        dateLabel: treatment.dateLabel || '',
+      });
+    });
+  });
+
+  const receivedPayments = payments.filter((payment) => payment.status !== 'void' && payment.status !== 'cancelled');
+  const todayPayments = receivedPayments.filter((payment) => isSameCalendarDay(payment.paymentDate, now));
+  const methodTotals = receivedPayments.reduce((acc, payment) => {
+    const current = acc.get(payment.method) ?? { method: payment.method, label: payment.methodLabel, total: 0, count: 0 };
+    current.total += payment.amount;
+    current.count += 1;
+    acc.set(payment.method, current);
+    return acc;
+  }, new Map());
+  const todayMethodTotals = todayPayments.reduce((acc, payment) => {
+    const current = acc.get(payment.method) ?? { method: payment.method, label: payment.methodLabel, total: 0, count: 0 };
+    current.total += payment.amount;
+    current.count += 1;
+    acc.set(payment.method, current);
+    return acc;
+  }, new Map());
+
+  return {
+    payments: receivedPayments.sort((a, b) => (b.paymentDate?.getTime() ?? 0) - (a.paymentDate?.getTime() ?? 0)),
+    todayPayments: todayPayments.sort((a, b) => (b.paymentDate?.getTime() ?? 0) - (a.paymentDate?.getTime() ?? 0)),
+    pendingCollections: pendingCollections.sort((a, b) => b.pending - a.pending),
+    methodTotals: Array.from(methodTotals.values()).sort((a, b) => b.total - a.total),
+    todayMethodTotals: Array.from(todayMethodTotals.values()).sort((a, b) => b.total - a.total),
+    summary: {
+      totalCollected: receivedPayments.reduce((sum, payment) => sum + payment.amount, 0),
+      todayCollected: todayPayments.reduce((sum, payment) => sum + payment.amount, 0),
+      pendingBalance: pendingCollections.reduce((sum, item) => sum + item.pending, 0),
+      paymentCount: receivedPayments.length,
+      todayPaymentCount: todayPayments.length,
+      pendingCount: pendingCollections.length,
+    },
+  };
+}
+
+export function buildBillingReportRows(billingDashboard) {
+  return (billingDashboard?.payments ?? []).map((payment) => ({
+    Fecha: payment.dateLabel,
+    Paciente: payment.patientName,
+    Ficha: payment.recordNumber,
+    Tratamiento: payment.treatmentName,
+    Concepto: payment.concept,
+    Metodo: payment.methodLabel,
+    Monto: payment.amount,
+    Estado: payment.status,
+    Nota: payment.notes,
+  }));
+}
+
+export function buildBillingPendingRows(billingDashboard) {
+  return (billingDashboard?.pendingCollections ?? []).map((item) => ({
+    Paciente: item.patientName,
+    Tratamiento: item.treatmentName,
+    Total: item.cost,
+    Abonado: item.paid,
+    Saldo: item.pending,
+    Estado: labelForOperationalStatus(item.status),
+    Fecha: item.dateLabel,
+  }));
+}
+
+export function BillingDashboard({
+  billingDashboard,
+  onExportBillingCsv,
+  onExportBillingWorkbook,
+}) {
+  const summary = billingDashboard?.summary ?? {};
+  const todayPayments = billingDashboard?.todayPayments ?? [];
+  const pendingCollections = billingDashboard?.pendingCollections ?? [];
+  const todayMethodTotals = billingDashboard?.todayMethodTotals ?? [];
+  const payments = billingDashboard?.payments ?? [];
+
+  return (
+    <section className="finance-shell">
+      <div className="finance-hero">
+        <div className="finance-hero-copy">
+          <div className="finance-kicker">Caja y cobros locales</div>
+          <h1>Cobros del dia, saldos pendientes y medios de pago.</h1>
+          <p>
+            Primera etapa operativa: usa los cobros y abonos registrados en cada ficha de paciente. No emite boleta electronica ni se conecta al SII.
+          </p>
+        </div>
+        <div className="finance-hero-band">
+          <div className="finance-band-card">
+            <span>Cobrado hoy</span>
+            <strong>{fmtCLP(summary.todayCollected ?? 0)}</strong>
+          </div>
+          <div className="finance-band-card">
+            <span>Cobros hoy</span>
+            <strong>{summary.todayPaymentCount ?? 0}</strong>
+          </div>
+          <div className="finance-band-card">
+            <span>Total cobrado</span>
+            <strong>{fmtCLP(summary.totalCollected ?? 0)}</strong>
+          </div>
+          <div className="finance-band-card">
+            <span>Saldo pendiente</span>
+            <strong>{fmtCLP(summary.pendingBalance ?? 0)}</strong>
+          </div>
+          <div className="finance-band-card">
+            <span>Pacientes/items pendientes</span>
+            <strong>{summary.pendingCount ?? 0}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div className="finance-lower-grid">
+        <div className="finance-panel">
+          <div className="finance-panel-head">
+            <div>
+              <div className="finance-panel-kicker">Resumen diario</div>
+              <h3>Medios de pago cobrados hoy</h3>
+            </div>
+            <div className="finance-panel-actions">
+              <button className="btn btn-secondary" type="button" onClick={onExportBillingCsv}>
+                <Icon.download />
+                Exportar CSV
+              </button>
+              <button className="btn btn-primary" type="button" onClick={onExportBillingWorkbook}>
+                <Icon.download />
+                Exportar Excel
+              </button>
+            </div>
+          </div>
+          <div className="finance-comparison-grid">
+            {todayMethodTotals.length > 0 ? todayMethodTotals.map((item) => (
+              <div key={item.method} className="finance-comparison-card">
+                <span>{item.label}</span>
+                <strong>{fmtCLP(item.total)}</strong>
+                <small>{item.count} cobros</small>
+              </div>
+            )) : <div className="finance-empty">Todavia no hay cobros registrados para hoy.</div>}
+          </div>
+        </div>
+
+        <div className="finance-panel">
+          <div className="finance-panel-head">
+            <div>
+              <div className="finance-panel-kicker">Pendientes de cobro</div>
+              <h3>Saldos por paciente y tratamiento</h3>
+            </div>
+          </div>
+          <div className="finance-mini-list">
+            {pendingCollections.slice(0, 8).map((item) => (
+              <div key={item.id} className="finance-mini-row">
+                <span>{item.patientName} · {item.treatmentName}</span>
+                <strong>{fmtCLP(item.pending)}</strong>
+              </div>
+            ))}
+            {!pendingCollections.length && <div className="finance-empty">No hay saldos pendientes registrados.</div>}
+          </div>
+        </div>
+      </div>
+
+      <div className="finance-panel">
+        <div className="finance-panel-head">
+          <div>
+            <div className="finance-panel-kicker">Cobros del dia</div>
+            <h3>Pagos registrados hoy desde las fichas</h3>
+          </div>
+        </div>
+        <div className="finance-table-wrap">
+          <table className="finance-table">
+            <thead>
+              <tr>
+                <th>Paciente</th>
+                <th>Tratamiento</th>
+                <th>Concepto</th>
+                <th>Metodo</th>
+                <th>Fecha</th>
+                <th>Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {todayPayments.length > 0 ? todayPayments.map((payment) => (
+                <tr key={payment.id}>
+                  <td>{payment.patientName}</td>
+                  <td>{payment.treatmentName}</td>
+                  <td>{payment.concept}</td>
+                  <td>{payment.methodLabel}</td>
+                  <td>{payment.dateLabel || 'Sin fecha'}</td>
+                  <td>{fmtCLP(payment.amount)}</td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan="6" className="finance-table-empty">No hay cobros con fecha de hoy.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="finance-panel">
+        <div className="finance-panel-head">
+          <div>
+            <div className="finance-panel-kicker">Historial de cobros</div>
+            <h3>Ultimos pagos registrados</h3>
+          </div>
+        </div>
+        <div className="finance-table-wrap">
+          <table className="finance-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Paciente</th>
+                <th>Tratamiento</th>
+                <th>Concepto</th>
+                <th>Metodo</th>
+                <th>Monto</th>
+                <th>Nota</th>
+              </tr>
+            </thead>
+            <tbody>
+              {payments.slice(0, 12).map((payment) => (
+                <tr key={payment.id}>
+                  <td>{payment.dateLabel || 'Sin fecha'}</td>
+                  <td>{payment.patientName}</td>
+                  <td>{payment.treatmentName}</td>
+                  <td>{payment.concept}</td>
+                  <td>{payment.methodLabel}</td>
+                  <td>{fmtCLP(payment.amount)}</td>
+                  <td>{payment.notes || 'Sin nota'}</td>
+                </tr>
+              ))}
+              {!payments.length && (
+                <tr>
+                  <td colSpan="7" className="finance-table-empty">Aun no hay cobros registrados.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 export function FinanceDashboard({

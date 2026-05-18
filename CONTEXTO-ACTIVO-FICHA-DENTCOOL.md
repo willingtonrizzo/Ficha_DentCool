@@ -245,6 +245,10 @@ Razon:
 - en Tauri, inventario/insumos se hidrata desde esas tablas SQLite y migra desde la persistencia local previa si las tablas estan vacias
 - cada guardado de inventario/insumos actualiza tambien la tabla SQLite correspondiente
 - verificacion actual de SQLite inventario/insumos: `npm test -- --run` paso con `79` tests y `npm run build` paso correctamente
+- `Facturacion` ahora es vista propia separada de `Reportes`
+- `Facturacion` muestra cobros del dia, medios de pago, pendientes de cobro, historial de pagos y exportacion CSV/XLSX
+- `Facturacion` usa los `paymentEntries` reales de las fichas de paciente y no emite boleta electronica/SII en esta fase
+- verificacion actual de facturacion MVP: `npm test -- --run` paso con `79` tests y `npm run build` paso correctamente
 
 ## Instruccion de retoma
 

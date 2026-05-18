@@ -1,6 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import { EVOLUTION, HISTORY, STORAGE_KEYS, TREATMENTS } from './data';
-import { FinanceDashboard, FloatingNewPatientButton, HomeDashboard, LoginScreen, PatientsDirectoryView, PriceListView, Sidebar, TopbarInner, PatientHeader, PatientsSheet, Odontogram, ToothPanel } from './app';
+import {
+  BillingDashboard,
+  FinanceDashboard,
+  FloatingNewPatientButton,
+  HomeDashboard,
+  LoginScreen,
+  PatientsDirectoryView,
+  PriceListView,
+  Sidebar,
+  TopbarInner,
+  PatientHeader,
+  PatientsSheet,
+  Odontogram,
+  ToothPanel,
+  buildBillingDashboard,
+  buildBillingPendingRows,
+  buildBillingReportRows,
+} from './app';
 import { Tabs, Antecedentes, Motivo, Evolucion, Presupuesto, Insumos, InventarioInsumos, Documentos, Historial, NotasRapidas, AgendaClinica, CobrosAbonos, TreatmentsTable, NextAppointments } from './tabs';
 import { updateToothSurfaceState } from './odontogram';
 import {
@@ -1070,6 +1087,38 @@ export default function App() {
     });
   };
 
+  const handleExportBillingCsv = () => {
+    const rows = buildBillingReportRows(billingDashboard);
+    const columns = [
+      'Fecha',
+      'Paciente',
+      'Ficha',
+      'Tratamiento',
+      'Concepto',
+      'Metodo',
+      'Monto',
+      'Estado',
+      'Nota',
+    ];
+    const csv = [
+      columns.join(','),
+      ...rows.map((row) => columns.map((column) => {
+        const value = row[column] == null ? '' : String(row[column]);
+        return /[",\n;]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+      }).join(',')),
+    ].join('\n');
+    downloadCsv('dentcool-facturacion-cobros.csv', csv);
+  };
+
+  const handleExportBillingWorkbook = () => {
+    import('xlsx').then((XLSX) => {
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(buildBillingReportRows(billingDashboard)), 'Cobros');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(buildBillingPendingRows(billingDashboard)), 'Pendientes');
+      XLSX.writeFile(workbook, 'dentcool-facturacion.xlsx');
+    });
+  };
+
   const handleFinanceFilterChange = (field, value) => {
     setFinanceFilters((current) => ({
       ...current,
@@ -1277,6 +1326,7 @@ export default function App() {
   counts.agenda = record.appointments.length;
   counts.cobros = record.paymentEntries.length;
   const financeDashboard = buildFinanceDashboard(clinicalRecords, patients, pricingSettings, financeFilters);
+  const billingDashboard = buildBillingDashboard(clinicalRecords, patients);
 
   const renderSheetClinicalSection = (sectionId) => {
     if (!permissions.sheetSections.includes(sectionId)) return null;
@@ -1479,6 +1529,12 @@ export default function App() {
               onExportFinanceSummary={handleExportFinanceSummary}
               onExportFinanceWorkbook={handleExportFinanceWorkbook}
               onFinanceFilterChange={handleFinanceFilterChange}
+            />
+          ) : activeView === 'billing' ? (
+            <BillingDashboard
+              billingDashboard={billingDashboard}
+              onExportBillingCsv={handleExportBillingCsv}
+              onExportBillingWorkbook={handleExportBillingWorkbook}
             />
           ) : (
             <>

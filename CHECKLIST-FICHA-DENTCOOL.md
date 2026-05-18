@@ -162,6 +162,10 @@
 - [x] Agregar comparativo `Estimado antes` vs `Real despues` en `Insumos`
 - [ ] Validar manualmente comparativo de insumos: extras reales y costo de tiempo adicional deben cambiar el final real y la diferencia
 - [ ] Profundizar reportes financieros con datos mas operativos
+- [x] Separar `Facturacion` como vista propia distinta de `Reportes`
+- [x] Agregar resumen de cobros del dia, medios de pago, pendientes de cobro e historial de pagos
+- [x] Agregar exportacion CSV/XLSX de facturacion y pendientes
+- [ ] Validar manualmente `Facturacion` con cobros reales de pacientes
 - [ ] Refinar componentes UX/UI uno por uno
 - [ ] Ajustar funcionalidades de negocio vivas
 - [ ] Preparar deploy demo en `Vercel`

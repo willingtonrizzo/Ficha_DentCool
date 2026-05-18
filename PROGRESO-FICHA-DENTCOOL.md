@@ -285,6 +285,12 @@ Hecho:
 - si las tablas nuevas aun estan vacias, la app migra desde las claves previas de persistencia local/`app_kv` hacia las tablas SQLite de insumos
 - cada guardado posterior de catalogo, proveedores, compras, snapshots, listas base, categorias o unidades actualiza tambien su tabla SQLite correspondiente
 - verificacion de SQLite inventario/insumos: `npm test -- --run` paso con `79` tests verdes y `npm run build` paso correctamente
+- se inicio el bloque `Bloque Funcionalidades - facturacion MVP`
+- `Facturacion` ahora es una vista propia separada de `Reportes`
+- la vista usa `paymentEntries` reales de las fichas para mostrar cobros del dia, resumen por medio de pago, pendientes de cobro e historial de pagos
+- `Facturacion` exporta CSV de cobros y XLSX con hojas `Cobros` y `Pendientes`
+- por ahora no emite boleta electronica ni integra SII; queda como caja/cobranza local operativa
+- verificacion de facturacion MVP: `npm test -- --run` paso con `79` tests verdes y `npm run build` paso correctamente
 
 ## Como se hizo este bloque
 

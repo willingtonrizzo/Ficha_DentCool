@@ -30,7 +30,7 @@ export const USER_ROLES = {
 
 export const ROLE_PERMISSIONS = {
   admin: {
-    views: ['home', 'patients', 'patient', 'priceList', 'inventory', 'finance'],
+    views: ['home', 'patients', 'patient', 'priceList', 'inventory', 'finance', 'billing'],
     patientTabs: ['antecedentes', 'motivo', 'evolucion', 'presupuesto', 'insumos', 'documentos', 'historial'],
     sheetSections: ['datos', 'antecedentes', 'motivo', 'evolucion', 'agenda', 'cobros', 'presupuesto', 'documentos', 'historial', 'notasRapidas'],
     canManagePricing: true,
