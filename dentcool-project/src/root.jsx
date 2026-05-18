@@ -15,8 +15,11 @@ import {
   Odontogram,
   ToothPanel,
   buildBillingDashboard,
+  buildBillingMethodRows,
+  buildBillingPatientRows,
   buildBillingPendingRows,
   buildBillingReportRows,
+  buildBillingVoidedRows,
 } from './app';
 import { Tabs, Antecedentes, Motivo, Evolucion, Presupuesto, Insumos, InventarioInsumos, Documentos, Historial, NotasRapidas, AgendaClinica, CobrosAbonos, TreatmentsTable, NextAppointments } from './tabs';
 import { updateToothSurfaceState } from './odontogram';
@@ -684,6 +687,12 @@ export default function App() {
         ? {
             ...payment,
             [field]: field === 'amount' ? Number(value) || 0 : value,
+            ...(field === 'status' && value === 'void'
+              ? {
+                  voidReason: payment.voidReason || 'Anulado desde ficha del paciente',
+                  voidedAt: payment.voidedAt || new Date().toISOString(),
+                }
+              : {}),
           }
         : payment
     );
@@ -712,6 +721,7 @@ export default function App() {
           amount: 0,
           method: 'cash',
           concept: activeRecord.treatments[0]?.procedure ? `Abono ${activeRecord.treatments[0].procedure}` : 'Nuevo abono',
+          reference: '',
           notes: '',
           status: 'received',
           source: 'manual',
@@ -736,7 +746,16 @@ export default function App() {
   const handleRemovePayment = (paymentId) => {
     if (!activePatient) return;
     const activeRecord = createClinicalPatientRecord(clinicalRecords[activePatient.id], activePatient);
-    const nextPayments = activeRecord.paymentEntries.filter((payment) => payment.id !== paymentId);
+    const nextPayments = activeRecord.paymentEntries.map((payment) =>
+      payment.id === paymentId
+        ? {
+            ...payment,
+            status: 'void',
+            voidReason: payment.voidReason || 'Anulado desde ficha del paciente',
+            voidedAt: new Date().toISOString(),
+          }
+        : payment
+    );
     const nextTreatments = syncTreatmentPaidWithPayments(activeRecord.treatments, nextPayments);
 
     setClinicalSaveState('dirty');
@@ -1097,6 +1116,7 @@ export default function App() {
       'Concepto',
       'Metodo',
       'Monto',
+      'Referencia',
       'Estado',
       'Nota',
     ];
@@ -1115,6 +1135,9 @@ export default function App() {
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(buildBillingReportRows(billingDashboard)), 'Cobros');
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(buildBillingPendingRows(billingDashboard)), 'Pendientes');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(buildBillingMethodRows(billingDashboard)), 'ResumenMedios');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(buildBillingPatientRows(billingDashboard)), 'ResumenPacientes');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(buildBillingVoidedRows(billingDashboard)), 'Anulados');
       XLSX.writeFile(workbook, 'dentcool-facturacion.xlsx');
     });
   };

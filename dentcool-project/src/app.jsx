@@ -551,6 +551,18 @@ function normalizePaymentMethod(method) {
   return labels[method] ?? method ?? 'Sin metodo';
 }
 
+function getPaymentStatusInfo(cost, paid) {
+  if (paid <= 0) return { key: 'none', label: 'Sin abono', tone: 'danger' };
+  if (cost > 0 && paid >= cost) {
+    return {
+      key: paid > cost ? 'overpaid' : 'paid',
+      label: paid > cost ? 'Sobrepagado' : 'Pagado',
+      tone: 'good',
+    };
+  }
+  return { key: 'partial', label: 'Abono parcial', tone: 'warn' };
+}
+
 function parseBillingDateLabel(value, fallbackDate = null) {
   if (!value) return fallbackDate;
   const normalized = normalizeText(value).replaceAll('-', '/');
@@ -569,10 +581,61 @@ function isSameCalendarDay(a, b) {
     a.getDate() === b.getDate();
 }
 
+function startOfCalendarDay(date) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function startOfCalendarWeek(date) {
+  const next = startOfCalendarDay(date);
+  const day = next.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  next.setDate(next.getDate() + diff);
+  return next;
+}
+
+function startOfCalendarMonth(date) {
+  const next = startOfCalendarDay(date);
+  next.setDate(1);
+  return next;
+}
+
+function filterPaymentsByBillingPeriod(payments, period, now) {
+  if (period === 'all') return payments;
+  const start =
+    period === 'week'
+      ? startOfCalendarWeek(now)
+      : period === 'month'
+        ? startOfCalendarMonth(now)
+        : startOfCalendarDay(now);
+
+  return payments.filter((payment) => payment.paymentDate && payment.paymentDate >= start);
+}
+
+function summarizePayments(payments) {
+  return {
+    total: payments.reduce((sum, payment) => sum + payment.amount, 0),
+    count: payments.length,
+  };
+}
+
+function summarizePaymentMethods(payments) {
+  return Array.from(payments.reduce((acc, payment) => {
+    const current = acc.get(payment.method) ?? { method: payment.method, label: payment.methodLabel, total: 0, count: 0 };
+    current.total += payment.amount;
+    current.count += 1;
+    acc.set(payment.method, current);
+    return acc;
+  }, new Map()).values()).sort((a, b) => b.total - a.total);
+}
+
 export function buildBillingDashboard(clinicalRecords = {}, patients = [], now = new Date()) {
   const patientById = new Map(patients.map((patient) => [patient.id, patient]));
   const payments = [];
+  const voidedPayments = [];
   const pendingCollections = [];
+  const treatmentPaymentRows = [];
 
   Object.entries(clinicalRecords ?? {}).forEach(([patientId, record]) => {
     const patient = patientById.get(patientId);
@@ -583,7 +646,7 @@ export function buildBillingDashboard(clinicalRecords = {}, patients = [], now =
     (Array.isArray(record?.paymentEntries) ? record.paymentEntries : []).forEach((payment) => {
       const treatment = treatmentsById.get(payment.treatmentId);
       const paymentDate = parseBillingDateLabel(payment.dateLabel, payment.createdAt ? new Date(payment.createdAt) : null);
-      payments.push({
+      const paymentRow = {
         id: payment.id,
         patientId,
         patientName,
@@ -596,15 +659,46 @@ export function buildBillingDashboard(clinicalRecords = {}, patients = [], now =
         method: payment.method || 'cash',
         methodLabel: normalizePaymentMethod(payment.method || 'cash'),
         concept: payment.concept || 'Abono',
+        reference: payment.reference || payment.referenceNumber || '',
         notes: payment.notes || '',
         status: payment.status || 'received',
-      });
+        statusLabel: payment.status === 'void' || payment.status === 'cancelled' ? 'Anulado' : 'Recibido',
+        voidReason: payment.voidReason || '',
+        voidedAt: payment.voidedAt || null,
+      };
+      if (paymentRow.status === 'void' || paymentRow.status === 'cancelled') {
+        voidedPayments.push(paymentRow);
+      } else {
+        payments.push(paymentRow);
+      }
     });
 
     treatments.forEach((treatment) => {
       const cost = Number(treatment.cost) || 0;
       const paid = Number(treatment.paid) || 0;
       const pending = Math.max(0, cost - paid);
+      const paymentStatus = getPaymentStatusInfo(cost, paid);
+      const treatmentPayments = payments
+        .filter((payment) => payment.patientId === patientId && payment.treatmentId === treatment.id)
+        .sort((a, b) => (b.paymentDate?.getTime() ?? 0) - (a.paymentDate?.getTime() ?? 0));
+      const lastPayment = treatmentPayments[0] ?? null;
+      treatmentPaymentRows.push({
+        id: treatment.id,
+        patientId,
+        patientName,
+        treatmentName: treatment.procedure || 'Sin procedimiento',
+        cost,
+        paid,
+        pending,
+        paymentStatus: paymentStatus.key,
+        paymentStatusLabel: paymentStatus.label,
+        paymentStatusTone: paymentStatus.tone,
+        paymentCount: treatmentPayments.length,
+        lastPaymentDate: lastPayment?.dateLabel ?? '',
+        lastPaymentAmount: lastPayment?.amount ?? 0,
+        status: treatment.status || 'planned',
+        dateLabel: treatment.dateLabel || '',
+      });
       if (pending <= 0) return;
       pendingCollections.push({
         id: treatment.id,
@@ -614,6 +708,12 @@ export function buildBillingDashboard(clinicalRecords = {}, patients = [], now =
         cost,
         paid,
         pending,
+        paymentStatus: paymentStatus.key,
+        paymentStatusLabel: paymentStatus.label,
+        paymentStatusTone: paymentStatus.tone,
+        paymentCount: treatmentPayments.length,
+        lastPaymentDate: lastPayment?.dateLabel ?? '',
+        lastPaymentAmount: lastPayment?.amount ?? 0,
         status: treatment.status || 'planned',
         dateLabel: treatment.dateLabel || '',
       });
@@ -622,27 +722,25 @@ export function buildBillingDashboard(clinicalRecords = {}, patients = [], now =
 
   const receivedPayments = payments.filter((payment) => payment.status !== 'void' && payment.status !== 'cancelled');
   const todayPayments = receivedPayments.filter((payment) => isSameCalendarDay(payment.paymentDate, now));
-  const methodTotals = receivedPayments.reduce((acc, payment) => {
-    const current = acc.get(payment.method) ?? { method: payment.method, label: payment.methodLabel, total: 0, count: 0 };
-    current.total += payment.amount;
-    current.count += 1;
-    acc.set(payment.method, current);
-    return acc;
-  }, new Map());
-  const todayMethodTotals = todayPayments.reduce((acc, payment) => {
-    const current = acc.get(payment.method) ?? { method: payment.method, label: payment.methodLabel, total: 0, count: 0 };
-    current.total += payment.amount;
-    current.count += 1;
-    acc.set(payment.method, current);
-    return acc;
-  }, new Map());
+  const weekPayments = filterPaymentsByBillingPeriod(receivedPayments, 'week', now);
+  const monthPayments = filterPaymentsByBillingPeriod(receivedPayments, 'month', now);
+  const methodTotals = summarizePaymentMethods(receivedPayments);
+  const todayMethodTotals = summarizePaymentMethods(todayPayments);
 
   return {
     payments: receivedPayments.sort((a, b) => (b.paymentDate?.getTime() ?? 0) - (a.paymentDate?.getTime() ?? 0)),
+    voidedPayments: voidedPayments.sort((a, b) => (b.paymentDate?.getTime() ?? 0) - (a.paymentDate?.getTime() ?? 0)),
     todayPayments: todayPayments.sort((a, b) => (b.paymentDate?.getTime() ?? 0) - (a.paymentDate?.getTime() ?? 0)),
     pendingCollections: pendingCollections.sort((a, b) => b.pending - a.pending),
-    methodTotals: Array.from(methodTotals.values()).sort((a, b) => b.total - a.total),
-    todayMethodTotals: Array.from(todayMethodTotals.values()).sort((a, b) => b.total - a.total),
+    treatmentPaymentRows: treatmentPaymentRows.sort((a, b) => b.pending - a.pending),
+    methodTotals,
+    todayMethodTotals,
+    periodSummaries: {
+      day: summarizePayments(todayPayments),
+      week: summarizePayments(weekPayments),
+      month: summarizePayments(monthPayments),
+      all: summarizePayments(receivedPayments),
+    },
     summary: {
       totalCollected: receivedPayments.reduce((sum, payment) => sum + payment.amount, 0),
       todayCollected: todayPayments.reduce((sum, payment) => sum + payment.amount, 0),
@@ -651,6 +749,10 @@ export function buildBillingDashboard(clinicalRecords = {}, patients = [], now =
       todayPaymentCount: todayPayments.length,
       pendingCount: pendingCollections.length,
     },
+    patientOptions: patients.map((patient) => ({
+      id: patient.id,
+      name: getPatientDisplayName(patient, 'Paciente sin nombre'),
+    })),
   };
 }
 
@@ -663,7 +765,8 @@ export function buildBillingReportRows(billingDashboard) {
     Concepto: payment.concept,
     Metodo: payment.methodLabel,
     Monto: payment.amount,
-    Estado: payment.status,
+    Referencia: payment.reference,
+    Estado: payment.statusLabel,
     Nota: payment.notes,
   }));
 }
@@ -675,8 +778,49 @@ export function buildBillingPendingRows(billingDashboard) {
     Total: item.cost,
     Abonado: item.paid,
     Saldo: item.pending,
-    Estado: labelForOperationalStatus(item.status),
+    EstadoPago: item.paymentStatusLabel,
+    UltimoPago: item.lastPaymentDate,
+    MontoUltimoPago: item.lastPaymentAmount,
+    EstadoTratamiento: labelForOperationalStatus(item.status),
     Fecha: item.dateLabel,
+  }));
+}
+
+export function buildBillingMethodRows(billingDashboard) {
+  return (billingDashboard?.methodTotals ?? []).map((item) => ({
+    Metodo: item.label,
+    Total: item.total,
+    Cobros: item.count,
+  }));
+}
+
+export function buildBillingPatientRows(billingDashboard) {
+  const rowsByPatient = new Map();
+  for (const payment of billingDashboard?.payments ?? []) {
+    const current = rowsByPatient.get(payment.patientId) ?? {
+      Paciente: payment.patientName,
+      TotalCobrado: 0,
+      Cobros: 0,
+      UltimoPago: payment.dateLabel,
+    };
+    current.TotalCobrado += payment.amount;
+    current.Cobros += 1;
+    rowsByPatient.set(payment.patientId, current);
+  }
+  return Array.from(rowsByPatient.values()).sort((a, b) => b.TotalCobrado - a.TotalCobrado);
+}
+
+export function buildBillingVoidedRows(billingDashboard) {
+  return (billingDashboard?.voidedPayments ?? []).map((payment) => ({
+    Fecha: payment.dateLabel,
+    Paciente: payment.patientName,
+    Tratamiento: payment.treatmentName,
+    Concepto: payment.concept,
+    Metodo: payment.methodLabel,
+    Monto: payment.amount,
+    Referencia: payment.reference,
+    MotivoAnulacion: payment.voidReason,
+    Nota: payment.notes,
   }));
 }
 
@@ -686,10 +830,24 @@ export function BillingDashboard({
   onExportBillingWorkbook,
 }) {
   const summary = billingDashboard?.summary ?? {};
-  const todayPayments = billingDashboard?.todayPayments ?? [];
   const pendingCollections = billingDashboard?.pendingCollections ?? [];
-  const todayMethodTotals = billingDashboard?.todayMethodTotals ?? [];
   const payments = billingDashboard?.payments ?? [];
+  const patientOptions = billingDashboard?.patientOptions ?? [];
+  const [billingPeriod, setBillingPeriod] = useState('day');
+  const [patientFilter, setPatientFilter] = useState('all');
+  const billingPeriodOptions = [
+    { value: 'day', label: 'Dia' },
+    { value: 'week', label: 'Semana' },
+    { value: 'month', label: 'Mes' },
+    { value: 'all', label: 'Todo' },
+  ];
+  const periodLabel = billingPeriodOptions.find((option) => option.value === billingPeriod)?.label ?? 'Dia';
+  const patientMatches = (item) => patientFilter === 'all' || item.patientId === patientFilter;
+  const periodPayments = filterPaymentsByBillingPeriod(payments, billingPeriod, new Date()).filter(patientMatches);
+  const periodMethodTotals = summarizePaymentMethods(periodPayments);
+  const periodSummary = summarizePayments(periodPayments);
+  const filteredPendingCollections = pendingCollections.filter(patientMatches);
+  const filteredTreatmentRows = (billingDashboard?.treatmentPaymentRows ?? []).filter(patientMatches);
 
   return (
     <section className="finance-shell">
@@ -703,12 +861,12 @@ export function BillingDashboard({
         </div>
         <div className="finance-hero-band">
           <div className="finance-band-card">
-            <span>Cobrado hoy</span>
-            <strong>{fmtCLP(summary.todayCollected ?? 0)}</strong>
+            <span>Cobrado en {periodLabel.toLowerCase()}</span>
+            <strong>{fmtCLP(periodSummary.total ?? 0)}</strong>
           </div>
           <div className="finance-band-card">
-            <span>Cobros hoy</span>
-            <strong>{summary.todayPaymentCount ?? 0}</strong>
+            <span>Cobros en {periodLabel.toLowerCase()}</span>
+            <strong>{periodSummary.count ?? 0}</strong>
           </div>
           <div className="finance-band-card">
             <span>Total cobrado</span>
@@ -725,12 +883,53 @@ export function BillingDashboard({
         </div>
       </div>
 
+      <div className="finance-panel">
+        <div className="finance-panel-head">
+          <div>
+            <div className="finance-panel-kicker">Conceptos de caja</div>
+            <h3>Que significa cada monto</h3>
+          </div>
+          <div className="finance-filter-row">
+            <span>Ver periodo</span>
+            <select value={billingPeriod} onChange={(event) => setBillingPeriod(event.target.value)}>
+              {billingPeriodOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <span>Paciente</span>
+            <select value={patientFilter} onChange={(event) => setPatientFilter(event.target.value)}>
+              <option value="all">Todos</option>
+              {patientOptions.map((patient) => (
+                <option key={patient.id} value={patient.id}>{patient.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="finance-comparison-grid">
+          <div className="finance-comparison-card">
+            <span>Abono</span>
+            <strong>Pago registrado</strong>
+            <small>Puede ser un adelanto, una parte del tratamiento o el pago total si cubre todo el saldo.</small>
+          </div>
+          <div className="finance-comparison-card">
+            <span>Cobro / pago</span>
+            <strong>Dinero recibido</strong>
+            <small>Es el monto que entro por efectivo, tarjeta, transferencia, mixto u otro medio.</small>
+          </div>
+          <div className="finance-comparison-card">
+            <span>Saldo pendiente</span>
+            <strong>Falta por cobrar</strong>
+            <small>Es total del tratamiento menos los abonos registrados. Si llega a cero, queda pagado.</small>
+          </div>
+        </div>
+      </div>
+
       <div className="finance-lower-grid">
         <div className="finance-panel">
           <div className="finance-panel-head">
             <div>
-              <div className="finance-panel-kicker">Resumen diario</div>
-              <h3>Medios de pago cobrados hoy</h3>
+              <div className="finance-panel-kicker">Resumen por periodo</div>
+              <h3>Medios de pago cobrados en {periodLabel.toLowerCase()}</h3>
             </div>
             <div className="finance-panel-actions">
               <button className="btn btn-secondary" type="button" onClick={onExportBillingCsv}>
@@ -744,13 +943,13 @@ export function BillingDashboard({
             </div>
           </div>
           <div className="finance-comparison-grid">
-            {todayMethodTotals.length > 0 ? todayMethodTotals.map((item) => (
+            {periodMethodTotals.length > 0 ? periodMethodTotals.map((item) => (
               <div key={item.method} className="finance-comparison-card">
                 <span>{item.label}</span>
                 <strong>{fmtCLP(item.total)}</strong>
                 <small>{item.count} cobros</small>
               </div>
-            )) : <div className="finance-empty">Todavia no hay cobros registrados para hoy.</div>}
+            )) : <div className="finance-empty">Todavia no hay cobros registrados para este periodo.</div>}
           </div>
         </div>
 
@@ -762,13 +961,13 @@ export function BillingDashboard({
             </div>
           </div>
           <div className="finance-mini-list">
-            {pendingCollections.slice(0, 8).map((item) => (
+            {filteredPendingCollections.slice(0, 8).map((item) => (
               <div key={item.id} className="finance-mini-row">
-                <span>{item.patientName} · {item.treatmentName}</span>
+                <span>{item.patientName} · {item.treatmentName} · {item.paymentStatusLabel}</span>
                 <strong>{fmtCLP(item.pending)}</strong>
               </div>
             ))}
-            {!pendingCollections.length && <div className="finance-empty">No hay saldos pendientes registrados.</div>}
+            {!filteredPendingCollections.length && <div className="finance-empty">No hay saldos pendientes registrados.</div>}
           </div>
         </div>
       </div>
@@ -776,8 +975,50 @@ export function BillingDashboard({
       <div className="finance-panel">
         <div className="finance-panel-head">
           <div>
-            <div className="finance-panel-kicker">Cobros del dia</div>
-            <h3>Pagos registrados hoy desde las fichas</h3>
+            <div className="finance-panel-kicker">Estado de pago</div>
+            <h3>Total, abonado, saldo y ultimo pago por tratamiento</h3>
+          </div>
+        </div>
+        <div className="finance-table-wrap">
+          <table className="finance-table">
+            <thead>
+              <tr>
+                <th>Paciente</th>
+                <th>Tratamiento</th>
+                <th>Estado pago</th>
+                <th>Total</th>
+                <th>Abonado</th>
+                <th>Saldo</th>
+                <th>Ultimo pago</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredTreatmentRows.slice(0, 16).map((item) => (
+                <tr key={item.id}>
+                  <td>{item.patientName}</td>
+                  <td>{item.treatmentName}</td>
+                  <td><span className={`status ${item.paymentStatusTone}`}><span className="dot" />{item.paymentStatusLabel}</span></td>
+                  <td>{fmtCLP(item.cost)}</td>
+                  <td>{fmtCLP(item.paid)}</td>
+                  <td>{fmtCLP(item.pending)}</td>
+                  <td>{item.lastPaymentDate || 'Sin pagos'}</td>
+                </tr>
+              ))}
+              {!filteredTreatmentRows.length && (
+                <tr>
+                  <td colSpan="7" className="finance-table-empty">No hay tratamientos para mostrar con este filtro.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="finance-panel">
+        <div className="finance-panel-head">
+          <div>
+            <div className="finance-panel-kicker">Cobros del periodo</div>
+            <h3>Pagos registrados en {periodLabel.toLowerCase()} desde las fichas</h3>
           </div>
         </div>
         <div className="finance-table-wrap">
@@ -789,22 +1030,24 @@ export function BillingDashboard({
                 <th>Concepto</th>
                 <th>Metodo</th>
                 <th>Fecha</th>
+                <th>Referencia</th>
                 <th>Monto</th>
               </tr>
             </thead>
             <tbody>
-              {todayPayments.length > 0 ? todayPayments.map((payment) => (
+              {periodPayments.length > 0 ? periodPayments.map((payment) => (
                 <tr key={payment.id}>
                   <td>{payment.patientName}</td>
                   <td>{payment.treatmentName}</td>
                   <td>{payment.concept}</td>
                   <td>{payment.methodLabel}</td>
                   <td>{payment.dateLabel || 'Sin fecha'}</td>
+                  <td>{payment.reference || 'Sin referencia'}</td>
                   <td>{fmtCLP(payment.amount)}</td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan="6" className="finance-table-empty">No hay cobros con fecha de hoy.</td>
+                  <td colSpan="7" className="finance-table-empty">No hay cobros registrados en este periodo.</td>
                 </tr>
               )}
             </tbody>
@@ -829,6 +1072,7 @@ export function BillingDashboard({
                 <th>Concepto</th>
                 <th>Metodo</th>
                 <th>Monto</th>
+                <th>Referencia</th>
                 <th>Nota</th>
               </tr>
             </thead>
@@ -841,6 +1085,7 @@ export function BillingDashboard({
                   <td>{payment.concept}</td>
                   <td>{payment.methodLabel}</td>
                   <td>{fmtCLP(payment.amount)}</td>
+                  <td>{payment.reference || 'Sin referencia'}</td>
                   <td>{payment.notes || 'Sin nota'}</td>
                 </tr>
               ))}

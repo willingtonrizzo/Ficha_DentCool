@@ -291,6 +291,29 @@ Hecho:
 - `Facturacion` exporta CSV de cobros y XLSX con hojas `Cobros` y `Pendientes`
 - por ahora no emite boleta electronica ni integra SII; queda como caja/cobranza local operativa
 - verificacion de facturacion MVP: `npm test -- --run` paso con `79` tests verdes y `npm run build` paso correctamente
+- se inicio el bloque `Bloque Funcionalidades - testing`
+- se ejecuto la suite unitaria/integracion existente y paso correctamente
+- se agrego cobertura de integracion para la capa local tipo API de persistencia `SQLite/Tauri` simulada
+- la integracion nueva valida inicializacion en modo `sqlite`, migracion desde `localStorage`, sincronizacion de cache/escritura y escritura relacional de ficha clinica
+- se agrego un reset interno de persistencia solo para aislar tests automatizados
+- verificacion del bloque de testing: `npm test -- --run` paso con `82` tests verdes
+- verificacion del bloque de testing: `npm run build` paso correctamente
+- Playwright es implementable aqui como siguiente capa E2E; requiere instalar `@playwright/test` y descargar browsers con `npx playwright install`
+- se amplio `Facturacion` con filtro de periodo `Dia`, `Semana`, `Mes` y `Todo` usando los abonos reales de `paymentEntries`
+- se agrego una nota visible de conceptos de caja para explicar `Abono`, `Cobro / pago` y `Saldo pendiente`
+- `Cobros y abonos` ahora aclara que un abono puede ser adelanto, pago parcial o pago total si cubre todo el saldo
+- se agrego prueba automatizada de resumen de facturacion por dia, semana, mes y total
+- verificacion del ajuste de facturacion: `npm test -- --run` paso con `83` tests verdes
+- verificacion del ajuste de facturacion: `npm run build` paso correctamente
+- se amplio el MVP de `Cobros y abonos` / `Facturacion`
+- cada abono ahora puede registrar `Referencia pago` para operacion, voucher o recibo interno
+- `Anular` un abono ya no lo borra: queda con estado `Anulado`, motivo y fecha interna de anulacion, y deja de sumar al pagado del tratamiento
+- `Facturacion` ahora muestra filtro por paciente, estado de pago por tratamiento, total, abonado, saldo y ultimo pago
+- la exportacion XLSX de facturacion ahora agrega hojas `ResumenMedios`, `ResumenPacientes` y `Anulados`
+- la exportacion CSV de cobros ahora incluye `Referencia`
+- la prueba de facturacion ahora cubre pagos anulados, referencia, pendientes y resumen por paciente
+- verificacion del MVP de facturacion: `npm test -- --run` paso con `83` tests verdes
+- verificacion del MVP de facturacion: `npm run build` paso correctamente
 
 ## Como se hizo este bloque
 
@@ -301,6 +324,9 @@ Hecho:
 - se conecto la UI en `src/app.jsx` para mostrar comparativo de periodos, totales por paciente, totales por tratamiento y detalle filtrado
 - se ajustaron estilos en `styles.css` para sostener la nueva vista sin romper la navegacion actual
 - se agregaron pruebas en `src/__tests__/pricing.test.js` para cubrir reportes, snapshots y exportaciones
+- se agregaron pruebas en `src/__tests__/persistence-integration.test.js` para cubrir el contrato de persistencia tipo API local sobre SQLite simulado
+- se agrego `src/__tests__/billing.test.js` para validar que los abonos alimentan los resumenes de facturacion por periodo
+- se ajusto `createPaymentEntry` para conservar referencia y datos de anulacion sin romper registros antiguos
 - en el bloque de insumos se reutilizo `applyPurchaseToStock` para no duplicar la regla de costo promedio ponderado dentro de la UI
 - se mantuvo la persistencia en `localStorage` mediante `saveSupplyState`, sin introducir `SQLite` todavia
 - se mantuvo la compra dentro de la ficha solo por demostracion del flujo completo de fase uno

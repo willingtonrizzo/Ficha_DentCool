@@ -165,7 +165,16 @@
 - [x] Separar `Facturacion` como vista propia distinta de `Reportes`
 - [x] Agregar resumen de cobros del dia, medios de pago, pendientes de cobro e historial de pagos
 - [x] Agregar exportacion CSV/XLSX de facturacion y pendientes
+- [x] Agregar pruebas de integracion para la capa local tipo API de persistencia `SQLite/Tauri`
+- [x] Agregar filtro `Dia`, `Semana`, `Mes` y `Todo` en `Facturacion`
+- [x] Explicar en UI la diferencia entre abono, cobro/pago y saldo pendiente
+- [x] Agregar filtro por paciente en `Facturacion`
+- [x] Agregar estado de pago por tratamiento: sin abono, parcial, pagado y sobrepagado
+- [x] Agregar referencia de pago para operacion, voucher o recibo interno
+- [x] Anular abonos sin borrarlos de la trazabilidad
+- [x] Exportar resumen por medios, resumen por paciente y anulados en XLSX
 - [ ] Validar manualmente `Facturacion` con cobros reales de pacientes
+- [ ] Implementar Playwright para flujos E2E criticos de login, directorio, ficha clinica e inventario
 - [ ] Refinar componentes UX/UI uno por uno
 - [ ] Ajustar funcionalidades de negocio vivas
 - [ ] Preparar deploy demo en `Vercel`

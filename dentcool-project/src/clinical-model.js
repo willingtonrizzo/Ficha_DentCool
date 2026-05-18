@@ -350,8 +350,11 @@ export function createPaymentEntry(input = {}, index = 0) {
     amount: Number.isFinite(Number(input.amount)) ? Number(input.amount) : 0,
     method: normalizePaymentMethod(input.method),
     concept: input.concept ?? '',
+    reference: input.reference ?? input.referenceNumber ?? '',
     notes: input.notes ?? '',
     status: input.status ?? 'received',
+    voidReason: input.voidReason ?? '',
+    voidedAt: input.voidedAt ?? null,
     source: input.source ?? 'manual',
   };
 }
@@ -376,6 +379,7 @@ export function createTreatmentEntry(input = {}, index = 0) {
 
 export function buildPaymentTotalsByTreatment(paymentEntries = []) {
   return paymentEntries.reduce((acc, entry) => {
+    if (entry?.status === 'void' || entry?.status === 'cancelled') return acc;
     if (!entry?.treatmentId) return acc;
     const current = acc.get(entry.treatmentId) ?? 0;
     acc.set(entry.treatmentId, current + (Number.isFinite(Number(entry.amount)) ? Number(entry.amount) : 0));

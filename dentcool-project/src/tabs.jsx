@@ -2480,6 +2480,54 @@ export function CobrosAbonos({
   onOpenSection,
 }) {
   const treatmentOptions = treatments ?? [];
+  const [showListView, setShowListView] = useState(false);
+  const activePayments = (payments ?? []).filter((payment) => payment.status !== 'void' && payment.status !== 'cancelled');
+  const voidedPayments = (payments ?? []).filter((payment) => payment.status === 'void' || payment.status === 'cancelled');
+  const paymentsByTreatment = activePayments.reduce((acc, payment) => {
+    if (!payment?.treatmentId) return acc;
+    const current = acc.get(payment.treatmentId) ?? 0;
+    acc.set(payment.treatmentId, current + (Number(payment.amount) || 0));
+    return acc;
+  }, new Map());
+  const treatmentBalanceRows = treatmentOptions.map((treatment) => {
+    const cost = Number(treatment.cost) || 0;
+    const paid = paymentsByTreatment.get(treatment.id) ?? (Number(treatment.paid) || 0);
+    const balance = Math.max(0, cost - paid);
+    let tone = 'danger';
+    let label = 'Sin abono';
+    if (paid > 0 && paid < cost) {
+      tone = 'warn';
+      label = 'Abono parcial';
+    } else if (cost > 0 && paid >= cost) {
+      tone = 'good';
+      label = paid > cost ? 'Pagado y excedente' : 'Pagado total';
+    }
+    return {
+      id: treatment.id,
+      procedure: treatment.procedure || 'Sin procedimiento',
+      cost,
+      paid,
+      balance,
+      tone,
+      label,
+      count: activePayments.filter((payment) => payment.treatmentId === treatment.id).length,
+    };
+  });
+  const paymentTotals = activePayments.reduce(
+    (acc, payment) => {
+      const amount = Number(payment.amount) || 0;
+      acc.total += amount;
+      acc.count += 1;
+      if (amount <= 0) return acc;
+      if (amount >= (Number(treatments?.find((item) => item.id === payment.treatmentId)?.cost) || 0)) {
+        acc.complete += 1;
+      } else {
+        acc.partial += 1;
+      }
+      return acc;
+    },
+    { total: 0, count: 0, partial: 0, complete: 0 }
+  );
   const saveLabel =
     saveState === 'dirty'
       ? 'Guardando cobros y abonos…'
@@ -2491,8 +2539,9 @@ export function CobrosAbonos({
     <div className="documents-editor">
       <div className="documents-toolbar">
         <div>
-          <div className="muted" style={{ fontSize: 12.5 }}>{payments.length} abonos registrados</div>
+          <div className="muted" style={{ fontSize: 12.5 }}>{activePayments.length} abonos activos · {voidedPayments.length} anulados</div>
           <div className="documents-save-note">{saveLabel}</div>
+          <div className="documents-save-note">Abono es cualquier pago recibido: puede ser adelanto, pago parcial o pago total si cubre todo el saldo. Verde = pagado, amarillo = parcial, rojo = sin abono.</div>
         </div>
         {mirror ? (
           <button className="btn btn-secondary" type="button" onClick={() => onOpenSection?.('cobros')}>
@@ -2500,85 +2549,186 @@ export function CobrosAbonos({
             Editar ficha
           </button>
         ) : (
-          <button className="btn btn-primary" onClick={onAddPayment}><Icon.plus />Nuevo abono</button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary" type="button" onClick={() => setShowListView((current) => !current)}>
+              <Icon.edit />
+              {showListView ? 'Editar' : 'Ver lista'}
+            </button>
+            <button className="btn btn-primary" type="button" onClick={onAddPayment}><Icon.plus />Nuevo abono</button>
+          </div>
         )}
       </div>
-      <div className="documents-list">
-        {payments.map((payment) => (
-          <div key={payment.id} className="document-row">
-            <div className="document-main">
-              <div className="document-head">
-                <div className="document-title">{payment.concept || 'Abono'}</div>
-                {!mirror && <button className="btn btn-ghost" onClick={() => onRemovePayment(payment.id)}><Icon.trash /></button>}
-              </div>
-              {mirror ? (
-                <>
-                  <div className="document-fields">
-                    <div className="document-field">
-                      <span>Fecha</span>
-                      <div className="document-value">{payment.dateLabel || 'Sin fecha'}</div>
-                    </div>
-                    <div className="document-field">
-                      <span>Monto</span>
-                      <div className="document-value">{fmtCLP(payment.amount || 0)}</div>
-                    </div>
-                    <div className="document-field">
-                      <span>Metodo</span>
-                      <div className="document-value">{payment.method || 'cash'}</div>
-                    </div>
-                  </div>
-                  <div className="document-meta-line">
-                    <span className="document-kind">{treatmentOptions.find((item) => item.id === payment.treatmentId)?.procedure || 'Sin tratamiento asociado'}</span>
-                    <span>{payment.notes || 'Sin notas registradas.'}</span>
-                  </div>
-                </>
-              ) : (
-                <div style={{ display: 'grid', gap: 10 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
-                    <label className="document-field">
-                      <span>Fecha</span>
-                      <input value={payment.dateLabel} onChange={(event) => onPaymentChange(payment.id, 'dateLabel', event.target.value)} placeholder="14 may 2026" />
-                    </label>
-                    <label className="document-field">
-                      <span>Monto</span>
-                      <input type="number" inputMode="decimal" value={payment.amount} onChange={(event) => onPaymentChange(payment.id, 'amount', event.target.value)} placeholder="0" />
-                    </label>
-                    <label className="document-field">
-                      <span>Metodo</span>
-                      <select value={payment.method} onChange={(event) => onPaymentChange(payment.id, 'method', event.target.value)}>
-                        <option value="cash">Efectivo</option>
-                        <option value="card">Tarjeta</option>
-                        <option value="transfer">Transferencia</option>
-                        <option value="mixed">Mixto</option>
-                        <option value="other">Otro</option>
-                      </select>
-                    </label>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <label className="document-field">
-                      <span>Tratamiento</span>
-                      <select value={payment.treatmentId || ''} onChange={(event) => onPaymentChange(payment.id, 'treatmentId', event.target.value)}>
-                        <option value="">Sin asociar</option>
-                        {treatmentOptions.map((treatment) => (
-                          <option key={treatment.id} value={treatment.id}>{treatment.procedure || treatment.id}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="document-field">
-                      <span>Concepto</span>
-                      <input value={payment.concept} onChange={(event) => onPaymentChange(payment.id, 'concept', event.target.value)} placeholder="Abono inicial / cuota / saldo" />
-                    </label>
-                  </div>
-                  <label className="document-field">
-                    <span>Notas</span>
-                    <textarea value={payment.notes} onChange={(event) => onPaymentChange(payment.id, 'notes', event.target.value)} placeholder="Medio de pago, referencia o detalle del abono." />
-                  </label>
+      {showListView && !mirror ? (
+        <div className="documents-list">
+          <div className="finance-mini-head">Estado por tratamiento</div>
+          {treatmentBalanceRows.map((row) => (
+            <div key={row.id} className="document-row">
+              <div className="document-main">
+                <div className="document-head">
+                  <div className="document-title">{row.procedure}</div>
+                  <span className={`status ${row.tone}`}><span className="dot" />{row.label}</span>
                 </div>
-              )}
+                <div className="document-fields">
+                  <div className="document-field">
+                    <span>Total</span>
+                    <div className="document-value">{fmtCLP(row.cost)}</div>
+                  </div>
+                  <div className="document-field">
+                    <span>Abonado</span>
+                    <div className="document-value">{fmtCLP(row.paid)}</div>
+                  </div>
+                  <div className="document-field">
+                    <span>Saldo</span>
+                    <div className="document-value">{fmtCLP(row.balance)}</div>
+                  </div>
+                  <div className="document-field">
+                    <span>Abonos</span>
+                    <div className="document-value">{row.count}</div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+          <div className="finance-mini-head" style={{ marginTop: 8 }}>Pagos registrados</div>
+          {activePayments.map((payment) => (
+            <div key={payment.id} className="document-row">
+              <div className="document-main">
+                <div className="document-head">
+                  <div className="document-title">{payment.concept || 'Abono'}</div>
+                  <span className="count">{fmtCLP(payment.amount || 0)}</span>
+                </div>
+                <div className="document-meta-line">
+                  <span className="document-kind">{treatmentOptions.find((item) => item.id === payment.treatmentId)?.procedure || 'Sin tratamiento asociado'}</span>
+                  <span>{payment.dateLabel || 'Sin fecha'} · {payment.method || 'cash'} · Ref: {payment.reference || 'sin referencia'} · {payment.notes || 'Sin notas registradas.'}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+          {voidedPayments.length > 0 && (
+            <>
+              <div className="finance-mini-head" style={{ marginTop: 8 }}>Abonos anulados</div>
+              {voidedPayments.map((payment) => (
+                <div key={payment.id} className="document-row">
+                  <div className="document-main">
+                    <div className="document-head">
+                      <div className="document-title">{payment.concept || 'Abono anulado'}</div>
+                      <span className="status danger"><span className="dot" />Anulado</span>
+                    </div>
+                    <div className="document-meta-line">
+                      <span className="document-kind">{fmtCLP(payment.amount || 0)}</span>
+                      <span>{payment.voidReason || 'Sin motivo registrado.'}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="documents-list">
+          {payments.map((payment) => (
+            <div key={payment.id} className="document-row">
+              <div className="document-main">
+                <div className="document-head">
+                  <div className="document-title">{payment.concept || 'Abono'}</div>
+                  {!mirror && payment.status !== 'void' && payment.status !== 'cancelled' && (
+                    <button className="btn btn-ghost" onClick={() => onRemovePayment(payment.id)}><Icon.trash />Anular</button>
+                  )}
+                  {(payment.status === 'void' || payment.status === 'cancelled') && <span className="status danger"><span className="dot" />Anulado</span>}
+                </div>
+                {mirror ? (
+                  <>
+                    <div className="document-fields">
+                      <div className="document-field">
+                        <span>Fecha</span>
+                        <div className="document-value">{payment.dateLabel || 'Sin fecha'}</div>
+                      </div>
+                      <div className="document-field">
+                        <span>Monto</span>
+                        <div className="document-value">{fmtCLP(payment.amount || 0)}</div>
+                      </div>
+                      <div className="document-field">
+                        <span>Metodo</span>
+                        <div className="document-value">{payment.method || 'cash'}</div>
+                      </div>
+                      <div className="document-field">
+                        <span>Referencia</span>
+                        <div className="document-value">{payment.reference || 'Sin referencia'}</div>
+                      </div>
+                    </div>
+                    <div className="document-meta-line">
+                      <span className="document-kind">{treatmentOptions.find((item) => item.id === payment.treatmentId)?.procedure || 'Sin tratamiento asociado'}</span>
+                      <span>{payment.status === 'void' ? `Anulado: ${payment.voidReason || 'sin motivo'}` : payment.notes || 'Sin notas registradas.'}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ display: 'grid', gap: 10 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+                      <label className="document-field">
+                        <span>Fecha</span>
+                        <input value={payment.dateLabel} onChange={(event) => onPaymentChange(payment.id, 'dateLabel', event.target.value)} placeholder="14 may 2026" disabled={payment.status === 'void' || payment.status === 'cancelled'} />
+                      </label>
+                      <label className="document-field">
+                        <span>Monto</span>
+                        <input type="number" inputMode="decimal" value={payment.amount} onChange={(event) => onPaymentChange(payment.id, 'amount', event.target.value)} placeholder="0" disabled={payment.status === 'void' || payment.status === 'cancelled'} />
+                      </label>
+                      <label className="document-field">
+                        <span>Metodo</span>
+                        <select value={payment.method} onChange={(event) => onPaymentChange(payment.id, 'method', event.target.value)} disabled={payment.status === 'void' || payment.status === 'cancelled'}>
+                          <option value="cash">Efectivo</option>
+                          <option value="card">Tarjeta</option>
+                          <option value="transfer">Transferencia</option>
+                          <option value="mixed">Mixto</option>
+                          <option value="other">Otro</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      <label className="document-field">
+                        <span>Referencia pago</span>
+                        <input value={payment.reference || ''} onChange={(event) => onPaymentChange(payment.id, 'reference', event.target.value)} placeholder="Operacion, voucher o recibo interno" disabled={payment.status === 'void' || payment.status === 'cancelled'} />
+                      </label>
+                      <label className="document-field">
+                        <span>Estado</span>
+                        <select value={payment.status || 'received'} onChange={(event) => onPaymentChange(payment.id, 'status', event.target.value)} disabled={payment.status === 'void' || payment.status === 'cancelled'}>
+                          <option value="received">Recibido</option>
+                          <option value="pending">Pendiente de confirmar</option>
+                          <option value="void">Anulado</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      <label className="document-field">
+                        <span>Tratamiento</span>
+                        <select value={payment.treatmentId || ''} onChange={(event) => onPaymentChange(payment.id, 'treatmentId', event.target.value)} disabled={payment.status === 'void' || payment.status === 'cancelled'}>
+                          <option value="">Sin asociar</option>
+                          {treatmentOptions.map((treatment) => (
+                            <option key={treatment.id} value={treatment.id}>{treatment.procedure || treatment.id}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="document-field">
+                        <span>Concepto</span>
+                        <input value={payment.concept} onChange={(event) => onPaymentChange(payment.id, 'concept', event.target.value)} placeholder="Abono inicial / cuota / saldo" disabled={payment.status === 'void' || payment.status === 'cancelled'} />
+                      </label>
+                    </div>
+                    <label className="document-field">
+                      <span>Notas</span>
+                      <textarea value={payment.notes} onChange={(event) => onPaymentChange(payment.id, 'notes', event.target.value)} placeholder="Medio de pago, referencia o detalle del abono." />
+                    </label>
+                    {(payment.status === 'void' || payment.status === 'cancelled') && (
+                      <label className="document-field">
+                        <span>Motivo anulacion</span>
+                        <textarea value={payment.voidReason || ''} onChange={(event) => onPaymentChange(payment.id, 'voidReason', event.target.value)} placeholder="Motivo administrativo de la anulacion." />
+                      </label>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {!payments.length && (
         <div className="finance-empty">Aun no hay cobros o abonos separados como entidad formal para este paciente.</div>
       )}

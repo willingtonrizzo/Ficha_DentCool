@@ -315,6 +315,22 @@ function buildPaymentRows(recordId, patientId, entries, createdAt, updatedAt) {
     }));
 }
 
+function mergePaymentPayloadFields(payments, fallbackPayments) {
+  const fallbackById = new Map(
+    (Array.isArray(fallbackPayments) ? fallbackPayments : [])
+      .filter(isPlainObject)
+      .map((payment) => [payment.id, payment])
+  );
+
+  return payments.map((payment) => ({
+    ...fallbackById.get(payment.id),
+    ...payment,
+    reference: fallbackById.get(payment.id)?.reference ?? fallbackById.get(payment.id)?.referenceNumber ?? payment.reference ?? '',
+    voidReason: fallbackById.get(payment.id)?.voidReason ?? payment.voidReason ?? '',
+    voidedAt: fallbackById.get(payment.id)?.voidedAt ?? payment.voidedAt ?? null,
+  }));
+}
+
 function buildDocumentRows(recordId, patientId, documents, createdAt, updatedAt) {
   if (!Array.isArray(documents)) return [];
 
@@ -1231,7 +1247,9 @@ async function hydrateClinicalRecordsCacheFromSqlite() {
       evolutionNotes: evolutionByPatient.get(patientId) ?? fallback.evolutionNotes,
       historyEntries: historyByPatient.get(patientId) ?? fallback.historyEntries,
       appointments: appointmentsByPatient.get(patientId) ?? fallback.appointments,
-      paymentEntries: paymentsByPatient.get(patientId) ?? fallback.paymentEntries,
+      paymentEntries: paymentsByPatient.has(patientId)
+        ? mergePaymentPayloadFields(paymentsByPatient.get(patientId), fallback.paymentEntries)
+        : fallback.paymentEntries,
       budget: budgetByPatient.get(patientId) ?? fallback.budget,
       pricingBudgets: pricingBudgetsByPatient.get(patientId) ?? fallback.pricingBudgets,
       documents: documentsByPatient.get(patientId) ?? fallback.documents,
@@ -1406,6 +1424,14 @@ export async function initPersistence() {
 
 export function getPersistenceMode() {
   return persistenceMode;
+}
+
+export function __resetPersistenceForTests() {
+  persistenceMode = 'browser';
+  sqliteDatabase = null;
+  initPromise = null;
+  writeChain = Promise.resolve();
+  sqliteCache.clear();
 }
 
 export function getPersistedItem(key) {

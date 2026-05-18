@@ -110,6 +110,9 @@ Ruta activa del proyecto:
 - `Lista precios` muestra precio lista, descuento maximo recomendado y precio minimo sin costos internos
 - el login local es barrera de uso para demo, no seguridad fuerte definitiva
 - el repo local esta limpio y tiene remoto `origin` apuntando a `https://github.com/willingtonrizzo/Ficha_DentCool.git`, por lo que se puede clonar si hay credenciales/acceso
+- cuenta GitHub visible para este repo: usuario `willingtonrizzo`, perfil `W_Rizzo_Naranjo`
+- repo GitHub visible para la ficha: `willingtonrizzo/Ficha_DentCool`, publico
+- queda pendiente confirmar nombre exacto del repo de la landing en la otra cuenta `WellingtonRizzo` para configurar SSH por alias sin cambiar sesiones
 - proveedores ya existe como maestro editable dentro de `Inventario`, pero parte desde una semilla unica `Proveedor Dental X`
 - el motor de insumos ya tiene calculo de amortizacion y semillas de equipos amortizables, pero falta una UI clara para explicar/capturar costo de espejo, rotor, aeropulidor u otros materiales reutilizables
 - no se encontro `maxLength` explicito en notas clinicas; queda pendiente ubicar la pantalla exacta de `notas rapidas`, `detalle` o `feedback` donde el texto se corta o se pierde
@@ -171,12 +174,15 @@ Razon:
 9. seguir refinando la operacion local antes de `SQLite runtime` completo
 10. preparar la futura transicion a `SQLite` sin mezclar demasiados frentes
 11. convertir las observaciones rapidas levantadas el `2026-05-17` en un bloque corto de ajustes de producto antes de ampliar inventario
+12. implementar Playwright con una suite chica E2E para login, apertura de ficha, guardado clinico e inventario cuando se autorice instalar dependencias
 
 ## Riesgos abiertos
 
 - `Inicio` todavia no es panel 100% real
 - parte del flujo clinico sigue compartiendo mocks
 - `SQLite` ya existe como runtime parcial; lectura y escritura de las tablas clinicas ya quedaron cubiertas en codigo y tests, falta validar arranque desktop nativo y casos borde
+- la integracion automatizada de persistencia cubre el contrato local simulado, pero no reemplaza una prueba manual/nativa completa de Tauri con SQLite real
+- Playwright aun no esta instalado; para usarlo hay que agregar dependencia y descargar navegadores, lo que requiere acceso de red
 - falta protocolo de backup local antes de escalar uso real
 - el pricing ya tiene settings, catalogo, snapshots, estados refinados, vista general, objetivo editable, exportacion CSV, exportacion Excel y filtros/reportes avanzados completos, y ahora cruza tratamientos/citas visibles
 - seguir usando `nextVisit` y `paid` como puente por mucho tiempo hara mas costosa la separacion de agenda y caja
@@ -249,6 +255,19 @@ Razon:
 - `Facturacion` muestra cobros del dia, medios de pago, pendientes de cobro, historial de pagos y exportacion CSV/XLSX
 - `Facturacion` usa los `paymentEntries` reales de las fichas de paciente y no emite boleta electronica/SII en esta fase
 - verificacion actual de facturacion MVP: `npm test -- --run` paso con `79` tests y `npm run build` paso correctamente
+- se agregaron pruebas de integracion para la capa local tipo API de persistencia `SQLite/Tauri` simulada
+- la integracion nueva cubre inicializacion SQLite, migracion desde `localStorage`, sincronizacion de cache/escritura y escritura relacional de ficha clinica
+- verificacion actual de testing: `npm test -- --run` paso con `82` tests y `npm run build` paso correctamente
+- Playwright se puede implementar en este repo como siguiente capa E2E; falta instalar `@playwright/test`, agregar script y definir flujos criticos
+- `Facturacion` ahora permite filtrar por `Dia`, `Semana`, `Mes` y `Todo` usando abonos reales de `paymentEntries`
+- `Facturacion` muestra una nota visible que explica: abono = pago recibido parcial, adelanto o total; cobro/pago = dinero recibido; saldo pendiente = total menos abonos
+- `Cobros y abonos` tambien aclara que un abono puede cubrir parte o todo el saldo
+- verificacion actual de facturacion por periodos: `npm test -- --run` paso con `83` tests y `npm run build` paso correctamente
+- `Cobros y abonos` ahora permite guardar referencia de pago y anular abonos sin borrarlos
+- los abonos anulados dejan de sumar al `paid` del tratamiento y quedan exportables en hoja `Anulados`
+- `Facturacion` ahora tiene filtro por paciente y una tabla de estado de pago por tratamiento con total, abonado, saldo y ultimo pago
+- XLSX de facturacion ahora incluye `Cobros`, `Pendientes`, `ResumenMedios`, `ResumenPacientes` y `Anulados`
+- verificacion actual del MVP de facturacion ampliado: `npm test -- --run` paso con `83` tests y `npm run build` paso correctamente
 
 ## Instruccion de retoma
 
