@@ -279,6 +279,12 @@ Hecho:
 - el bloque `Real despues` permite registrar insumos extra reales, minutos extra y costo de tiempo extra
 - al guardar costo, el snapshot local conserva estimado, extras reales, costo de tiempo, final real y diferencia contra estimado
 - verificacion del comparativo de insumos: `npm test -- --run` paso con `79` tests verdes y `npm run build` paso correctamente
+- se inicio el bloque `Bloque Funcionalidades - SQLite inventario e insumos`
+- se agregaron tablas SQLite para `supply_catalog_items`, `supply_suppliers`, `supply_purchases`, `supply_snapshots`, `supply_recipes`, `supply_categories` y `supply_units`
+- la persistencia de Tauri ahora hidrata inventario/insumos desde esas tablas SQLite cuando existen datos
+- si las tablas nuevas aun estan vacias, la app migra desde las claves previas de persistencia local/`app_kv` hacia las tablas SQLite de insumos
+- cada guardado posterior de catalogo, proveedores, compras, snapshots, listas base, categorias o unidades actualiza tambien su tabla SQLite correspondiente
+- verificacion de SQLite inventario/insumos: `npm test -- --run` paso con `79` tests verdes y `npm run build` paso correctamente
 
 ## Como se hizo este bloque
 

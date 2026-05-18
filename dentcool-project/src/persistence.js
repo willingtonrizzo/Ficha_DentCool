@@ -12,6 +12,15 @@ const SQLITE_TABLE = 'app_kv';
 const SQLITE_PATIENT_PAYLOAD_TABLE = 'patient_payloads';
 const SQLITE_MOTIVO_TABLE = 'motivo_diagnostico_records';
 const SQLITE_CLINICAL_RECORD_PAYLOAD_TABLE = 'clinical_record_payloads';
+const SUPPLY_KEY_TO_TABLE = {
+  [STORAGE_KEYS.suppliesCatalog]: 'supply_catalog_items',
+  [STORAGE_KEYS.suppliesSuppliers]: 'supply_suppliers',
+  [STORAGE_KEYS.suppliesPurchases]: 'supply_purchases',
+  [STORAGE_KEYS.suppliesSnapshots]: 'supply_snapshots',
+  [STORAGE_KEYS.suppliesRecipes]: 'supply_recipes',
+  [STORAGE_KEYS.suppliesCategories]: 'supply_categories',
+  [STORAGE_KEYS.suppliesUnits]: 'supply_units',
+};
 
 let persistenceMode = 'browser';
 let sqliteDatabase = null;
@@ -372,6 +381,23 @@ function buildPricingBudgetRows(recordId, patientId, pricingBudgets, createdAt, 
       createdAt,
       updatedAt,
     }));
+}
+
+function normalizeJsonArrayFromRaw(rawValue) {
+  const parsed = typeof rawValue === 'string' ? safeParseJson(rawValue, []) : rawValue;
+  return Array.isArray(parsed) ? parsed.filter((item) => item != null) : [];
+}
+
+function getPayloadTimestamp(payload) {
+  return typeof payload?.updatedAt === 'string'
+    ? payload.updatedAt
+    : typeof payload?.createdAt === 'string'
+      ? payload.createdAt
+      : nowIso();
+}
+
+function getPayloadCreationTimestamp(payload) {
+  return typeof payload?.createdAt === 'string' ? payload.createdAt : getPayloadTimestamp(payload);
 }
 
 export function normalizePatientCollectionJson(rawValue) {
@@ -735,6 +761,208 @@ async function replaceClinicalRecordsInSqlite(rawValue) {
   });
 }
 
+async function replaceSupplyCatalogInSqlite(rawValue) {
+  if (!sqliteDatabase) return;
+  const items = normalizeJsonArrayFromRaw(rawValue).filter(isPlainObject);
+  const now = nowIso();
+
+  await queueSqliteTask(async () => {
+    await sqliteDatabase.execute('DELETE FROM supply_catalog_items');
+    for (const item of items) {
+      const createdAt = getPayloadCreationTimestamp(item) || now;
+      const updatedAt = getPayloadTimestamp(item) || now;
+      await sqliteDatabase.execute(
+        `
+          INSERT INTO supply_catalog_items (
+            id, name, brand, category, item_type, unit, purchase_quantity, purchase_total_cost, unit_cost, current_stock, minimum_stock, supplier_id, active, payload_json, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          item.id || `supply-${Date.now()}`,
+          item.name || 'Insumo sin nombre',
+          item.brand || null,
+          item.category || null,
+          item.itemType || 'consumable',
+          item.unit || 'unidad',
+          Number(item.purchaseQuantity) || 0,
+          Number(item.purchaseTotalCost) || 0,
+          Number(item.unitCost) || 0,
+          Number(item.currentStock) || 0,
+          Number(item.minimumStock) || 0,
+          item.supplierId || null,
+          item.active === false ? 0 : 1,
+          JSON.stringify(item),
+          createdAt,
+          updatedAt,
+        ]
+      );
+    }
+  });
+}
+
+async function replaceSupplySuppliersInSqlite(rawValue) {
+  if (!sqliteDatabase) return;
+  const suppliers = normalizeJsonArrayFromRaw(rawValue).filter(isPlainObject);
+  const now = nowIso();
+
+  await queueSqliteTask(async () => {
+    await sqliteDatabase.execute('DELETE FROM supply_suppliers');
+    for (const supplier of suppliers) {
+      const createdAt = getPayloadCreationTimestamp(supplier) || now;
+      const updatedAt = getPayloadTimestamp(supplier) || now;
+      await sqliteDatabase.execute(
+        `
+          INSERT INTO supply_suppliers (
+            id, name, phone, website, address, dispatch, active, payload_json, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          supplier.id || `supplier-${Date.now()}`,
+          supplier.name || 'Proveedor sin nombre',
+          supplier.phone || null,
+          supplier.website || null,
+          supplier.address || null,
+          supplier.dispatch || supplier.notes || null,
+          supplier.active === false ? 0 : 1,
+          JSON.stringify(supplier),
+          createdAt,
+          updatedAt,
+        ]
+      );
+    }
+  });
+}
+
+async function replaceSupplyPurchasesInSqlite(rawValue) {
+  if (!sqliteDatabase) return;
+  const purchases = normalizeJsonArrayFromRaw(rawValue).filter(isPlainObject);
+  const now = nowIso();
+
+  await queueSqliteTask(async () => {
+    await sqliteDatabase.execute('DELETE FROM supply_purchases');
+    for (const purchase of purchases) {
+      const createdAt = getPayloadCreationTimestamp(purchase) || now;
+      const updatedAt = getPayloadTimestamp(purchase) || now;
+      await sqliteDatabase.execute(
+        `
+          INSERT INTO supply_purchases (
+            id, item_id, supplier_id, quantity_purchased, total_cost, unit_cost, document_type, document_number, purchase_date_label, payload_json, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          purchase.id || `purchase-${Date.now()}`,
+          purchase.itemId || '',
+          purchase.supplierId || null,
+          Number(purchase.quantityPurchased ?? purchase.quantity) || 0,
+          Number(purchase.totalCost) || 0,
+          Number(purchase.unitCost) || 0,
+          purchase.documentType || null,
+          purchase.documentNumber || null,
+          purchase.purchaseDateLabel || null,
+          JSON.stringify(purchase),
+          createdAt,
+          updatedAt,
+        ]
+      );
+    }
+  });
+}
+
+async function replaceSupplySnapshotsInSqlite(rawValue) {
+  if (!sqliteDatabase) return;
+  const snapshots = normalizeJsonArrayFromRaw(rawValue).filter(isPlainObject);
+  const now = nowIso();
+
+  await queueSqliteTask(async () => {
+    await sqliteDatabase.execute('DELETE FROM supply_snapshots');
+    for (const snapshot of snapshots) {
+      const createdAt = getPayloadCreationTimestamp(snapshot) || now;
+      const updatedAt = getPayloadTimestamp(snapshot) || now;
+      await sqliteDatabase.execute(
+        `
+          INSERT INTO supply_snapshots (
+            id, patient_id, treatment_id, recipe_id, total_supply_cost, estimated_supply_cost, final_supply_cost, cost_variance, payload_json, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          snapshot.id || `snapshot-${Date.now()}`,
+          snapshot.patientId || null,
+          snapshot.treatmentId || null,
+          snapshot.recipeId || null,
+          Number(snapshot.totalSupplyCost) || 0,
+          snapshot.estimatedSupplyCost == null ? null : Number(snapshot.estimatedSupplyCost) || 0,
+          snapshot.finalSupplyCost == null ? null : Number(snapshot.finalSupplyCost) || 0,
+          snapshot.costVariance == null ? null : Number(snapshot.costVariance) || 0,
+          JSON.stringify(snapshot),
+          createdAt,
+          updatedAt,
+        ]
+      );
+    }
+  });
+}
+
+async function replaceSupplyRecipesInSqlite(rawValue) {
+  if (!sqliteDatabase) return;
+  const recipes = normalizeJsonArrayFromRaw(rawValue).filter(isPlainObject);
+  const now = nowIso();
+
+  await queueSqliteTask(async () => {
+    await sqliteDatabase.execute('DELETE FROM supply_recipes');
+    for (const recipe of recipes) {
+      const createdAt = getPayloadCreationTimestamp(recipe) || now;
+      const updatedAt = getPayloadTimestamp(recipe) || now;
+      await sqliteDatabase.execute(
+        `
+          INSERT INTO supply_recipes (
+            id, treatment_id, name, active, payload_json, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          recipe.id || `recipe-${Date.now()}`,
+          recipe.treatmentId || null,
+          recipe.name || 'Lista base',
+          recipe.active === false ? 0 : 1,
+          JSON.stringify(recipe),
+          createdAt,
+          updatedAt,
+        ]
+      );
+    }
+  });
+}
+
+async function replaceSupplyTextValuesInSqlite(tableName, rawValue) {
+  if (!sqliteDatabase) return;
+  const values = normalizeJsonArrayFromRaw(rawValue).filter((item) => typeof item === 'string' && item.trim());
+  const now = nowIso();
+
+  await queueSqliteTask(async () => {
+    await sqliteDatabase.execute(`DELETE FROM ${tableName}`);
+    for (const value of values) {
+      await sqliteDatabase.execute(
+        `
+          INSERT INTO ${tableName} (
+            value, created_at, updated_at
+          ) VALUES (?, ?, ?)
+        `,
+        [value, now, now]
+      );
+    }
+  });
+}
+
+async function replaceSupplyKeyInSqlite(key, rawValue) {
+  if (key === STORAGE_KEYS.suppliesCatalog) return replaceSupplyCatalogInSqlite(rawValue);
+  if (key === STORAGE_KEYS.suppliesSuppliers) return replaceSupplySuppliersInSqlite(rawValue);
+  if (key === STORAGE_KEYS.suppliesPurchases) return replaceSupplyPurchasesInSqlite(rawValue);
+  if (key === STORAGE_KEYS.suppliesSnapshots) return replaceSupplySnapshotsInSqlite(rawValue);
+  if (key === STORAGE_KEYS.suppliesRecipes) return replaceSupplyRecipesInSqlite(rawValue);
+  if (key === STORAGE_KEYS.suppliesCategories) return replaceSupplyTextValuesInSqlite('supply_categories', rawValue);
+  if (key === STORAGE_KEYS.suppliesUnits) return replaceSupplyTextValuesInSqlite('supply_units', rawValue);
+  return undefined;
+}
+
 async function hydratePatientsCacheFromSqlite() {
   if (!sqliteDatabase) return false;
   const payloadRows = await selectSqliteRows(`SELECT patient_id, payload_json FROM ${SQLITE_PATIENT_PAYLOAD_TABLE} ORDER BY updated_at ASC`);
@@ -1031,6 +1259,44 @@ async function hydrateClinicalRecordsCacheFromSqlite() {
   return true;
 }
 
+async function hydrateSupplyArrayCacheFromTable(key, tableName) {
+  if (!sqliteDatabase) return false;
+  const rows = await selectSqliteRows(`SELECT payload_json FROM ${tableName} ORDER BY updated_at ASC`);
+  if (rows.length === 0) return false;
+
+  const values = rows
+    .map((row) => parseRowJson(row?.payload_json, null))
+    .filter((value) => value != null);
+
+  if (values.length === 0) return false;
+  sqliteCache.set(key, JSON.stringify(values));
+  return true;
+}
+
+async function hydrateSupplyTextCacheFromTable(key, tableName) {
+  if (!sqliteDatabase) return false;
+  const rows = await selectSqliteRows(`SELECT value FROM ${tableName} ORDER BY value ASC`);
+  if (rows.length === 0) return false;
+  const values = rows.map((row) => row?.value).filter((value) => typeof value === 'string' && value.trim());
+  if (values.length === 0) return false;
+  sqliteCache.set(key, JSON.stringify(values));
+  return true;
+}
+
+async function hydrateSupplyCacheFromSqlite() {
+  const results = await Promise.all([
+    hydrateSupplyArrayCacheFromTable(STORAGE_KEYS.suppliesCatalog, 'supply_catalog_items'),
+    hydrateSupplyArrayCacheFromTable(STORAGE_KEYS.suppliesSuppliers, 'supply_suppliers'),
+    hydrateSupplyArrayCacheFromTable(STORAGE_KEYS.suppliesPurchases, 'supply_purchases'),
+    hydrateSupplyArrayCacheFromTable(STORAGE_KEYS.suppliesSnapshots, 'supply_snapshots'),
+    hydrateSupplyArrayCacheFromTable(STORAGE_KEYS.suppliesRecipes, 'supply_recipes'),
+    hydrateSupplyTextCacheFromTable(STORAGE_KEYS.suppliesCategories, 'supply_categories'),
+    hydrateSupplyTextCacheFromTable(STORAGE_KEYS.suppliesUnits, 'supply_units'),
+  ]);
+
+  return results.some(Boolean);
+}
+
 function splitSqlStatements(sql) {
   return sql
     .split(';')
@@ -1112,6 +1378,15 @@ export async function initPersistence() {
         await replaceClinicalRecordsInSqlite(sqliteCache.get(STORAGE_KEYS.clinicalRecords));
       }
 
+      const suppliesFromSqlite = await hydrateSupplyCacheFromSqlite();
+      if (!suppliesFromSqlite) {
+        for (const key of Object.keys(SUPPLY_KEY_TO_TABLE)) {
+          if (sqliteCache.has(key)) {
+            await replaceSupplyKeyInSqlite(key, sqliteCache.get(key));
+          }
+        }
+      }
+
       for (const [key, value] of sqliteCache.entries()) {
         window.localStorage.setItem(key, value);
       }
@@ -1160,6 +1435,9 @@ export function setPersistedItem(key, value) {
     if (key === STORAGE_KEYS.clinicalRecords) {
       void replaceClinicalRecordsInSqlite(serializedValue);
     }
+    if (Object.hasOwn(SUPPLY_KEY_TO_TABLE, key)) {
+      void replaceSupplyKeyInSqlite(key, serializedValue);
+    }
     return;
   }
 
@@ -1202,6 +1480,9 @@ export function removePersistedItem(key) {
           await sqliteDatabase.execute('DELETE FROM odontogram_surface_states');
           await sqliteDatabase.execute('DELETE FROM clinical_records');
         });
+      }
+      if (Object.hasOwn(SUPPLY_KEY_TO_TABLE, key)) {
+        queueSqliteTask(() => sqliteDatabase.execute(`DELETE FROM ${SUPPLY_KEY_TO_TABLE[key]}`));
       }
     }
     return;

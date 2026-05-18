@@ -96,6 +96,8 @@
 - [x] Agregar una vista de historial por proveedor mas navegable
 - [x] Resaltar visualmente los paneles principales del inventario general
 - [x] Dejar lista la primera capa de persistencia para `Tauri + SQLite`
+- [x] Agregar tablas SQLite para inventario e insumos: catalogo, proveedores, compras, snapshots, listas base, categorias y unidades
+- [x] Conectar inventario/insumos a SQLite en Tauri con migracion desde la persistencia local previa
 
 ## En curso / siguiente
 

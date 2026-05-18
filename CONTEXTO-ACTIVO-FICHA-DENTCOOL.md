@@ -241,6 +241,10 @@ Razon:
 - el estimado usa lista base + extras planificados; el real posterior suma insumos extra reales, minutos extra y costo de tiempo extra
 - el snapshot local de insumos guarda estimado, final real y diferencia para analizar ajustes futuros de listas base y precios
 - verificacion actual del comparativo de insumos: `npm test -- --run` paso con `79` tests y `npm run build` paso correctamente
+- SQLite de inventario/insumos ya tiene tablas explicitas para catalogo, proveedores, compras, snapshots, listas base, categorias y unidades
+- en Tauri, inventario/insumos se hidrata desde esas tablas SQLite y migra desde la persistencia local previa si las tablas estan vacias
+- cada guardado de inventario/insumos actualiza tambien la tabla SQLite correspondiente
+- verificacion actual de SQLite inventario/insumos: `npm test -- --run` paso con `79` tests y `npm run build` paso correctamente
 
 ## Instruccion de retoma
 

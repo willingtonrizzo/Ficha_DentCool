@@ -198,3 +198,89 @@ CREATE TABLE IF NOT EXISTS appointments (
   FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
   FOREIGN KEY (record_id) REFERENCES clinical_records(id) ON DELETE SET NULL
 );
+
+CREATE TABLE IF NOT EXISTS supply_catalog_items (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  brand TEXT,
+  category TEXT,
+  item_type TEXT NOT NULL,
+  unit TEXT NOT NULL,
+  purchase_quantity REAL NOT NULL DEFAULT 0,
+  purchase_total_cost REAL NOT NULL DEFAULT 0,
+  unit_cost REAL NOT NULL DEFAULT 0,
+  current_stock REAL NOT NULL DEFAULT 0,
+  minimum_stock REAL NOT NULL DEFAULT 0,
+  supplier_id TEXT,
+  active INTEGER NOT NULL DEFAULT 1,
+  payload_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS supply_suppliers (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  phone TEXT,
+  website TEXT,
+  address TEXT,
+  dispatch TEXT,
+  active INTEGER NOT NULL DEFAULT 1,
+  payload_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS supply_purchases (
+  id TEXT PRIMARY KEY,
+  item_id TEXT NOT NULL,
+  supplier_id TEXT,
+  quantity_purchased REAL NOT NULL DEFAULT 0,
+  total_cost REAL NOT NULL DEFAULT 0,
+  unit_cost REAL NOT NULL DEFAULT 0,
+  document_type TEXT,
+  document_number TEXT,
+  purchase_date_label TEXT,
+  payload_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (item_id) REFERENCES supply_catalog_items(id) ON DELETE CASCADE,
+  FOREIGN KEY (supplier_id) REFERENCES supply_suppliers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS supply_snapshots (
+  id TEXT PRIMARY KEY,
+  patient_id TEXT,
+  treatment_id TEXT,
+  recipe_id TEXT,
+  total_supply_cost REAL NOT NULL DEFAULT 0,
+  estimated_supply_cost REAL,
+  final_supply_cost REAL,
+  cost_variance REAL,
+  payload_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS supply_recipes (
+  id TEXT PRIMARY KEY,
+  treatment_id TEXT,
+  name TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  payload_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS supply_categories (
+  value TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS supply_units (
+  value TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
