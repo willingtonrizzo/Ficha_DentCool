@@ -2602,6 +2602,10 @@ export function Insumos({
   const [selectedTreatmentId, setSelectedTreatmentId] = useState(initialTreatmentId);
   const [draftItems, setDraftItems] = useState([]);
   const [extraItemId, setExtraItemId] = useState('');
+  const [actualExtraItemId, setActualExtraItemId] = useState('');
+  const [actualExtraItems, setActualExtraItems] = useState([]);
+  const [actualExtraMinutes, setActualExtraMinutes] = useState(0);
+  const [actualExtraTimeCost, setActualExtraTimeCost] = useState(0);
   const [openInsumosHelp, setOpenInsumosHelp] = useState(null);
 
   useEffect(() => {
@@ -2644,6 +2648,10 @@ export function Insumos({
   }, [selectedRecipe?.id]);
 
   const usageResult = calculatePatientSupplyUsageCost(draftItems, moduleState.catalog);
+  const actualExtraUsageResult = calculatePatientSupplyUsageCost(actualExtraItems, moduleState.catalog);
+  const actualExtraTimeCostNumber = Number(actualExtraTimeCost) || 0;
+  const finalSupplyCost = usageResult.totalCost + actualExtraUsageResult.totalCost + actualExtraTimeCostNumber;
+  const costVariance = finalSupplyCost - usageResult.totalCost;
   const agendaNeeds = checkAgendaSupplyNeeds(appointments ?? [], moduleState.recipes, moduleState.catalog);
   const lowStockItems = moduleState.catalog.filter(checkLowStock);
   const patientSnapshots = moduleState.snapshots.filter((snapshot) => snapshot.patientId === patient?.id);
@@ -2674,8 +2682,38 @@ export function Insumos({
     setExtraItemId('');
   };
 
+  const handleAddActualExtraItem = () => {
+    const item = moduleState.catalog.find((catalogItem) => catalogItem.id === actualExtraItemId);
+    if (!item) return;
+
+    setActualExtraItems((current) => {
+      if (current.some((entry) => entry.itemId === item.id)) return current;
+      return [
+        ...current,
+        {
+          itemId: item.id,
+          quantity: item.defaultUsePerPatient ?? 1,
+          editableAtPatientLevel: true,
+          isActualExtra: true,
+        },
+      ];
+    });
+    setActualExtraItemId('');
+  };
+
   const handleRemoveDraftItem = (itemId) => {
     setDraftItems((current) => current.filter((item) => item.itemId !== itemId));
+  };
+
+  const handleActualExtraQtyChange = (itemId, value) => {
+    const nextQuantity = Number(value) || 0;
+    setActualExtraItems((current) =>
+      current.map((item) => (item.itemId === itemId ? { ...item, quantity: nextQuantity } : item))
+    );
+  };
+
+  const handleRemoveActualExtraItem = (itemId) => {
+    setActualExtraItems((current) => current.filter((item) => item.itemId !== itemId));
   };
 
   const handleResetCatalog = () => {
@@ -2693,6 +2731,10 @@ export function Insumos({
         ...item,
       })) ?? []
     );
+    setActualExtraItems([]);
+    setActualExtraItemId('');
+    setActualExtraMinutes(0);
+    setActualExtraTimeCost(0);
   };
 
   const handleSaveSnapshot = () => {
@@ -2704,18 +2746,30 @@ export function Insumos({
       appointmentId: appointments?.[0]?.id ?? null,
       recipeId: selectedRecipe.id,
       recipeName: selectedRecipe.name,
-      usageItems: draftItems,
+      usageItems: [...draftItems, ...actualExtraItems],
       catalog: moduleState.catalog,
       notes: `Snapshot de insumos para ${selectedTreatment.procedure}`,
       status: 'confirmed',
       source: 'manual',
     });
+    const supplySnapshot = {
+      ...snapshot,
+      estimatedSupplyCost: usageResult.totalCost,
+      actualExtraSupplyCost: actualExtraUsageResult.totalCost,
+      actualExtraTimeMinutes: Number(actualExtraMinutes) || 0,
+      actualExtraTimeCost: actualExtraTimeCostNumber,
+      finalSupplyCost,
+      costVariance,
+      plannedItems: usageResult.lines,
+      actualExtraItems: actualExtraUsageResult.lines,
+      totalSupplyCost: finalSupplyCost,
+    };
 
     setModuleState((current) => ({
       ...current,
-      snapshots: [snapshot, ...current.snapshots],
+      snapshots: [supplySnapshot, ...current.snapshots],
     }));
-    onBudgetFieldChange?.('supplySnapshotId', snapshot.id);
+    onBudgetFieldChange?.('supplySnapshotId', supplySnapshot.id);
   };
 
   return (
@@ -2795,6 +2849,16 @@ export function Insumos({
             <small>{mappedPricingTreatment?.name ?? 'Sin mapeo a pricing'}</small>
           </div>
           <div className="budget-pricing-kpi budget-pricing-kpi-small">
+            <div className="budget-pricing-kpi-head"><span>Estimado antes</span></div>
+            <strong>{fmtCLP(usageResult.totalCost)}</strong>
+            <small>lista base + extras planificados</small>
+          </div>
+          <div className="budget-pricing-kpi budget-pricing-kpi-small">
+            <div className="budget-pricing-kpi-head"><span>Real despues</span></div>
+            <strong>{fmtCLP(finalSupplyCost)}</strong>
+            <small>{costVariance >= 0 ? '+' : ''}{fmtCLP(costVariance)} vs estimado</small>
+          </div>
+          <div className="budget-pricing-kpi budget-pricing-kpi-small">
             <div className="budget-pricing-kpi-head"><span>Agenda</span></div>
             <strong>{agendaNeeds.lines.length}</strong>
             <small>citas futuras con lista base</small>
@@ -2803,8 +2867,8 @@ export function Insumos({
 
         <div className="budget-pricing-settings-head" style={{ marginTop: 14 }}>
           <div>
-            <div className="bs-label">Agregar insumo</div>
-            <div className="bs-help">Si este caso necesita algo mas que la lista base, sumalo aqui antes de guardar el costo.</div>
+            <div className="bs-label">Agregar insumo planificado</div>
+            <div className="bs-help">Lista base son los insumos normales del tratamiento. Insumo extra planificado es algo que ya sabes antes de atender que este caso necesitara.</div>
           </div>
         </div>
         <div className="budget-pricing-settings-grid">
@@ -2829,6 +2893,13 @@ export function Insumos({
               Agregar insumo
             </button>
           </div>
+        </div>
+      </div>
+
+      <div className="budget-pricing-settings-head" style={{ margin: '4px 0 10px' }}>
+        <div>
+          <div className="bs-label">Estimado antes del tratamiento</div>
+          <div className="bs-help">Base para presupuestar: lista normal del tratamiento mas extras planificados para este paciente.</div>
         </div>
       </div>
 
@@ -2928,6 +2999,114 @@ export function Insumos({
         </table>
       </div>
 
+      <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
+        <div className="budget-pricing-settings-head">
+          <div>
+            <div className="bs-label">Real despues del tratamiento</div>
+            <div className="bs-help">Registra diferencias reales: insumos agregados durante la atencion y tiempo clinico extra. Sirve para ajustar listas base y precios despues.</div>
+          </div>
+        </div>
+        <div className="budget-pricing-settings-grid">
+          <label className="pricing-setting-field" style={{ gridColumn: '1 / span 2' }}>
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Insumo extra real</span>
+            </span>
+            <select value={actualExtraItemId} onChange={(event) => setActualExtraItemId(event.target.value)}>
+              <option value="">Selecciona un insumo</option>
+              {moduleState.catalog
+                .filter((item) => !actualExtraItems.some((entry) => entry.itemId === item.id))
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name} · {item.unit}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <div style={{ display: 'flex', alignItems: 'end' }}>
+            <button className="btn btn-secondary" type="button" onClick={handleAddActualExtraItem} disabled={!actualExtraItemId}>
+              <Icon.plus />
+              Agregar real
+            </button>
+          </div>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Minutos extra</span>
+            </span>
+            <input type="number" min="0" step="5" value={actualExtraMinutes} onChange={(event) => setActualExtraMinutes(event.target.value)} />
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Costo tiempo extra</span>
+            </span>
+            <input type="number" min="0" step="1000" value={actualExtraTimeCost} onChange={(event) => setActualExtraTimeCost(event.target.value)} />
+          </label>
+        </div>
+
+        {actualExtraItems.length > 0 && (
+          <div className="table-wrap" style={{ marginTop: 12 }}>
+            <table className="tx">
+              <thead>
+                <tr>
+                  <th>Insumo real agregado</th>
+                  <th>Unidad</th>
+                  <th style={{ textAlign: 'right' }}>Cantidad</th>
+                  <th style={{ textAlign: 'right' }}>Costo unitario</th>
+                  <th style={{ textAlign: 'right' }}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {actualExtraItems.map((item) => {
+                  const line = actualExtraUsageResult.lines.find((entry) => entry.itemId === item.itemId);
+                  return (
+                    <tr key={item.itemId}>
+                      <td style={{ fontWeight: 600 }}>{line?.itemName ?? item.itemId}</td>
+                      <td>{line?.unit ?? 'unidad'}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={item.quantity}
+                          onChange={(event) => handleActualExtraQtyChange(item.itemId, event.target.value)}
+                          style={{ width: 92, textAlign: 'right' }}
+                        />
+                      </td>
+                      <td style={{ textAlign: 'right' }}>{fmtCLP(line?.unitCostAtTime ?? 0)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                          <span>{fmtCLP(line?.totalCostAtTime ?? 0)}</span>
+                          <button className="row-action" type="button" onClick={() => handleRemoveActualExtraItem(item.itemId)} title="Quitar insumo real">
+                            <Icon.trash />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="budget-pricing-kpi-row" style={{ marginTop: 12 }}>
+          <div className="budget-pricing-kpi budget-pricing-kpi-small">
+            <div className="budget-pricing-kpi-head"><span>Estimado</span></div>
+            <strong>{fmtCLP(usageResult.totalCost)}</strong>
+            <small>antes de atender</small>
+          </div>
+          <div className="budget-pricing-kpi budget-pricing-kpi-small tone-warn">
+            <div className="budget-pricing-kpi-head"><span>Diferencia real</span></div>
+            <strong>{costVariance >= 0 ? '+' : ''}{fmtCLP(costVariance)}</strong>
+            <small>{fmtCLP(actualExtraUsageResult.totalCost)} insumos + {fmtCLP(actualExtraTimeCostNumber)} tiempo</small>
+          </div>
+          <div className="budget-pricing-kpi budget-pricing-kpi-small tone-good">
+            <div className="budget-pricing-kpi-head"><span>Final real</span></div>
+            <strong>{fmtCLP(finalSupplyCost)}</strong>
+            <small>se guarda en costos del paciente</small>
+          </div>
+        </div>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 14 }}>
         <div className="budget-pricing-settings">
           <div className="budget-pricing-settings-head">
@@ -2972,7 +3151,12 @@ export function Insumos({
                   </div>
                   <div className="document-meta-line">
                     <span className="document-kind">{snapshot.status}</span>
-                    <span>{snapshot.createdAt ? new Date(snapshot.createdAt).toLocaleString('es-CL') : 'Sin fecha'}</span>
+                    <span>
+                      {snapshot.createdAt ? new Date(snapshot.createdAt).toLocaleString('es-CL') : 'Sin fecha'}
+                      {snapshot.estimatedSupplyCost != null && snapshot.finalSupplyCost != null
+                        ? ` · estimado ${fmtCLP(snapshot.estimatedSupplyCost)} · diferencia ${snapshot.costVariance >= 0 ? '+' : ''}${fmtCLP(snapshot.costVariance)}`
+                        : ''}
+                    </span>
                   </div>
                 </div>
               </div>

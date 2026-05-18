@@ -274,6 +274,11 @@ Hecho:
 - la tabla de `Insumos` ahora muestra `Amortizado: X usos / $Y` cuando el material es reutilizable, para evitar que se tome el precio completo como costo del paciente
 - se agregaron ayudas `?` para tipo de material, unidad, cantidad, costo total, usos estimados y stock minimo
 - verificacion del bloque de amortizacion: `npm test -- --run` paso con `79` tests verdes y `npm run build` paso correctamente
+- se agrego aclaracion operativa en `Insumos`: `lista base` corresponde a insumos normales del tratamiento y `extra planificado` a insumos conocidos antes de atender
+- se agrego comparativo `Estimado antes del tratamiento` vs `Real despues del tratamiento`
+- el bloque `Real despues` permite registrar insumos extra reales, minutos extra y costo de tiempo extra
+- al guardar costo, el snapshot local conserva estimado, extras reales, costo de tiempo, final real y diferencia contra estimado
+- verificacion del comparativo de insumos: `npm test -- --run` paso con `79` tests verdes y `npm run build` paso correctamente
 
 ## Como se hizo este bloque
 

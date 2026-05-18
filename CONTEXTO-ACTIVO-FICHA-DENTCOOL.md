@@ -237,6 +237,10 @@ Razon:
 - los insumos amortizables se calculan por costo por uso, no por el precio completo del equipo
 - la tabla de `Insumos` muestra el origen `Amortizado: X usos / $Y`
 - verificacion actual del bloque de amortizacion: `npm test -- --run` paso con `79` tests y `npm run build` paso correctamente
+- `Insumos` ahora separa `Estimado antes del tratamiento` y `Real despues del tratamiento`
+- el estimado usa lista base + extras planificados; el real posterior suma insumos extra reales, minutos extra y costo de tiempo extra
+- el snapshot local de insumos guarda estimado, final real y diferencia para analizar ajustes futuros de listas base y precios
+- verificacion actual del comparativo de insumos: `npm test -- --run` paso con `79` tests y `npm run build` paso correctamente
 
 ## Instruccion de retoma
 
