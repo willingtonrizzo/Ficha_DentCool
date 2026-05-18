@@ -3008,8 +3008,10 @@ export function InventarioInsumos({
   const [supplierWebsite, setSupplierWebsite] = useState('');
   const [supplierDispatch, setSupplierDispatch] = useState('');
   const [supplierActive, setSupplierActive] = useState(true);
+  const [showSuppliersList, setShowSuppliersList] = useState(false);
   const [filterSupplierId, setFilterSupplierId] = useState('all');
   const [filterItemId, setFilterItemId] = useState('all');
+  const [costHistoryItemId, setCostHistoryItemId] = useState('all');
 
   useEffect(() => {
     saveSupplyState(moduleState);
@@ -3021,6 +3023,7 @@ export function InventarioInsumos({
     .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime())
     .slice(0, 10);
   const priceComparisonRows = buildSupplyPurchaseComparisonRows(moduleState.purchases, moduleState.suppliers);
+  const filteredCostHistoryRows = priceComparisonRows.filter((row) => costHistoryItemId === 'all' || row.itemId === costHistoryItemId);
   const supplierHistoryRows = Array.from(
     moduleState.purchases.reduce((acc, purchase) => {
       const key = purchase.supplierId || '__none__';
@@ -3462,12 +3465,18 @@ export function InventarioInsumos({
             <div className="bs-label">{editingSupplierId ? 'Editar proveedor' : 'Proveedor'}</div>
             <div className="bs-help">Ficha del proveedor para registrar compras, comparar precios y revisar historial.</div>
           </div>
-          {editingSupplierId && (
-            <button className="btn btn-secondary" type="button" onClick={handleCancelSupplierEdit}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary" type="button" onClick={() => setShowSuppliersList((current) => !current)}>
               <Icon.edit />
-              Cancelar
+              {showSuppliersList ? 'Ocultar proveedores' : 'Lista proveedores'}
             </button>
-          )}
+            {editingSupplierId && (
+              <button className="btn btn-secondary" type="button" onClick={handleCancelSupplierEdit}>
+                <Icon.edit />
+                Cancelar
+              </button>
+            )}
+          </div>
         </div>
         <div className="budget-pricing-settings-grid" style={{ marginBottom: 14 }}>
           <label className="pricing-setting-field" style={{ gridColumn: '1 / span 2' }}>
@@ -3516,38 +3525,40 @@ export function InventarioInsumos({
             </button>
           </div>
         </div>
-        <div className="inventory-table-shell" style={{ marginTop: 10 }}>
-          <div className="inventory-table-head inventory-suppliers-head">
-            <span>Proveedor</span>
-            <span>Telefono</span>
-            <span>Web</span>
-            <span>Direccion</span>
-            <span>Despacho</span>
-            <span>Estado</span>
-            <span>Compras</span>
-            <span>Acciones</span>
-          </div>
-          {moduleState.suppliers.map((supplier) => (
-            <div key={supplier.id} className="inventory-table-row inventory-suppliers-row">
-              <strong>{supplier.name}</strong>
-              <span>{supplier.phone || 'Sin telefono'}</span>
-              <span>{supplier.website || 'Sin web'}</span>
-              <span>{supplier.address || 'Sin direccion'}</span>
-              <span>{supplier.dispatch || 'Sin despacho'}</span>
-              <span>{supplier.active ? 'Activo' : 'Inactivo'}</span>
-              <span>{moduleState.purchases.filter((purchase) => purchase.supplierId === supplier.id).length}</span>
-              <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                <button className="row-action" type="button" onClick={() => handleEditSupplier(supplier)} title="Editar proveedor">
-                  <Icon.edit />
-                </button>
-                <button className="row-action" type="button" onClick={() => setFilterSupplierId(supplier.id)} title="Ver compras">
-                  <Icon.download />
-                </button>
-              </span>
+        {showSuppliersList && (
+          <div className="inventory-table-shell" style={{ marginTop: 10 }}>
+            <div className="inventory-table-head inventory-suppliers-head">
+              <span>Proveedor</span>
+              <span>Telefono</span>
+              <span>Web</span>
+              <span>Direccion</span>
+              <span>Despacho</span>
+              <span>Estado</span>
+              <span>Compras</span>
+              <span>Acciones</span>
             </div>
-          ))}
-          {!moduleState.suppliers.length && <div className="finance-empty">No hay proveedores configurados.</div>}
-        </div>
+            {moduleState.suppliers.map((supplier) => (
+              <div key={supplier.id} className="inventory-table-row inventory-suppliers-row">
+                <strong>{supplier.name}</strong>
+                <span>{supplier.phone || 'Sin telefono'}</span>
+                <span>{supplier.website || 'Sin web'}</span>
+                <span>{supplier.address || 'Sin direccion'}</span>
+                <span>{supplier.dispatch || 'Sin despacho'}</span>
+                <span>{supplier.active ? 'Activo' : 'Inactivo'}</span>
+                <span>{moduleState.purchases.filter((purchase) => purchase.supplierId === supplier.id).length}</span>
+                <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                  <button className="row-action" type="button" onClick={() => handleEditSupplier(supplier)} title="Editar proveedor">
+                    <Icon.edit />
+                  </button>
+                  <button className="row-action" type="button" onClick={() => setFilterSupplierId(supplier.id)} title="Ver compras">
+                    <Icon.download />
+                  </button>
+                </span>
+              </div>
+            ))}
+            {!moduleState.suppliers.length && <div className="finance-empty">No hay proveedores configurados.</div>}
+          </div>
+        )}
       </div>
 
       <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
@@ -3621,29 +3632,36 @@ export function InventarioInsumos({
           </div>
         </div>
         {showCatalogList && (
-          <div className="documents-list" style={{ marginTop: 14 }}>
+          <div className="inventory-table-shell" style={{ marginTop: 14 }}>
+            <div className="inventory-table-head inventory-catalog-head">
+              <span>Material</span>
+              <span>Marca</span>
+              <span>Unidad</span>
+              <span>Cant.</span>
+              <span>Stock</span>
+              <span>Min.</span>
+              <span>Costo c/u</span>
+              <span>Acciones</span>
+            </div>
             {moduleState.catalog.map((item) => {
               const unitCost = item.purchaseQuantity > 0 ? Math.round((Number(item.purchaseTotalCost) / Number(item.purchaseQuantity)) || 0) : 0;
               return (
-                <div key={item.id} className="document-row">
-                  <div className="document-main">
-                    <div className="document-head">
-                      <div className="document-title">{item.name || 'Sin nombre'}</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span className="count">{fmtCLP(unitCost)}</span>
-                        <button className="row-action" type="button" onClick={() => handleEditCatalogItem(item)} title="Editar insumo">
-                          <Icon.edit />
-                        </button>
-                        <button className="row-action" type="button" onClick={() => handleRemoveCatalogItem(item.id)} title="Eliminar insumo">
-                          <Icon.trash />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="document-meta-line">
-                      <span className="document-kind">{item.unit}</span>
-                      <span>{item.brand || 'Sin marca'} · {item.purchaseQuantity} comprados · stock {item.currentStock} · minimo {item.minimumStock}</span>
-                    </div>
-                  </div>
+                <div key={item.id} className="inventory-table-row inventory-catalog-row">
+                  <strong>{item.name || 'Sin nombre'}</strong>
+                  <span>{item.brand || 'Sin marca'}</span>
+                  <span>{item.unit || 'unidad'}</span>
+                  <span>{item.purchaseQuantity ?? 0}</span>
+                  <span>{item.currentStock ?? 0}</span>
+                  <span>{item.minimumStock ?? 0}</span>
+                  <span>{fmtCLP(unitCost)}</span>
+                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                    <button className="row-action" type="button" onClick={() => handleEditCatalogItem(item)} title="Editar insumo">
+                      <Icon.edit />
+                    </button>
+                    <button className="row-action" type="button" onClick={() => handleRemoveCatalogItem(item.id)} title="Eliminar insumo">
+                      <Icon.trash />
+                    </button>
+                  </span>
                 </div>
               );
             })}
@@ -3657,6 +3675,7 @@ export function InventarioInsumos({
           <div>
             <div className="bs-label">{editingPurchaseId ? 'Editar compra' : 'Registrar compra'}</div>
             <div className="bs-help">{editingPurchaseId ? 'Corrige la compra y guarda la version actualizada.' : 'Aqui vive el flujo de compra para que no quede dentro de la ficha del paciente.'}</div>
+            <div className="documents-save-note">Las compras guardadas aparecen abajo en Ultimas compras y actualizan la comparacion de precios.</div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className="btn btn-secondary" type="button" onClick={handleStartSupplierCreate}>
@@ -3760,8 +3779,16 @@ export function InventarioInsumos({
       <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
         <div className="budget-pricing-settings-head">
           <div>
-            <div className="bs-label">Comparacion de precios</div>
-            <div className="bs-help">Lectura basica del costo unitario por insumo segun el historial local guardado.</div>
+            <div className="bs-label">Historial de costos por insumo</div>
+            <div className="bs-help">Lectura del minimo, promedio, ultimo y maximo costo de cada insumo segun sus compras guardadas.</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <select value={costHistoryItemId} onChange={(event) => setCostHistoryItemId(event.target.value)}>
+              <option value="all">Todos los insumos</option>
+              {moduleState.catalog.map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </select>
           </div>
         </div>
         <div className="inventory-table-shell">
@@ -3775,7 +3802,7 @@ export function InventarioInsumos({
             <span>Fecha</span>
             <span>Proveedor</span>
           </div>
-          {priceComparisonRows.map((row) => (
+          {filteredCostHistoryRows.map((row) => (
             <div key={row.itemId} className="inventory-table-row inventory-comparison-row">
               <strong>{row.itemName}</strong>
               <span>{row.lastBrandName || 'Sin marca'}</span>
@@ -3792,7 +3819,7 @@ export function InventarioInsumos({
               </span>
             </div>
           ))}
-          {!priceComparisonRows.length && <div className="finance-empty">Todavia no hay compras suficientes para comparar precios.</div>}
+          {!filteredCostHistoryRows.length && <div className="finance-empty">Todavia no hay compras guardadas para ese insumo.</div>}
         </div>
       </div>
 

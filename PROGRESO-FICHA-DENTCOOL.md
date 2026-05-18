@@ -261,6 +261,12 @@ Hecho:
 - se agrego formulario rapido de proveedor dentro de `Registrar compra` para escribir nombre/contacto sin bajar al bloque maestro
 - el formulario rapido tiene accion `Guardar y seleccionar`
 - verificacion de proveedor rapido en compra: `npm test -- --run` paso con `78` tests verdes y `npm run build` paso correctamente
+- se ajusto `Inventario` para que la lista de proveedores quede oculta por defecto y se abra solo desde el boton `Lista proveedores`, evitando scroll largo cuando existan muchos proveedores
+- se renombro `Comparacion de precios` a `Historial de costos por insumo` para evitar que se lea como comparacion entre productos distintos
+- `Historial de costos por insumo` ahora permite filtrar por todos los insumos o por un insumo especifico
+- se ajusto `Ver catalogo` para mostrar materiales como tabla horizontal compacta, evitando tarjetas altas y cortes visuales
+- validacion manual del usuario: proveedor creado, compra registrada, historial por proveedor visible, cierre de sesion y reingreso conservan datos locales
+- verificacion del ajuste visual de inventario: `npm test -- --run` paso con `78` tests verdes y `npm run build` paso correctamente
 
 ## Como se hizo este bloque
 

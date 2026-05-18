@@ -145,8 +145,14 @@
 - [x] Seleccionar automaticamente el proveedor recien creado al registrar compra
 - [x] Reordenar inventario para dejar `Proveedor` arriba de `Registrar compra`, `Agregar material`, `Comparacion de precios`, `Ultimas compras` e `Historial por proveedor`
 - [x] Simplificar la ficha de proveedor a `Nombre proveedor`, `Telefono`, `Web`, `Direccion`, `Despacho` y `Estado`
-- [ ] Validar manualmente crear proveedor y usarlo en una compra
-- [ ] Validar manualmente que el formulario de proveedor vive arriba y ya no depende del formulario inline dentro de compras
+- [x] Ocultar la lista de proveedores detras del boton `Lista proveedores` para reducir scroll en inventario
+- [x] Renombrar `Comparacion de precios` a `Historial de costos por insumo`
+- [x] Agregar filtro por insumo al historial de costos
+- [x] Validar manualmente crear proveedor y usarlo en una compra
+- [x] Validar manualmente que el formulario de proveedor vive arriba y ya no depende del formulario inline dentro de compras
+- [x] Validar persistencia local de inventario al cerrar sesion y volver a entrar
+- [x] Validar visualmente `Ver catalogo` como tabla horizontal compacta
+- [x] Validar `Historial de costos por insumo` con compras guardadas y filtro por insumo
 - [ ] Mejorar insumos amortizables: espejo, rotor, aeropulidor y otros equipos deben calcular costo por uso/vida util, no como dosis simple
 - [ ] Mostrar en UI como se obtiene el precio unitario de un material comprado, incluyendo cantidad comprada, costo total y costo amortizado si corresponde
 - [ ] Validar la separacion entre lista base comun del tratamiento e insumos especificos agregados para un caso/paciente

@@ -2,7 +2,7 @@
 
 ## Fecha de referencia
 
-`2026-05-17`
+`2026-05-18`
 
 ## Estado resumido
 
@@ -227,8 +227,11 @@ Razon:
 - inventario se esta reordenando para que `Proveedor` quede primero y el resto siga el orden operativo pedido por la doctora
 - la ficha de proveedor se simplifico a los campos operativos que pidio: nombre, telefono, web, direccion, despacho y estado
 - el formulario inline rapido de proveedor dentro de compras se elimino para evitar duplicidad y confusion
-- queda pendiente validar manualmente crear proveedor y usarlo en una compra real de inventario
-- queda pendiente validar manualmente que el formulario de proveedor se vea arriba y que el boton `Agregar proveedor` lleve a esa ficha
+- `Inventario` ahora oculta la lista de proveedores por defecto y la muestra desde el boton `Lista proveedores`, para evitar scroll largo cuando crezca el maestro
+- `Inventario` ahora muestra `Historial de costos por insumo` con filtro por insumo, en vez de `Comparacion de precios`, para evitar confundir productos distintos
+- `Ver catalogo` ahora muestra los materiales como tabla horizontal compacta
+- validacion manual del usuario: proveedor creado, compra registrada, historial por proveedor visible, cierre de sesion y reingreso conservan datos locales de inventario
+- verificacion actual del ajuste visual de inventario: `npm test -- --run` paso con `78` tests y `npm run build` paso correctamente
 
 ## Instruccion de retoma
 
