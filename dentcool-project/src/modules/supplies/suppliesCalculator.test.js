@@ -57,6 +57,30 @@ describe('supplies calculator', () => {
     expect(result.lines[0].quantity).toBe(4);
   });
 
+  it('uses amortized unit cost for reusable equipment', () => {
+    const result = calculatePatientSupplyUsageCost(
+      [
+        { itemId: 'eq_contraangulo_test', quantity: 1 },
+      ],
+      [
+        {
+          id: 'eq_contraangulo_test',
+          name: 'Contraangulo',
+          itemType: 'equipment',
+          unit: 'uso',
+          purchaseQuantity: 100,
+          purchaseTotalCost: 100000,
+          unitCost: 1000,
+          amortizationUses: 100,
+        },
+      ]
+    );
+
+    expect(result.totalCost).toBe(1000);
+    expect(result.lines[0].itemType).toBe('equipment');
+    expect(result.lines[0].purchaseQuantity).toBe(100);
+  });
+
   it('creates immutable supply snapshots', () => {
     const usageItems = [{ itemId: 'sup_vaso_001', quantity: 2 }];
     const snapshot = createSupplySnapshot({

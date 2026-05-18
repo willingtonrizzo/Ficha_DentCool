@@ -4876,8 +4876,8 @@ table.tx tfoot td {
 
 .inventory-catalog-head,
 .inventory-catalog-row {
-  grid-template-columns: minmax(170px, 1.7fr) minmax(110px, 1fr) 90px 80px 80px 80px 100px 90px;
-  min-width: 860px;
+  grid-template-columns: minmax(160px, 1.6fr) 110px minmax(100px, 1fr) 80px 105px 80px 90px 95px 90px;
+  min-width: 980px;
 }
 
 .inventory-provider-history-head,

@@ -267,6 +267,13 @@ Hecho:
 - se ajusto `Ver catalogo` para mostrar materiales como tabla horizontal compacta, evitando tarjetas altas y cortes visuales
 - validacion manual del usuario: proveedor creado, compra registrada, historial por proveedor visible, cierre de sesion y reingreso conservan datos locales
 - verificacion del ajuste visual de inventario: `npm test -- --run` paso con `78` tests verdes y `npm run build` paso correctamente
+- se inicio el bloque `Bloque Funcionalidades - insumos amortizables`
+- `Agregar material` ahora permite marcar un material como `Consumible` o `Amortizable`
+- cuando un material es `Amortizable`, la unidad queda como `uso`, el stock minimo queda desactivado en 0 y aparece `Usos/pacientes estimados`
+- el costo por uso se calcula como costo total de compra dividido por usos/pacientes estimados, por ejemplo $100.000 / 100 usos = $1.000 por uso
+- la tabla de `Insumos` ahora muestra `Amortizado: X usos / $Y` cuando el material es reutilizable, para evitar que se tome el precio completo como costo del paciente
+- se agregaron ayudas `?` para tipo de material, unidad, cantidad, costo total, usos estimados y stock minimo
+- verificacion del bloque de amortizacion: `npm test -- --run` paso con `79` tests verdes y `npm run build` paso correctamente
 
 ## Como se hizo este bloque
 

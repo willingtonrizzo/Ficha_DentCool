@@ -153,8 +153,9 @@
 - [x] Validar persistencia local de inventario al cerrar sesion y volver a entrar
 - [x] Validar visualmente `Ver catalogo` como tabla horizontal compacta
 - [x] Validar `Historial de costos por insumo` con compras guardadas y filtro por insumo
-- [ ] Mejorar insumos amortizables: espejo, rotor, aeropulidor y otros equipos deben calcular costo por uso/vida util, no como dosis simple
-- [ ] Mostrar en UI como se obtiene el precio unitario de un material comprado, incluyendo cantidad comprada, costo total y costo amortizado si corresponde
+- [x] Mejorar insumos amortizables: espejo, rotor, aeropulidor y otros equipos deben calcular costo por uso/vida util, no como dosis simple
+- [x] Mostrar en UI como se obtiene el precio unitario de un material comprado, incluyendo cantidad comprada, costo total y costo amortizado si corresponde
+- [ ] Validar manualmente insumo amortizable: contraangulo de $100.000 con usos estimados debe entrar a `Insumos` como costo por uso, no costo completo
 - [ ] Validar la separacion entre lista base comun del tratamiento e insumos especificos agregados para un caso/paciente
 - [ ] Profundizar reportes financieros con datos mas operativos
 - [ ] Refinar componentes UX/UI uno por uno

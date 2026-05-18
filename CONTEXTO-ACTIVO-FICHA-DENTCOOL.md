@@ -232,6 +232,11 @@ Razon:
 - `Ver catalogo` ahora muestra los materiales como tabla horizontal compacta
 - validacion manual del usuario: proveedor creado, compra registrada, historial por proveedor visible, cierre de sesion y reingreso conservan datos locales de inventario
 - verificacion actual del ajuste visual de inventario: `npm test -- --run` paso con `78` tests y `npm run build` paso correctamente
+- `Agregar material` ahora distingue `Consumible` y `Amortizable`
+- para materiales amortizables, la UI usa unidad `uso`, desactiva stock minimo y permite definir `Usos/pacientes estimados`
+- los insumos amortizables se calculan por costo por uso, no por el precio completo del equipo
+- la tabla de `Insumos` muestra el origen `Amortizado: X usos / $Y`
+- verificacion actual del bloque de amortizacion: `npm test -- --run` paso con `79` tests y `npm run build` paso correctamente
 
 ## Instruccion de retoma
 

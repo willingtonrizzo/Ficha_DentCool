@@ -10,6 +10,7 @@ import {
 import {
   adjustSupplyItemForPurchaseChange,
   buildSupplyPurchaseComparisonRows,
+  calculateAmortizedCost,
   calculatePatientSupplyUsageCost,
   checkAgendaSupplyNeeds,
   checkLowStock,
@@ -53,6 +54,18 @@ function PricingHelpButton({ label, text, compact = false, open, onToggle, place
     </div>
   );
 }
+
+const supplyUnitHelpText = [
+  'unidad: piezas individuales, como vaso, mascarilla o eyector.',
+  'par: dos unidades que se usan juntas, como guantes.',
+  'caja/pack: compra agrupada; usa Cantidad de compra para dividir el costo total.',
+  'ml/mg/g: materiales medidos por volumen o peso.',
+  'dosis: medicamento o material que se consume por aplicacion.',
+  'rollo: materiales comprados en rollo.',
+  'uso: equipos o packs reutilizables/amortizables; cada paciente consume un uso.',
+  'paciente estimado: costo repartido por cantidad esperada de pacientes.',
+  'semana/jornada: costos operativos repartidos por periodo de trabajo.',
+].join('\n');
 
 function csvEscape(value) {
   const text = value == null ? '' : String(value);
@@ -2878,7 +2891,9 @@ export function Insumos({
                       <strong>{fmtCLP(line?.unitCostAtTime ?? 0)}</strong>
                       {(line?.purchaseQuantity ?? 0) > 0 && (line?.purchaseTotalCost ?? 0) > 0 && (
                         <small style={{ color: 'var(--muted)', fontSize: 11 }}>
-                          Base: {line.purchaseQuantity} {line.unit} / {fmtCLP(line.purchaseTotalCost)}
+                          {line.itemType === 'equipment'
+                            ? `Amortizado: ${line.purchaseQuantity} usos / ${fmtCLP(line.purchaseTotalCost)}`
+                            : `Base: ${line.purchaseQuantity} ${line.unit} / ${fmtCLP(line.purchaseTotalCost)}`}
                         </small>
                       )}
                     </div>
@@ -2981,9 +2996,11 @@ export function InventarioInsumos({
   const [moduleState, setModuleState] = useState(() => loadSupplyState());
   const [newCatalogName, setNewCatalogName] = useState('');
   const [newCatalogBrand, setNewCatalogBrand] = useState('');
+  const [newCatalogItemType, setNewCatalogItemType] = useState('consumable');
   const [newCatalogUnit, setNewCatalogUnit] = useState('unidad');
   const [newCatalogQuantity, setNewCatalogQuantity] = useState(1);
   const [newCatalogTotalCost, setNewCatalogTotalCost] = useState(0);
+  const [newCatalogEstimatedUses, setNewCatalogEstimatedUses] = useState(50);
   const [newCatalogMinimumStock, setNewCatalogMinimumStock] = useState(0);
   const [showCatalogList, setShowCatalogList] = useState(false);
   const [editingCatalogId, setEditingCatalogId] = useState('');
@@ -3009,6 +3026,7 @@ export function InventarioInsumos({
   const [supplierDispatch, setSupplierDispatch] = useState('');
   const [supplierActive, setSupplierActive] = useState(true);
   const [showSuppliersList, setShowSuppliersList] = useState(false);
+  const [openInventoryHelp, setOpenInventoryHelp] = useState(null);
   const [filterSupplierId, setFilterSupplierId] = useState('all');
   const [filterItemId, setFilterItemId] = useState('all');
   const [costHistoryItemId, setCostHistoryItemId] = useState('all');
@@ -3071,10 +3089,19 @@ export function InventarioInsumos({
   const handleSaveCatalogItem = () => {
     const nextName = newCatalogName.trim() || 'Nuevo insumo';
     const nextBrand = newCatalogBrand.trim();
+    const isAmortizable = newCatalogItemType === 'equipment';
     const nextQuantity = Number(newCatalogQuantity) || 0;
     const nextTotalCost = Number(newCatalogTotalCost) || 0;
-    const nextMinimumStock = Number(newCatalogMinimumStock) || 0;
-    const nextUnitCost = nextQuantity > 0 ? Math.round(nextTotalCost / nextQuantity) : 0;
+    const nextEstimatedUses = Math.max(1, Number(newCatalogEstimatedUses) || 1);
+    const nextMinimumStock = isAmortizable ? 0 : Number(newCatalogMinimumStock) || 0;
+    const costDivisor = isAmortizable ? nextEstimatedUses : nextQuantity;
+    const nextUnitCost = isAmortizable
+      ? calculateAmortizedCost(nextTotalCost, nextEstimatedUses)
+      : costDivisor > 0
+        ? Math.round(nextTotalCost / costDivisor)
+        : 0;
+    const nextUnit = isAmortizable ? 'uso' : newCatalogUnit;
+    const nextPurchaseQuantity = isAmortizable ? nextEstimatedUses : nextQuantity;
 
     if (editingCatalogId) {
       setModuleState((current) => ({
@@ -3085,11 +3112,13 @@ export function InventarioInsumos({
             ...item,
             name: nextName,
             brand: nextBrand,
-            unit: newCatalogUnit,
-            purchaseQuantity: nextQuantity,
+            itemType: newCatalogItemType,
+            unit: nextUnit,
+            purchaseQuantity: nextPurchaseQuantity,
             purchaseTotalCost: nextTotalCost,
             unitCost: nextUnitCost,
             minimumStock: nextMinimumStock,
+            amortizationUses: isAmortizable ? nextEstimatedUses : null,
           };
         }),
       }));
@@ -3103,17 +3132,18 @@ export function InventarioInsumos({
             id: nextId,
             name: nextName,
             brand: nextBrand,
-            category: 'Otros',
-            itemType: 'consumable',
-            unit: newCatalogUnit,
-            purchaseQuantity: nextQuantity,
+            category: isAmortizable ? 'Equipos amortizables' : 'Otros',
+            itemType: newCatalogItemType,
+            unit: nextUnit,
+            purchaseQuantity: nextPurchaseQuantity,
             purchaseTotalCost: nextTotalCost,
             unitCost: nextUnitCost,
-            currentStock: 0,
+            currentStock: isAmortizable ? 1 : 0,
             minimumStock: nextMinimumStock,
             supplierId: '',
             defaultUsePerPatient: 1,
             active: true,
+            amortizationUses: isAmortizable ? nextEstimatedUses : null,
             notes: '',
           },
           ...current.catalog,
@@ -3122,9 +3152,11 @@ export function InventarioInsumos({
     }
     setNewCatalogName('');
     setNewCatalogBrand('');
+    setNewCatalogItemType('consumable');
     setNewCatalogUnit('unidad');
     setNewCatalogQuantity(1);
     setNewCatalogTotalCost(0);
+    setNewCatalogEstimatedUses(50);
     setNewCatalogMinimumStock(0);
     setEditingCatalogId('');
   };
@@ -3140,9 +3172,11 @@ export function InventarioInsumos({
     setEditingCatalogId(item.id);
     setNewCatalogName(item.name ?? '');
     setNewCatalogBrand(item.brand ?? '');
+    setNewCatalogItemType(item.itemType === 'equipment' ? 'equipment' : 'consumable');
     setNewCatalogUnit(item.unit ?? 'unidad');
-    setNewCatalogQuantity(item.purchaseQuantity ?? 1);
+    setNewCatalogQuantity(item.itemType === 'equipment' ? 1 : item.purchaseQuantity ?? 1);
     setNewCatalogTotalCost(item.purchaseTotalCost ?? 0);
+    setNewCatalogEstimatedUses(item.amortizationUses ?? (item.itemType === 'equipment' ? item.purchaseQuantity : 50) ?? 50);
     setNewCatalogMinimumStock(item.minimumStock ?? 0);
     setShowCatalogList(false);
   };
@@ -3151,9 +3185,11 @@ export function InventarioInsumos({
     setEditingCatalogId('');
     setNewCatalogName('');
     setNewCatalogBrand('');
+    setNewCatalogItemType('consumable');
     setNewCatalogUnit('unidad');
     setNewCatalogQuantity(1);
     setNewCatalogTotalCost(0);
+    setNewCatalogEstimatedUses(50);
     setNewCatalogMinimumStock(0);
   };
 
@@ -3174,7 +3210,10 @@ export function InventarioInsumos({
     if (!catalogItem || quantity <= 0 || totalCost <= 0 || !documentNumber) return;
 
     const now = new Date().toISOString();
-    const unitCost = Math.round((totalCost / quantity) * 100) / 100;
+    const amortizationUses = Math.max(1, Number(catalogItem.amortizationUses || catalogItem.purchaseQuantity || quantity) || 1);
+    const unitCost = catalogItem.itemType === 'equipment'
+      ? calculateAmortizedCost(totalCost, amortizationUses * quantity)
+      : Math.round((totalCost / quantity) * 100) / 100;
     const purchase = {
       id: editingPurchaseId || `supply-purchase-${catalogItem.id}-${Date.now()}`,
       itemId: catalogItem.id,
@@ -3593,9 +3632,39 @@ export function InventarioInsumos({
           </label>
           <label className="pricing-setting-field">
             <span className="pricing-setting-label-row">
-              <span className="pricing-setting-label-text">Unidad</span>
+              <span className="pricing-setting-label-text">Tipo</span>
+              <PricingHelpButton
+                label="Tipo de material"
+                text="Consumible: se gasta por unidad, dosis, par, caja o ml. Amortizable: equipo o instrumental reutilizable como espejo, rotor, contraangulo o aeropulidor; el costo se reparte por usos/pacientes estimados."
+                compact
+                open={openInventoryHelp === 'itemType'}
+                onToggle={() => setOpenInventoryHelp((current) => (current === 'itemType' ? null : 'itemType'))}
+              />
             </span>
-            <select value={newCatalogUnit} onChange={(event) => setNewCatalogUnit(event.target.value)}>
+            <select value={newCatalogItemType} onChange={(event) => {
+              const nextType = event.target.value;
+              setNewCatalogItemType(nextType);
+              if (nextType === 'equipment') {
+                setNewCatalogUnit('uso');
+                setNewCatalogMinimumStock(0);
+              }
+            }}>
+              <option value="consumable">Consumible</option>
+              <option value="equipment">Amortizable</option>
+            </select>
+          </label>
+          <label className="pricing-setting-field">
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Unidad</span>
+              <PricingHelpButton
+                label="Unidad de insumo"
+                text={supplyUnitHelpText}
+                compact
+                open={openInventoryHelp === 'unit'}
+                onToggle={() => setOpenInventoryHelp((current) => (current === 'unit' ? null : 'unit'))}
+              />
+            </span>
+            <select value={newCatalogItemType === 'equipment' ? 'uso' : newCatalogUnit} onChange={(event) => setNewCatalogUnit(event.target.value)} disabled={newCatalogItemType === 'equipment'}>
               {(moduleState.units.length ? moduleState.units : ['unidad']).map((unit) => (
                 <option key={unit} value={unit}>{unit}</option>
               ))}
@@ -3603,21 +3672,64 @@ export function InventarioInsumos({
           </label>
           <label className="pricing-setting-field">
             <span className="pricing-setting-label-row">
-              <span className="pricing-setting-label-text">Cantidad de compra</span>
+              <span className="pricing-setting-label-text">{newCatalogItemType === 'equipment' ? 'Cantidad fisica' : 'Cantidad de compra'}</span>
+              <PricingHelpButton
+                label="Cantidad de compra"
+                text="En consumibles, divide el costo total para obtener el costo unitario. En amortizables, representa cuantas piezas fisicas compraste; el costo por uso se calcula con usos/pacientes estimados."
+                compact
+                open={openInventoryHelp === 'quantity'}
+                onToggle={() => setOpenInventoryHelp((current) => (current === 'quantity' ? null : 'quantity'))}
+              />
             </span>
             <input type="number" min="0" step="1" value={newCatalogQuantity} onChange={(event) => setNewCatalogQuantity(event.target.value)} />
           </label>
           <label className="pricing-setting-field">
             <span className="pricing-setting-label-row">
               <span className="pricing-setting-label-text">Costo total compra</span>
+              <PricingHelpButton
+                label="Costo total compra"
+                text="Monto total pagado. En consumibles se divide por la cantidad comprada. En amortizables se divide por los usos/pacientes estimados para calcular el costo por uso."
+                compact
+                open={openInventoryHelp === 'totalCost'}
+                onToggle={() => setOpenInventoryHelp((current) => (current === 'totalCost' ? null : 'totalCost'))}
+              />
             </span>
             <input type="number" min="0" step="1" value={newCatalogTotalCost} onChange={(event) => setNewCatalogTotalCost(event.target.value)} />
           </label>
+          {newCatalogItemType === 'equipment' && (
+            <label className="pricing-setting-field">
+              <span className="pricing-setting-label-row">
+                <span className="pricing-setting-label-text">Usos/pacientes estimados</span>
+                <PricingHelpButton
+                  label="Usos o pacientes estimados"
+                  text="Vida util operativa estimada. Ejemplo: contraangulo de $100.000 con 100 usos = $1.000 por paciente/uso. Si luego el uso real cambia, puedes editar este numero."
+                  compact
+                  open={openInventoryHelp === 'estimatedUses'}
+                  onToggle={() => setOpenInventoryHelp((current) => (current === 'estimatedUses' ? null : 'estimatedUses'))}
+                />
+              </span>
+              <input type="number" min="1" step="1" value={newCatalogEstimatedUses} onChange={(event) => setNewCatalogEstimatedUses(event.target.value)} />
+            </label>
+          )}
           <label className="pricing-setting-field">
             <span className="pricing-setting-label-row">
               <span className="pricing-setting-label-text">Stock minimo alerta</span>
+              <PricingHelpButton
+                label="Stock minimo"
+                text="Aplica a consumibles que se acaban fisicamente. En amortizables queda en 0 porque el control principal es vida util/uso estimado, no alerta de stock bajo."
+                compact
+                open={openInventoryHelp === 'minimumStock'}
+                onToggle={() => setOpenInventoryHelp((current) => (current === 'minimumStock' ? null : 'minimumStock'))}
+              />
             </span>
-            <input type="number" min="0" step="1" value={newCatalogMinimumStock} onChange={(event) => setNewCatalogMinimumStock(event.target.value)} />
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={newCatalogItemType === 'equipment' ? 0 : newCatalogMinimumStock}
+              onChange={(event) => setNewCatalogMinimumStock(event.target.value)}
+              disabled={newCatalogItemType === 'equipment'}
+            />
           </label>
           <div style={{ display: 'flex', alignItems: 'end', gap: 8 }}>
             <button className="btn btn-primary" type="button" onClick={handleSaveCatalogItem}>
@@ -3635,6 +3747,7 @@ export function InventarioInsumos({
           <div className="inventory-table-shell" style={{ marginTop: 14 }}>
             <div className="inventory-table-head inventory-catalog-head">
               <span>Material</span>
+              <span>Tipo</span>
               <span>Marca</span>
               <span>Unidad</span>
               <span>Cant.</span>
@@ -3645,14 +3758,16 @@ export function InventarioInsumos({
             </div>
             {moduleState.catalog.map((item) => {
               const unitCost = item.purchaseQuantity > 0 ? Math.round((Number(item.purchaseTotalCost) / Number(item.purchaseQuantity)) || 0) : 0;
+              const isAmortizable = item.itemType === 'equipment';
               return (
                 <div key={item.id} className="inventory-table-row inventory-catalog-row">
                   <strong>{item.name || 'Sin nombre'}</strong>
+                  <span>{isAmortizable ? 'Amortizable' : 'Consumible'}</span>
                   <span>{item.brand || 'Sin marca'}</span>
                   <span>{item.unit || 'unidad'}</span>
-                  <span>{item.purchaseQuantity ?? 0}</span>
+                  <span>{isAmortizable ? `${item.amortizationUses ?? item.purchaseQuantity ?? 0} usos` : item.purchaseQuantity ?? 0}</span>
                   <span>{item.currentStock ?? 0}</span>
-                  <span>{item.minimumStock ?? 0}</span>
+                  <span>{isAmortizable ? 'No aplica' : item.minimumStock ?? 0}</span>
                   <span>{fmtCLP(unitCost)}</span>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     <button className="row-action" type="button" onClick={() => handleEditCatalogItem(item)} title="Editar insumo">

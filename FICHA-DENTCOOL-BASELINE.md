@@ -158,6 +158,8 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - En la rama `ajustes-validacion-doctora`, `Inventario` oculta la lista de proveedores por defecto detras del boton `Lista proveedores`.
 - En la rama `ajustes-validacion-doctora`, `Inventario` muestra `Historial de costos por insumo` con filtro por insumo especifico para leer minimo, promedio, ultimo y maximo costo sin comparar productos distintos.
 - En la rama `ajustes-validacion-doctora`, `Ver catalogo` en inventario usa tabla horizontal compacta y el usuario ya valido proveedor, compra, historial por proveedor y persistencia local al cerrar sesion.
+- En la rama `ajustes-validacion-doctora`, `Agregar material` permite distinguir consumibles de amortizables; los amortizables usan unidad `uso`, desactivan stock minimo y calculan costo por uso/paciente estimado.
+- En la rama `ajustes-validacion-doctora`, la tabla de `Insumos` muestra el origen amortizado para evitar que un equipo reutilizable se cargue al paciente por su precio completo.
 - El repositorio local tiene remoto GitHub `https://github.com/willingtonrizzo/Ficha_DentCool.git`; se puede clonar desde ahi si el usuario tiene acceso.
 - El inventario parte con un proveedor semilla (`Proveedor Dental X`) y permite crear/editar proveedores, pero la accion esta dentro de `Ver proveedores` y puede quedar poco visible.
 - El motor de insumos ya contiene una funcion de costo amortizado y categorias de equipos amortizables, pero la UI aun no explica de forma suficiente como calcular el costo por uso de espejo, rotor, aeropulidor u otros reutilizables.
