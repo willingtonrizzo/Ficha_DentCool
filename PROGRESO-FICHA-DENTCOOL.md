@@ -14,6 +14,50 @@ Objetivo inmediato:
 
 ## Ultimo avance realizado
 
+Fecha de referencia: `2026-05-18`
+
+Hecho:
+
+- se cambio la base de trabajo a la rama local `ajustes-validacion-doctora`, siguiendo `origin/ajustes-validacion-doctora`
+- se guardo un stash de seguridad antes de cambiar de rama: `handoff antes de cambiar a ajustes-validacion-doctora`
+- se verifico la rama con `npm test -- --run`: `83` tests verdes
+- se verifico la rama con `npm run build`: build correcto
+- se compilo la app de escritorio con `npm run desktop:build`: build correcto
+- se genero instalador Windows actualizado desde esta rama en `dentcool-project/src-tauri/target/release/bundle/nsis/DentCool_0.1.0_x64-setup.exe`
+- se creo backup previo de SQLite en `backups/ficha-dentcool-20260518-170706.db`
+- se instalo la build local de Tauri de `ajustes-validacion-doctora`
+- se verifico ejecutable instalado en `C:\Users\welli\AppData\Local\DentCool\dentcool.exe`
+- se verifico que la base SQLite real sigue en `C:\Users\welli\AppData\Roaming\com.dentcool.app\ficha-dentcool.db`
+- queda pendiente prueba manual visual/login de la app instalada y decidir si se limpia o conserva el stash de seguridad
+- se agrego Playwright como primera capa de pruebas tipo usuario sobre Vite
+- se creo `playwright.config.js` con servidor Vite automatico
+- se creo `tests/e2e/login-permissions.spec.js` para validar login y permisos visibles de `Admin` y `Staff`
+- se agrego script `npm run test:e2e`
+- se ajusto `vite.config.js` para que Vitest no ejecute los tests E2E
+- se instalo Chromium de Playwright localmente; el primer intento fallo por certificado y se resolvio usando `NODE_OPTIONS=--use-system-ca`
+- verificacion actual: `npm test -- --run` pasa con `83` tests, `npm run test:e2e` pasa con `2` tests y `npm run build` pasa
+- se abrio `Bloque Funcionalidades - insumos/inventario`
+- en `Insumos` se agrego comentario de detalle hasta `500` palabras para cada costo guardado
+- el historial de costos guardados ahora tiene boton `Detalle` y muestra lista base/planificada, insumos extras reales, tiempo extra y comentarios
+- el historial de costos guardados ahora permite editar fecha, costo, estado y comentarios; tambien permite eliminar registros manualmente
+- `Restaurar panel` ahora limpia solo el panel de trabajo y conserva el historial/snapshots guardados
+- en `Inventario` se agrego `Editor de lista de tratamientos` para editar listas base persistentes por tratamiento desde el inventario general
+- se recompilo e instalo Tauri con estos cambios
+- backup previo a instalacion: `backups/ficha-dentcool-20260518-200853.db`
+- verificacion del bloque: `npm test -- --run` pasa con `83` tests, `npm run build` pasa, `npm run test:e2e` pasa con `2` tests y `npm run desktop:build` pasa
+- se ajusto el ancho del panel abierto por `Detalle` en historial de insumos a `40vw` en escritorio, manteniendo `100%` en pantallas chicas
+- se verifico con `npm test -- --run`, `npm run build`, `npm run desktop:build` y se reinstalo Tauri
+- backup previo a esta instalacion visual: `backups/ficha-dentcool-20260518-204833.db`
+- se abrio `Bloque UX/UI - Inicio operativo`
+- se revisaron referencias de dashboards dentales/clinicos y se tomo como criterio: agenda/seguimientos visibles, alertas reales, accesos accionables y reduccion de carga cognitiva
+- se quitaron de Inicio las acciones de maqueta sin funcionalidad directa y el resumen financiero con montos de ejemplo
+- Inicio ahora usa datos reales disponibles: pacientes, seguimientos con fecha, alertas clinicas, datos incompletos y permisos de rol
+- se agregaron accesos funcionales a nuevo paciente, ficha activa, directorio, inventario y facturacion segun permisos
+- se reforzo la profundidad visual con fondo de marca, hero mas definido, tarjetas con mayor contraste y botones con detalle operativo
+- se ajusto Playwright por el nuevo acceso de Inventario en Inicio
+- verificacion del bloque: `npm test -- --run` pasa con `83` tests, `npm run build` pasa, `npm run test:e2e` pasa con `2` tests y `npm run desktop:build` pasa
+- se instalo Tauri con Inicio actualizado; backup previo `backups/ficha-dentcool-20260519-001240.db`
+
 Fecha de referencia: `2026-05-17`
 
 Hecho:
@@ -505,3 +549,63 @@ Hecho:
 - inventario general reordenado: `Proveedor` arriba, luego `Registrar compra`, `Agregar material`, `Comparacion de precios`, `Ultimas compras` y `Historial por proveedor`
 - ficha de proveedor recortada a campos operativos reales: `Nombre proveedor`, `Telefono`, `Web`, `Direccion`, `Despacho` y `Estado`
 - se elimino el formulario inline duplicado de proveedor dentro de compras para que el alta viva en la ficha superior
+
+## 2026-05-19 - Bloque UX/UI - Inicio operativo y seguimientos editables
+
+- se mantiene el bloque superior de bienvenida `Bienvenido Admin/Staff`; tras correccion posterior queda como hero operativo visual.
+- el primer bloque visible de `Inicio` ahora tiene mas profundidad visual con fondo de marca y tarjetas KPI con mayor contraste.
+- `Seguimientos visibles` ahora lee citas reales de `clinicalRecords.appointments` cuando existen y mantiene compatibilidad con `nextVisit` legacy.
+- cada seguimiento real permite cambiar estado desde Inicio: `Programada`, `Confirmada`, `Atendida / concluida`, `Cancelada` y `No asistio`.
+- al marcar una cita como `Atendida / concluida`, `Cancelada` o `No asistio`, deja de contarse como pendiente y se recalcula `nextVisit` del paciente.
+- se actualizo Playwright para validar Inicio por el heading `Seguimientos visibles`, ya que el heading de bienvenida fue retirado.
+- verificacion actual: `npm test -- --run` paso con `83` tests, `npm run build` paso, `npm run test:e2e` paso con `2` tests.
+- Tauri actualizado: `npm run desktop:build` genero `dentcool-project/src-tauri/target/release/bundle/nsis/DentCool_0.1.0_x64-setup.exe` y se instalo en `C:\Users\welli\AppData\Local\DentCool\dentcool.exe` con fecha `2026-05-19 01:00`.
+- respaldo SQLite previo a reinstalar: `backups/ficha-dentcool-20260519-004814.db`.
+
+### Correccion 2026-05-19 - Bienvenida restaurada
+
+- se restauro la seccion superior de bienvenida en `Inicio`; no queda eliminada, queda redisenada con mas color, contraste y profundidad visual.
+- se agrego el bloque visible `Seccion KPI` para separar los indicadores operativos.
+- se retiro el amarillo de la zona KPI/datos pendientes y se reemplazo por una mezcla de marca con morado.
+- verificacion posterior: `npm test -- --run` paso con `83` tests, `npm run build` paso y `npm run test:e2e` paso con `2` tests.
+- Tauri reinstalado con la correccion en `C:\Users\welli\AppData\Local\DentCool\dentcool.exe` con fecha `2026-05-19 01:19`; respaldo SQLite previo: `backups/ficha-dentcool-20260519-011557.db`.
+
+### Ajuste visual 2026-05-19 - Bienvenida revisada en navegador
+
+- se reviso visualmente `Inicio` con Playwright y captura local; la primera version seguia lavada porque `.card` pisaba el fondo del hero.
+- se corrigio `.card.home-hero` para que conserve el fondo de marca real y contraste de texto.
+- la bienvenida ahora integra logo DentCool, etiqueta `Centro operativo DentCool`, chips operativos, franja de estado y tarjeta de paciente activo con mayor profundidad.
+- captura de revision generada en `dentcool-project/test-results/home-welcome-review-after.png`.
+- verificacion final: `npm test -- --run` paso con `83` tests, `npm run build` paso, `npm run test:e2e` paso con `2` tests.
+- Tauri reinstalado con la bienvenida final en `C:\Users\welli\AppData\Local\DentCool\dentcool.exe` con fecha `2026-05-19 01:42`; respaldo SQLite previo: `backups/ficha-dentcool-20260519-013819.db`.
+
+### Ajuste visual 2026-05-19 - Barra superior
+
+- se actualizo la barra superior donde aparece `Inicio / Bienvenido Admin`, buscador, mensaje y campana para que no quede con fondo blanco plano.
+- el fondo ahora usa una capa suave de marca con sombra, borde azul tenue y blur.
+- el buscador, mensaje y campana quedaron integrados con tarjetas suaves.
+- se agrego un avatar pequeno de usuario en la barra superior usando la misma silueta visual del login.
+- captura de revision generada en `dentcool-project/test-results/topbar-review.png`.
+- verificacion: `npm test -- --run` paso con `83` tests, `npm run build` paso, `npm run test:e2e` paso con `2` tests.
+- Tauri reinstalado con la barra superior final en `C:\Users\welli\AppData\Local\DentCool\dentcool.exe` con fecha `2026-05-19 02:01`; respaldo SQLite previo: `backups/ficha-dentcool-20260519-015909.db`.
+- ajuste posterior: el fondo de la barra superior paso de suave/palido a degradado de marca mas marcado; `npm run build` paso y Tauri quedo reinstalado con fecha `2026-05-19 02:11`; respaldo SQLite previo: `backups/ficha-dentcool-20260519-020826.db`.
+
+### Ajuste visual 2026-05-19 - Barra lateral
+
+- se actualizo la barra lateral izquierda (`Clinico`, `Gestion`, navegacion, logo y usuario) con fondo de marca mas profundo y consistente con Inicio/topbar.
+- los botones de navegacion ahora tienen estilo de capsula, estado activo mas claro, hover con movimiento leve y badges integrados.
+- el logo DentCool y el bloque de usuario quedaron dentro de tarjetas con sombra y bordes suaves.
+- captura de revision generada en `dentcool-project/test-results/sidebar-review.png`.
+- verificacion: `npm test -- --run` paso con `83` tests, `npm run build` paso, `npm run test:e2e` paso con `2` tests.
+- Tauri reinstalado con la barra lateral final en `C:\Users\welli\AppData\Local\DentCool\dentcool.exe` con fecha `2026-05-19 02:28`; respaldo SQLite previo: `backups/ficha-dentcool-20260519-022521.db`.
+- ajuste posterior: se bajo la saturacion/opacidad del degradado lateral y solo se reforzo el borde del contenedor del logo, sin cambiar forma, tamano ni radio; `npm run build` paso y Tauri quedo reinstalado con fecha `2026-05-19 02:42`; respaldo SQLite previo: `backups/ficha-dentcool-20260519-023827.db`.
+- ajuste posterior: el borde del contenedor del logo lateral ahora usa el degradado turquesa/azul/violeta del icono de escritorio, sin cambiar forma, tamano ni radio; `npm run build` paso y Tauri quedo reinstalado con fecha `2026-05-19 02:54`; respaldo SQLite previo: `backups/ficha-dentcool-20260519-025028.db`.
+
+### Ajuste visual 2026-05-19 - Inventario con tabs internos
+
+- se organizo `Inventario` con tabs superiores visibles para saltar entre `Proveedor`, `Registrar compra`, `Agregar material`, `Costos por insumo`, `Ultimas compras`, `Historial proveedores` y `Lista tratamientos`.
+- cada tab muestra solo su panel correspondiente para reducir el scroll largo sin cambiar la logica ni los datos guardados.
+- las acciones de editar material, editar compra, editar proveedor y ver compras cambian automaticamente al tab correspondiente.
+- captura de revision generada en `dentcool-project/test-results/inventory-tabs-review.png`.
+- verificacion: `npm test -- --run` paso con `83` tests, `npm run build` paso y `npm run test:e2e` paso con `2` tests.
+- Tauri reinstalado con Inventario por tabs en `C:\Users\welli\AppData\Local\DentCool\dentcool.exe` con fecha `2026-05-19 03:30`; respaldo SQLite previo: `backups/ficha-dentcool-20260519-032623.db`.

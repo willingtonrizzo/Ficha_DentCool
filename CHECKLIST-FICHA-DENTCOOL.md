@@ -101,6 +101,22 @@
 
 ## En curso / siguiente
 
+- [x] Cambiar trabajo local a la rama `ajustes-validacion-doctora`
+- [x] Verificar la rama `ajustes-validacion-doctora` con tests y build web
+- [x] Compilar e instalar build Tauri desde `ajustes-validacion-doctora`
+- [x] Agregar primera configuracion de Playwright para pruebas tipo usuario
+- [x] Cubrir login/permisos de `Admin` y `Staff` con Playwright
+- [x] Separar Vitest y Playwright para que no se ejecuten suites cruzadas
+- [x] Agregar detalle editable al historial de costos guardados de insumos
+- [x] Evitar que `Restaurar panel` borre historial de insumos
+- [x] Agregar editor persistente de listas base por tratamiento en `Inventario`
+- [x] Recompilar e instalar app Tauri con cambios de insumos/inventario
+- [x] Ampliar el panel `Detalle` del historial de insumos a 40% de pantalla en escritorio
+- [x] Rediseñar `Inicio` como panel operativo con datos reales
+- [x] Quitar de `Inicio` montos/acciones mock sin funcionalidad
+- [x] Recompilar e instalar app Tauri con `Inicio` actualizado
+- [ ] Probar manualmente la app instalada con login y permisos
+- [ ] Decidir si se conserva o elimina el stash de seguridad del cambio de rama
 - [ ] Probar flujo de entrega con login antes de instalar/demo
 - [ ] Validar con la doctora si el pack debe quedar como linea unica o desglose por tratamientos
 - [ ] Definir aprobacion de `Admin` para descuentos de pack aplicados por `Dr`
@@ -155,6 +171,7 @@
 - [x] Validar persistencia local de inventario al cerrar sesion y volver a entrar
 - [x] Validar visualmente `Ver catalogo` como tabla horizontal compacta
 - [x] Validar `Historial de costos por insumo` con compras guardadas y filtro por insumo
+- [x] Organizar `Inventario` con tabs internos superiores visibles para reducir scroll
 - [x] Mejorar insumos amortizables: espejo, rotor, aeropulidor y otros equipos deben calcular costo por uso/vida util, no como dosis simple
 - [x] Mostrar en UI como se obtiene el precio unitario de un material comprado, incluyendo cantidad comprada, costo total y costo amortizado si corresponde
 - [ ] Validar manualmente insumo amortizable: contraangulo de $100.000 con usos estimados debe entrar a `Insumos` como costo por uso, no costo completo
@@ -175,6 +192,15 @@
 - [x] Exportar resumen por medios, resumen por paciente y anulados en XLSX
 - [ ] Validar manualmente `Facturacion` con cobros reales de pacientes
 - [ ] Implementar Playwright para flujos E2E criticos de login, directorio, ficha clinica e inventario
+- [x] Agregar Playwright base para login y permisos por rol
+- [x] Restaurar y mejorar visualmente el bloque superior `Bienvenido Admin/Staff` de Inicio
+- [x] Mejorar profundidad visual del primer bloque de Inicio con colores de marca
+- [x] Agregar `Seccion KPI` y cambiar el amarillo de datos pendientes por morado
+- [x] Revisar visualmente con Playwright la bienvenida de Inicio y corregir el fondo lavado por `.card`
+- [x] Mejorar visualmente la barra superior de Inicio con fondo de marca, buscador integrado y avatar tipo login
+- [x] Mejorar visualmente la barra lateral izquierda con fondo de marca, navegacion capsula y usuario integrado
+- [x] Permitir editar estado de seguimientos/citas reales desde Inicio
+- [ ] Validar manualmente en Tauri que marcar una cita como `Atendida / concluida` la retire de vencidas correctamente
 - [ ] Refinar componentes UX/UI uno por uno
 - [ ] Ajustar funcionalidades de negocio vivas
 - [ ] Preparar deploy demo en `Vercel`

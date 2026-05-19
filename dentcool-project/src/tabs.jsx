@@ -19,7 +19,6 @@ import {
 import {
   loadSupplyState,
   resetSupplyCatalog,
-  resetSupplyState,
   saveSupplyState,
 } from './modules/supplies/suppliesStorage';
 
@@ -90,6 +89,30 @@ function triggerDownload(filename, content, mimeType = 'text/csv;charset=utf-8;'
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function limitWords(text = '', maxWords = 500) {
+  const words = String(text).trim().split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return String(text);
+  return words.slice(0, maxWords).join(' ');
+}
+
+function countWords(text = '') {
+  return String(text).trim().split(/\s+/).filter(Boolean).length;
+}
+
+function toDateTimeLocalValue(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const offsetMs = date.getTimezoneOffset() * 60 * 1000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+function fromDateTimeLocalValue(value) {
+  if (!value) return new Date().toISOString();
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
 }
 
 export function Tabs({ active, onChange, counts, allowedTabs }) {
@@ -2756,6 +2779,13 @@ export function Insumos({
   const [actualExtraItems, setActualExtraItems] = useState([]);
   const [actualExtraMinutes, setActualExtraMinutes] = useState(0);
   const [actualExtraTimeCost, setActualExtraTimeCost] = useState(0);
+  const [snapshotDetailNotes, setSnapshotDetailNotes] = useState('');
+  const [openSnapshotId, setOpenSnapshotId] = useState('');
+  const [editingSnapshotId, setEditingSnapshotId] = useState('');
+  const [editingSnapshotCost, setEditingSnapshotCost] = useState(0);
+  const [editingSnapshotDate, setEditingSnapshotDate] = useState('');
+  const [editingSnapshotStatus, setEditingSnapshotStatus] = useState('confirmed');
+  const [editingSnapshotNotes, setEditingSnapshotNotes] = useState('');
   const [openInsumosHelp, setOpenInsumosHelp] = useState(null);
 
   useEffect(() => {
@@ -2804,7 +2834,9 @@ export function Insumos({
   const costVariance = finalSupplyCost - usageResult.totalCost;
   const agendaNeeds = checkAgendaSupplyNeeds(appointments ?? [], moduleState.recipes, moduleState.catalog);
   const lowStockItems = moduleState.catalog.filter(checkLowStock);
-  const patientSnapshots = moduleState.snapshots.filter((snapshot) => snapshot.patientId === patient?.id);
+  const patientSnapshots = moduleState.snapshots
+    .filter((snapshot) => snapshot.patientId === patient?.id)
+    .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
 
   const handleQtyChange = (itemId, value) => {
     const nextQuantity = Number(value) || 0;
@@ -2874,8 +2906,6 @@ export function Insumos({
   };
 
   const handleResetModule = () => {
-    const resetState = resetSupplyState();
-    setModuleState(resetState);
     setDraftItems(
       selectedRecipe?.items.map((item) => ({
         ...item,
@@ -2885,6 +2915,8 @@ export function Insumos({
     setActualExtraItemId('');
     setActualExtraMinutes(0);
     setActualExtraTimeCost(0);
+    setSnapshotDetailNotes('');
+    setExtraItemId('');
   };
 
   const handleSaveSnapshot = () => {
@@ -2898,7 +2930,7 @@ export function Insumos({
       recipeName: selectedRecipe.name,
       usageItems: [...draftItems, ...actualExtraItems],
       catalog: moduleState.catalog,
-      notes: `Snapshot de insumos para ${selectedTreatment.procedure}`,
+      notes: limitWords(snapshotDetailNotes, 500) || `Snapshot de insumos para ${selectedTreatment.procedure}`,
       status: 'confirmed',
       source: 'manual',
     });
@@ -2913,6 +2945,7 @@ export function Insumos({
       plannedItems: usageResult.lines,
       actualExtraItems: actualExtraUsageResult.lines,
       totalSupplyCost: finalSupplyCost,
+      detailNotes: limitWords(snapshotDetailNotes, 500),
     };
 
     setModuleState((current) => ({
@@ -2920,6 +2953,66 @@ export function Insumos({
       snapshots: [supplySnapshot, ...current.snapshots],
     }));
     onBudgetFieldChange?.('supplySnapshotId', supplySnapshot.id);
+    setSnapshotDetailNotes('');
+    setActualExtraItems([]);
+    setActualExtraItemId('');
+    setActualExtraMinutes(0);
+    setActualExtraTimeCost(0);
+  };
+
+  const handleDeleteSnapshot = (snapshotId) => {
+    if (typeof window !== 'undefined') {
+      const confirmed = window.confirm('Vas a eliminar este costo guardado del historial. Esta accion no se puede deshacer. ¿Confirmas eliminarlo?');
+      if (!confirmed) return;
+    }
+    setModuleState((current) => ({
+      ...current,
+      snapshots: current.snapshots.filter((snapshot) => snapshot.id !== snapshotId),
+    }));
+    if (openSnapshotId === snapshotId) setOpenSnapshotId('');
+    if (editingSnapshotId === snapshotId) setEditingSnapshotId('');
+  };
+
+  const handleStartEditSnapshot = (snapshot) => {
+    setEditingSnapshotId(snapshot.id);
+    setEditingSnapshotCost(snapshot.totalSupplyCost ?? snapshot.finalSupplyCost ?? 0);
+    setEditingSnapshotDate(toDateTimeLocalValue(snapshot.createdAt));
+    setEditingSnapshotStatus(snapshot.status ?? 'confirmed');
+    setEditingSnapshotNotes(snapshot.detailNotes ?? snapshot.notes ?? '');
+    setOpenSnapshotId(snapshot.id);
+  };
+
+  const handleCancelEditSnapshot = () => {
+    setEditingSnapshotId('');
+    setEditingSnapshotCost(0);
+    setEditingSnapshotDate('');
+    setEditingSnapshotStatus('confirmed');
+    setEditingSnapshotNotes('');
+  };
+
+  const handleSaveEditedSnapshot = () => {
+    const nextCost = Number(editingSnapshotCost) || 0;
+    const nextDate = fromDateTimeLocalValue(editingSnapshotDate);
+    const nextNotes = limitWords(editingSnapshotNotes, 500);
+    setModuleState((current) => ({
+      ...current,
+      snapshots: current.snapshots.map((snapshot) => {
+        if (snapshot.id !== editingSnapshotId) return snapshot;
+        const estimated = Number(snapshot.estimatedSupplyCost) || 0;
+        return {
+          ...snapshot,
+          status: editingSnapshotStatus,
+          createdAt: nextDate,
+          updatedAt: new Date().toISOString(),
+          totalSupplyCost: nextCost,
+          finalSupplyCost: nextCost,
+          costVariance: nextCost - estimated,
+          notes: nextNotes,
+          detailNotes: nextNotes,
+        };
+      }),
+    }));
+    handleCancelEditSnapshot();
   };
 
   return (
@@ -3255,6 +3348,18 @@ export function Insumos({
             <small>se guarda en costos del paciente</small>
           </div>
         </div>
+        <label className="pricing-setting-field" style={{ marginTop: 12 }}>
+          <span className="pricing-setting-label-row">
+            <span className="pricing-setting-label-text">Detalles del costo guardado</span>
+            <span className="document-value">{countWords(snapshotDetailNotes)} / 500 palabras</span>
+          </span>
+          <textarea
+            value={snapshotDetailNotes}
+            onChange={(event) => setSnapshotDetailNotes(limitWords(event.target.value, 500))}
+            placeholder="Detalle clinico u operativo: por que se agregaron insumos extra, observaciones de lista base, tiempo extra, ajustes del caso o comentarios para revisar despues."
+            style={{ minHeight: 110 }}
+          />
+        </label>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 14 }}>
@@ -3292,7 +3397,7 @@ export function Insumos({
             </div>
           </div>
           <div className="documents-list">
-            {patientSnapshots.slice(0, 5).map((snapshot) => (
+            {patientSnapshots.map((snapshot) => (
               <div key={snapshot.id} className="document-row">
                 <div className="document-main">
                   <div className="document-head">
@@ -3308,6 +3413,129 @@ export function Insumos({
                         : ''}
                     </span>
                   </div>
+                  <div className="supply-snapshot-actions">
+                    <button className="btn btn-secondary" type="button" onClick={() => setOpenSnapshotId((current) => (current === snapshot.id ? '' : snapshot.id))}>
+                      Detalle
+                    </button>
+                    <button className="btn btn-secondary" type="button" onClick={() => handleStartEditSnapshot(snapshot)}>
+                      <Icon.edit />
+                      Editar
+                    </button>
+                    <button className="btn btn-secondary" type="button" onClick={() => handleDeleteSnapshot(snapshot.id)}>
+                      <Icon.trash />
+                      Eliminar
+                    </button>
+                  </div>
+                  {openSnapshotId === snapshot.id && (
+                    <div className="budget-pricing-settings supply-snapshot-detail" style={{ marginTop: 10 }}>
+                      {editingSnapshotId === snapshot.id ? (
+                        <div className="budget-pricing-settings-grid">
+                          <label className="pricing-setting-field">
+                            <span className="pricing-setting-label-row">
+                              <span className="pricing-setting-label-text">Fecha/hora</span>
+                            </span>
+                            <input type="datetime-local" value={editingSnapshotDate} onChange={(event) => setEditingSnapshotDate(event.target.value)} />
+                          </label>
+                          <label className="pricing-setting-field">
+                            <span className="pricing-setting-label-row">
+                              <span className="pricing-setting-label-text">Costo guardado</span>
+                            </span>
+                            <input type="number" min="0" step="1" value={editingSnapshotCost} onChange={(event) => setEditingSnapshotCost(event.target.value)} />
+                          </label>
+                          <label className="pricing-setting-field">
+                            <span className="pricing-setting-label-row">
+                              <span className="pricing-setting-label-text">Estado</span>
+                            </span>
+                            <select value={editingSnapshotStatus} onChange={(event) => setEditingSnapshotStatus(event.target.value)}>
+                              <option value="confirmed">Confirmado</option>
+                              <option value="draft">Borrador</option>
+                              <option value="review">Revisar</option>
+                              <option value="void">Anulado</option>
+                            </select>
+                          </label>
+                          <label className="pricing-setting-field" style={{ gridColumn: '1 / -1' }}>
+                            <span className="pricing-setting-label-row">
+                              <span className="pricing-setting-label-text">Comentarios</span>
+                              <span className="document-value">{countWords(editingSnapshotNotes)} / 500 palabras</span>
+                            </span>
+                            <textarea
+                              value={editingSnapshotNotes}
+                              onChange={(event) => setEditingSnapshotNotes(limitWords(event.target.value, 500))}
+                              placeholder="Detalle del registro guardado."
+                              style={{ minHeight: 100 }}
+                            />
+                          </label>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <button className="btn btn-primary" type="button" onClick={handleSaveEditedSnapshot}>
+                              Guardar cambios
+                            </button>
+                            <button className="btn btn-secondary" type="button" onClick={handleCancelEditSnapshot}>
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="budget-pricing-kpi-row">
+                            <div className="budget-pricing-kpi budget-pricing-kpi-small">
+                              <div className="budget-pricing-kpi-head"><span>Lista base</span></div>
+                              <strong>{fmtCLP(snapshot.estimatedSupplyCost ?? 0)}</strong>
+                              <small>{snapshot.plannedItems?.length ?? snapshot.items?.length ?? 0} insumos base/planificados</small>
+                            </div>
+                            <div className="budget-pricing-kpi budget-pricing-kpi-small tone-warn">
+                              <div className="budget-pricing-kpi-head"><span>Extras reales</span></div>
+                              <strong>{fmtCLP(snapshot.actualExtraSupplyCost ?? 0)}</strong>
+                              <small>{snapshot.actualExtraItems?.length ?? 0} insumos extra</small>
+                            </div>
+                            <div className="budget-pricing-kpi budget-pricing-kpi-small">
+                              <div className="budget-pricing-kpi-head"><span>Tiempo extra</span></div>
+                              <strong>{fmtCLP(snapshot.actualExtraTimeCost ?? 0)}</strong>
+                              <small>{snapshot.actualExtraTimeMinutes ?? 0} minutos</small>
+                            </div>
+                          </div>
+                          <div className="table-wrap" style={{ marginTop: 10 }}>
+                            <table className="tx">
+                              <thead>
+                                <tr>
+                                  <th>Tipo</th>
+                                  <th>Insumo</th>
+                                  <th>Unidad</th>
+                                  <th style={{ textAlign: 'right' }}>Cantidad</th>
+                                  <th style={{ textAlign: 'right' }}>Costo</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(snapshot.plannedItems ?? snapshot.items ?? []).map((item) => (
+                                  <tr key={`planned-${item.itemId}`}>
+                                    <td>Base/planificado</td>
+                                    <td>{item.itemName}</td>
+                                    <td>{item.unit}</td>
+                                    <td style={{ textAlign: 'right' }}>{item.quantity}</td>
+                                    <td style={{ textAlign: 'right' }}>{fmtCLP(item.totalCostAtTime ?? 0)}</td>
+                                  </tr>
+                                ))}
+                                {(snapshot.actualExtraItems ?? []).map((item) => (
+                                  <tr key={`extra-${item.itemId}`} className="supply-extra-row">
+                                    <td>Extra real</td>
+                                    <td>{item.itemName}</td>
+                                    <td>{item.unit}</td>
+                                    <td style={{ textAlign: 'right' }}>{item.quantity}</td>
+                                    <td style={{ textAlign: 'right' }}>{fmtCLP(item.totalCostAtTime ?? 0)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          <label className="pricing-setting-field" style={{ marginTop: 10 }}>
+                            <span className="pricing-setting-label-row">
+                              <span className="pricing-setting-label-text">Comentarios guardados</span>
+                            </span>
+                            <textarea readOnly value={snapshot.detailNotes ?? snapshot.notes ?? ''} style={{ minHeight: 90 }} />
+                          </label>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -3364,10 +3592,19 @@ export function InventarioInsumos({
   const [filterSupplierId, setFilterSupplierId] = useState('all');
   const [filterItemId, setFilterItemId] = useState('all');
   const [costHistoryItemId, setCostHistoryItemId] = useState('all');
+  const [recipeEditorTreatmentId, setRecipeEditorTreatmentId] = useState(() => pricingCatalog?.[0]?.id ?? '');
+  const [recipeEditorItemId, setRecipeEditorItemId] = useState('');
+  const [activeInventorySection, setActiveInventorySection] = useState('supplier');
 
   useEffect(() => {
     saveSupplyState(moduleState);
   }, [moduleState]);
+
+  useEffect(() => {
+    if (!recipeEditorTreatmentId && pricingCatalog?.[0]?.id) {
+      setRecipeEditorTreatmentId(pricingCatalog[0].id);
+    }
+  }, [pricingCatalog, recipeEditorTreatmentId]);
 
   const filteredPurchases = [...moduleState.purchases]
     .filter((purchase) => filterSupplierId === 'all' || purchase.supplierId === filterSupplierId)
@@ -3376,6 +3613,14 @@ export function InventarioInsumos({
     .slice(0, 10);
   const priceComparisonRows = buildSupplyPurchaseComparisonRows(moduleState.purchases, moduleState.suppliers);
   const filteredCostHistoryRows = priceComparisonRows.filter((row) => costHistoryItemId === 'all' || row.itemId === costHistoryItemId);
+  const recipeTreatmentOptions = pricingCatalog ?? [];
+  const selectedRecipeTreatment = recipeTreatmentOptions.find((item) => item.id === recipeEditorTreatmentId) ?? recipeTreatmentOptions[0] ?? null;
+  const selectedEditableRecipe = selectedRecipeTreatment
+    ? moduleState.recipes.find((recipe) => recipe.treatmentId === selectedRecipeTreatment.id)
+    : null;
+  const selectedRecipeCost = selectedEditableRecipe
+    ? calculatePatientSupplyUsageCost(selectedEditableRecipe.items ?? [], moduleState.catalog)
+    : { lines: [], totalCost: 0 };
   const supplierHistoryRows = Array.from(
     moduleState.purchases.reduce((acc, purchase) => {
       const key = purchase.supplierId || '__none__';
@@ -3503,6 +3748,7 @@ export function InventarioInsumos({
   };
 
   const handleEditCatalogItem = (item) => {
+    setActiveInventorySection('catalog');
     setEditingCatalogId(item.id);
     setNewCatalogName(item.name ?? '');
     setNewCatalogBrand(item.brand ?? '');
@@ -3513,6 +3759,93 @@ export function InventarioInsumos({
     setNewCatalogEstimatedUses(item.amortizationUses ?? (item.itemType === 'equipment' ? item.purchaseQuantity : 50) ?? 50);
     setNewCatalogMinimumStock(item.minimumStock ?? 0);
     setShowCatalogList(false);
+  };
+
+  const ensureRecipeForTreatment = () => {
+    if (!selectedRecipeTreatment) return null;
+    const existing = moduleState.recipes.find((recipe) => recipe.treatmentId === selectedRecipeTreatment.id);
+    if (existing) return existing;
+    const nextRecipe = {
+      id: `recipe_${selectedRecipeTreatment.id}`,
+      treatmentId: selectedRecipeTreatment.id,
+      name: `Lista base ${selectedRecipeTreatment.name}`,
+      items: [],
+      includesBaseDisposablePack: false,
+      includesExamPack: false,
+    };
+    setModuleState((current) => ({
+      ...current,
+      recipes: [...current.recipes, nextRecipe],
+    }));
+    return nextRecipe;
+  };
+
+  const handleAddRecipeItem = () => {
+    if (!recipeEditorItemId || !selectedRecipeTreatment) return;
+    setModuleState((current) => ({
+      ...current,
+      recipes: (() => {
+        const catalogItem = current.catalog.find((item) => item.id === recipeEditorItemId);
+        const recipes = current.recipes.some((recipe) => recipe.treatmentId === selectedRecipeTreatment.id)
+          ? current.recipes
+          : [
+              ...current.recipes,
+              {
+                id: `recipe_${selectedRecipeTreatment.id}`,
+                treatmentId: selectedRecipeTreatment.id,
+                name: `Lista base ${selectedRecipeTreatment.name}`,
+                items: [],
+                includesBaseDisposablePack: false,
+                includesExamPack: false,
+              },
+            ];
+        return recipes.map((entry) => {
+          if (entry.treatmentId !== selectedRecipeTreatment.id) return entry;
+          if ((entry.items ?? []).some((item) => item.itemId === recipeEditorItemId)) return entry;
+          return {
+            ...entry,
+            items: [
+              ...(entry.items ?? []),
+              {
+                itemId: recipeEditorItemId,
+                quantity: catalogItem?.defaultUsePerPatient ?? 1,
+                editableAtPatientLevel: true,
+              },
+            ],
+          };
+        });
+      })(),
+    }));
+    setRecipeEditorItemId('');
+  };
+
+  const handleRecipeQuantityChange = (itemId, value) => {
+    const nextQuantity = Number(value) || 0;
+    setModuleState((current) => ({
+      ...current,
+      recipes: current.recipes.map((recipe) => {
+        if (recipe.treatmentId !== selectedRecipeTreatment?.id) return recipe;
+        return {
+          ...recipe,
+          items: (recipe.items ?? []).map((item) => (
+            item.itemId === itemId ? { ...item, quantity: nextQuantity } : item
+          )),
+        };
+      }),
+    }));
+  };
+
+  const handleRemoveRecipeItem = (itemId) => {
+    setModuleState((current) => ({
+      ...current,
+      recipes: current.recipes.map((recipe) => {
+        if (recipe.treatmentId !== selectedRecipeTreatment?.id) return recipe;
+        return {
+          ...recipe,
+          items: (recipe.items ?? []).filter((item) => item.itemId !== itemId),
+        };
+      }),
+    }));
   };
 
   const handleCancelCatalogEdit = () => {
@@ -3608,6 +3941,7 @@ export function InventarioInsumos({
   };
 
   const handleEditPurchase = (purchase) => {
+    setActiveInventorySection('purchase');
     setEditingPurchaseId(purchase.id);
     setPurchaseItemId(purchase.itemId ?? '');
     setPurchaseQuantity(purchase.quantityPurchased ?? 1);
@@ -3699,11 +4033,13 @@ export function InventarioInsumos({
   };
 
   const handleStartSupplierCreate = () => {
+    setActiveInventorySection('supplier');
     handleCancelSupplierEdit();
     supplierPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const handleEditSupplier = (supplier) => {
+    setActiveInventorySection('supplier');
     setEditingSupplierId(supplier.id);
     setSupplierName(supplier.name ?? '');
     setSupplierPhone(supplier.phone ?? '');
@@ -3789,6 +4125,15 @@ export function InventarioInsumos({
 
   const supplierById = new Map(moduleState.suppliers.map((item) => [item.id, item]));
   const lowStockItems = moduleState.catalog.filter(checkLowStock);
+  const inventorySections = [
+    { id: 'supplier', label: 'Proveedor', detail: `${moduleState.suppliers.length} activos` },
+    { id: 'purchase', label: 'Registrar compra', detail: `${moduleState.purchases.length} compras` },
+    { id: 'catalog', label: 'Agregar material', detail: `${moduleState.catalog.length} materiales` },
+    { id: 'costs', label: 'Costos por insumo', detail: `${filteredCostHistoryRows.length} filas` },
+    { id: 'recent', label: 'Ultimas compras', detail: `${filteredPurchases.length} visibles` },
+    { id: 'suppliersHistory', label: 'Historial proveedores', detail: `${supplierHistoryRows.length} proveedores` },
+    { id: 'recipes', label: 'Lista tratamientos', detail: `${moduleState.recipes.length} listas` },
+  ];
 
   return (
     <div className="documents-editor">
@@ -3832,7 +4177,23 @@ export function InventarioInsumos({
         </div>
       </div>
 
-      <div ref={supplierPanelRef} className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
+      <div className="inventory-section-tabs" role="tablist" aria-label="Secciones de inventario">
+        {inventorySections.map((section) => (
+          <button
+            key={section.id}
+            type="button"
+            role="tab"
+            aria-selected={activeInventorySection === section.id}
+            className={`inventory-section-tab ${activeInventorySection === section.id ? 'active' : ''}`}
+            onClick={() => setActiveInventorySection(section.id)}
+          >
+            <strong>{section.label}</strong>
+            <span>{section.detail}</span>
+          </button>
+        ))}
+      </div>
+
+      <div ref={supplierPanelRef} hidden={activeInventorySection !== 'supplier'} className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
         <div className="budget-pricing-settings-head">
           <div>
             <div className="bs-label">{editingSupplierId ? 'Editar proveedor' : 'Proveedor'}</div>
@@ -3923,7 +4284,10 @@ export function InventarioInsumos({
                   <button className="row-action" type="button" onClick={() => handleEditSupplier(supplier)} title="Editar proveedor">
                     <Icon.edit />
                   </button>
-                  <button className="row-action" type="button" onClick={() => setFilterSupplierId(supplier.id)} title="Ver compras">
+                  <button className="row-action" type="button" onClick={() => {
+                    setFilterSupplierId(supplier.id);
+                    setActiveInventorySection('recent');
+                  }} title="Ver compras">
                     <Icon.download />
                   </button>
                 </span>
@@ -3934,7 +4298,7 @@ export function InventarioInsumos({
         )}
       </div>
 
-      <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
+      <div hidden={activeInventorySection !== 'catalog'} className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
         <div className="budget-pricing-settings-head">
           <div>
             <div className="bs-label">{editingCatalogId ? 'Editar material' : 'Agregar material'}</div>
@@ -4119,7 +4483,7 @@ export function InventarioInsumos({
         )}
       </div>
 
-      <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
+      <div hidden={activeInventorySection !== 'purchase'} className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
         <div className="budget-pricing-settings-head">
           <div>
             <div className="bs-label">{editingPurchaseId ? 'Editar compra' : 'Registrar compra'}</div>
@@ -4225,7 +4589,7 @@ export function InventarioInsumos({
         </div>
       </div>
 
-      <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
+      <div hidden={activeInventorySection !== 'costs'} className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
         <div className="budget-pricing-settings-head">
           <div>
             <div className="bs-label">Historial de costos por insumo</div>
@@ -4272,7 +4636,7 @@ export function InventarioInsumos({
         </div>
       </div>
 
-      <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
+      <div hidden={activeInventorySection !== 'recent'} className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
         <div className="budget-pricing-settings-head">
           <div>
             <div className="bs-label">Ultimas compras</div>
@@ -4342,7 +4706,7 @@ export function InventarioInsumos({
         </div>
       </div>
 
-      <div className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
+      <div hidden={activeInventorySection !== 'suppliersHistory'} className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
         <div className="budget-pricing-settings-head">
           <div>
             <div className="bs-label">Historial por proveedor</div>
@@ -4366,13 +4730,118 @@ export function InventarioInsumos({
               <span>{row.lastPurchaseLabel || 'Sin fecha'}</span>
               <span>{row.items.slice(0, 3).join(', ') || 'Sin items'}</span>
               <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                <button className="btn btn-secondary" type="button" onClick={() => setFilterSupplierId(row.supplierId || 'all')}>
+                <button className="btn btn-secondary" type="button" onClick={() => {
+                  setFilterSupplierId(row.supplierId || 'all');
+                  setActiveInventorySection('recent');
+                }}>
                   Ver compras
                 </button>
               </span>
             </div>
           ))}
           {!supplierHistoryRows.length && <div className="finance-empty">No hay historial por proveedor para mostrar.</div>}
+        </div>
+      </div>
+
+      <div hidden={activeInventorySection !== 'recipes'} className="budget-pricing-settings inventory-panel-spotlight" style={{ marginBottom: 14 }}>
+        <div className="budget-pricing-settings-head">
+          <div>
+            <div className="bs-label">Editor de lista de tratamientos</div>
+            <div className="bs-help">Edita la lista base persistente de insumos por tratamiento. Luego esa lista aparece en la ficha del paciente debajo del odontograma.</div>
+          </div>
+          {!selectedEditableRecipe && selectedRecipeTreatment && (
+            <button className="btn btn-secondary" type="button" onClick={ensureRecipeForTreatment}>
+              <Icon.plus />
+              Crear lista base
+            </button>
+          )}
+        </div>
+        <div className="budget-pricing-settings-grid" style={{ marginBottom: 12 }}>
+          <label className="pricing-setting-field" style={{ gridColumn: '1 / span 2' }}>
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Tratamiento</span>
+            </span>
+            <select value={recipeEditorTreatmentId} onChange={(event) => setRecipeEditorTreatmentId(event.target.value)}>
+              {recipeTreatmentOptions.map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="pricing-setting-field" style={{ gridColumn: 'span 2' }}>
+            <span className="pricing-setting-label-row">
+              <span className="pricing-setting-label-text">Agregar insumo a lista base</span>
+            </span>
+            <select value={recipeEditorItemId} onChange={(event) => setRecipeEditorItemId(event.target.value)}>
+              <option value="">Selecciona un insumo</option>
+              {moduleState.catalog
+                .filter((item) => !(selectedEditableRecipe?.items ?? []).some((recipeItem) => recipeItem.itemId === item.id))
+                .map((item) => (
+                  <option key={item.id} value={item.id}>{item.name} · {item.unit}</option>
+                ))}
+            </select>
+          </label>
+          <div style={{ display: 'flex', alignItems: 'end' }}>
+            <button className="btn btn-primary" type="button" onClick={handleAddRecipeItem} disabled={!recipeEditorItemId || !selectedRecipeTreatment}>
+              <Icon.plus />
+              Agregar a lista
+            </button>
+          </div>
+        </div>
+        <div className="budget-pricing-kpi-row" style={{ marginBottom: 12 }}>
+          <div className="budget-pricing-kpi budget-pricing-kpi-small">
+            <div className="budget-pricing-kpi-head"><span>Tratamiento</span></div>
+            <strong>{selectedRecipeTreatment?.name ?? 'Sin tratamiento'}</strong>
+            <small>{selectedEditableRecipe ? selectedEditableRecipe.name : 'Sin lista creada'}</small>
+          </div>
+          <div className="budget-pricing-kpi budget-pricing-kpi-small tone-good">
+            <div className="budget-pricing-kpi-head"><span>Costo lista</span></div>
+            <strong>{fmtCLP(selectedRecipeCost.totalCost)}</strong>
+            <small>{selectedRecipeCost.lines.length} insumos</small>
+          </div>
+        </div>
+        <div className="table-wrap">
+          <table className="tx">
+            <thead>
+              <tr>
+                <th>Insumo base</th>
+                <th>Unidad</th>
+                <th style={{ textAlign: 'right' }}>Cantidad</th>
+                <th style={{ textAlign: 'right' }}>Costo unitario</th>
+                <th style={{ textAlign: 'right' }}>Total</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {selectedRecipeCost.lines.map((line) => (
+                <tr key={line.itemId}>
+                  <td style={{ fontWeight: 600 }}>{line.itemName}</td>
+                  <td>{line.unit}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={line.quantity}
+                      onChange={(event) => handleRecipeQuantityChange(line.itemId, event.target.value)}
+                      style={{ width: 92, textAlign: 'right' }}
+                    />
+                  </td>
+                  <td style={{ textAlign: 'right' }}>{fmtCLP(line.unitCostAtTime ?? 0)}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmtCLP(line.totalCostAtTime ?? 0)}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    <button className="row-action" type="button" onClick={() => handleRemoveRecipeItem(line.itemId)} title="Quitar de lista base">
+                      <Icon.trash />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!selectedRecipeCost.lines.length && (
+                <tr>
+                  <td colSpan="6" className="finance-table-empty">Este tratamiento no tiene insumos base configurados todavia.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

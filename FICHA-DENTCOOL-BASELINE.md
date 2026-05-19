@@ -15,6 +15,16 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 
 ## Estado actual
 
+- Fecha de referencia de ultima verificacion local: `2026-05-18`.
+- Rama local activa para trabajo: `ajustes-validacion-doctora`, siguiendo `origin/ajustes-validacion-doctora`.
+- La app web pasa `npm test -- --run` con `83` tests verdes y `npm run build`.
+- Existe una primera capa Playwright para pruebas tipo usuario; `npm run test:e2e` pasa con `2` tests de login/permisos.
+- El modulo `Insumos` permite guardar costos con detalle, ver lista base/extras/tiempo extra, editar o eliminar historiales y restaurar el panel sin borrar snapshots.
+- El detalle abierto del historial de insumos usa ancho ampliado en escritorio para revisar mejor tablas y comentarios.
+- `Inventario` contiene un editor de listas base por tratamiento que persiste en el storage local de insumos.
+- `Inicio` ya no muestra montos financieros de ejemplo ni acciones de relleno; funciona como panel operativo con datos reales disponibles y accesos por permisos.
+- La app desktop pasa `npm run desktop:build` y genera `dentcool-project/src-tauri/target/release/bundle/nsis/DentCool_0.1.0_x64-setup.exe`.
+- La app desktop fue instalada localmente desde ese instalador, con backup previo `backups/ficha-dentcool-20260518-170706.db`.
 - La app ya corre sobre `Vite + React`.
 - El punto de entrada actual es `src/main.jsx`.
 - Los componentes principales ya viven en `src/`.
@@ -236,3 +246,20 @@ Se evaluo el prototipo actual en `dentcool-project` usando como criterio las ski
 - `dentcool-project/src/modules/supplies/suppliesStorage.js`
 - `dentcool-project/src/modules/supplies/suppliesStorage.test.js`
 - `dentcool-project/db/schema.sql`
+
+## Actualizacion 2026-05-19 - Inicio
+
+- La vista `Inicio` mantiene el hero de bienvenida `Bienvenido Admin/Staff`, redisenado con mayor contraste, color de marca y profundidad visual.
+- La grilla KPI queda separada como `Seccion KPI`, con fondo de marca y morado en vez de amarillo para la zona de datos pendientes.
+- El hero de bienvenida usa logo DentCool, fondo de marca real, chips operativos y tarjeta de paciente activo; se valido visualmente con Playwright tras corregir la interferencia de `.card`.
+- La barra superior de la app usa fondo suave de marca, buscador integrado y avatar pequeno basado en la silueta del login.
+- La barra lateral izquierda usa fondo de marca, navegacion tipo capsula, activo contrastado, logo en tarjeta y usuario integrado.
+- `Seguimientos visibles` prioriza citas reales de `clinicalRecords.appointments`; el texto legacy `nextVisit` queda como compatibilidad.
+- Desde Inicio se puede cambiar el estado de una cita real y cerrar pendientes como `Atendida / concluida`, `Cancelada` o `No asistio`.
+- El recalculo de `nextVisit` excluye citas completadas, canceladas y no asistidas.
+
+## Actualizacion 2026-05-19 - Inventario
+
+- `Inventario` mantiene sus mismos paneles y datos, pero ahora se navega con tabs superiores visibles para reducir scroll: `Proveedor`, `Registrar compra`, `Agregar material`, `Costos por insumo`, `Ultimas compras`, `Historial proveedores` y `Lista tratamientos`.
+- Las acciones internas que llevan a editar o revisar informacion cambian al tab correspondiente sin modificar la persistencia.
+- Validacion: revision visual con Playwright, `npm test -- --run`, `npm run build` y `npm run test:e2e`.

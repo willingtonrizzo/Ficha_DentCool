@@ -53,7 +53,6 @@ function normalizeText(value) {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
 }
-
 function parseVisitDate(value) {
   const match = normalizeText(value).match(/^(\d{1,2})\s+([a-z]+)\s+(\d{4})$/);
   if (!match) return null;
@@ -467,6 +466,16 @@ export function TopbarInner({ patientName, activeView = 'patients', currentUser 
       </div>
       <button className="topbar-btn"><Icon.msg /></button>
       <button className="topbar-btn"><Icon.bell /><span className="dot" /></button>
+      <div className="topbar-profile" title={currentUser?.name ?? 'Sesion local'}>
+        <div className="topbar-avatar" aria-hidden="true">
+          <div className="topbar-avatar-head" />
+          <div className="topbar-avatar-body" />
+        </div>
+        <div className="topbar-profile-copy">
+          <strong>{currentUser?.roleLabel ?? 'Sesion'}</strong>
+          <span>{currentUser?.initials ?? 'DC'}</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1586,11 +1595,19 @@ export function FinanceDashboard({
   );
 }
 
-export function HomeDashboard({ patients, activePatient, currentUser }) {
-  const [showFinance, setShowFinance] = useState(false);
+const appointmentStatusLabels = {
+  scheduled: 'Programada',
+  confirmed: 'Confirmada',
+  completed: 'Atendida / concluida',
+  cancelled: 'Cancelada',
+  no_show: 'No asistio',
+};
+
+export function HomeDashboard({ patients, activePatient, currentUser, permissions, clinicalRecords, onNavigate, onCreatePatient, onOpenActivePatient, onAppointmentStatusChange }) {
   const welcomeText = getWelcomeText(currentUser);
   const pendingAlerts = patients.reduce((total, patient) => total + patient.alerts.length, 0);
-  const upcomingPatients = patients
+  const missingContactCount = patients.filter((patient) => !patient.phone || !patient.rut).length;
+  const legacyUpcomingPatients = patients
     .filter((patient) => patient.nextVisit && patient.nextVisit !== 'Sin cita' && patient.nextVisit !== 'Sin agendar')
     .map((patient) => {
       const followUp = getVisitFollowUp(patient.nextVisit);
@@ -1607,9 +1624,50 @@ export function HomeDashboard({ patients, activePatient, currentUser }) {
       };
     })
     .sort((a, b) => a.daysUntil - b.daysUntil);
+  const upcomingPatients = patients
+    .flatMap((patient) => {
+      const recordAppointments = clinicalRecords?.[patient.id]?.appointments ?? [];
+      const visibleAppointments = recordAppointments.filter((appointment) =>
+        !['cancelled', 'completed', 'no_show'].includes(appointment?.status) &&
+        appointment?.dateLabel &&
+        appointment.dateLabel !== 'Sin cita'
+      );
+
+      if (!visibleAppointments.length) {
+        return legacyUpcomingPatients.filter((item) => item.id === patient.id).map((item) => ({
+          ...item,
+          id: `legacy-${item.id}`,
+          patientId: patient.id,
+          appointmentId: null,
+          appointmentStatus: 'scheduled',
+        }));
+      }
+
+      return visibleAppointments.map((appointment) => {
+        const followUp = getVisitFollowUp(appointment.dateLabel);
+        return {
+          id: `${patient.id}-${appointment.id}`,
+          patientId: patient.id,
+          appointmentId: appointment.id,
+          appointmentStatus: appointment.status || 'scheduled',
+          patient: getPatientDisplayName(patient),
+          schedule: [appointment.dateLabel, appointment.timeLabel].filter(Boolean).join(' - '),
+          detail: `${patient.recordNumber} - ${appointment.reason || patient.phone || 'Seguimiento clinico'}`,
+          tone: followUp.tone,
+          state: followUp.state,
+          reminder: `${appointmentStatusLabels[appointment.status] ?? 'Programada'} - ${followUp.reminder}`,
+          daysUntil: followUp.daysUntil,
+          daysLabel: followUp.daysLabel,
+        };
+      });
+    })
+    .sort((a, b) => a.daysUntil - b.daysUntil);
   const upcoming = upcomingPatients.length;
   const visibleFollowUps = upcomingPatients.slice(0, 4).map((patient) => ({
       id: patient.id,
+      patientId: patient.patientId,
+      appointmentId: patient.appointmentId,
+      appointmentStatus: patient.appointmentStatus,
       patient: patient.patient,
       schedule: patient.schedule,
       detail: patient.detail,
@@ -1618,64 +1676,89 @@ export function HomeDashboard({ patients, activePatient, currentUser }) {
       reminder: patient.reminder,
       daysLabel: patient.daysLabel,
     }));
-  const quickActions = ['Nuevo paciente', 'Nueva cita', 'Abrir ficha activa', 'Registrar pago'];
+  const recentPatients = patients.slice(0, 5);
+  const quickActions = [
+    { label: 'Nuevo paciente', detail: 'Crear ficha administrativa', action: onCreatePatient, tone: 'primary' },
+    { label: 'Abrir ficha activa', detail: getPatientDisplayName(activePatient, 'Sin paciente activo'), action: activePatient?.id ? onOpenActivePatient : null, tone: 'teal' },
+    { label: 'Directorio', detail: `${patients.length} pacientes locales`, action: () => onNavigate?.('patients'), tone: 'blue' },
+    ...(permissions?.views?.includes('inventory') ? [{ label: 'Inventario', detail: 'Listas base e insumos', action: () => onNavigate?.('inventory'), tone: 'amber' }] : []),
+    ...(permissions?.views?.includes('billing') ? [{ label: 'Facturacion', detail: 'Cobros y resumen operativo', action: () => onNavigate?.('billing'), tone: 'violet' }] : []),
+  ];
   const alerts = [
-    { tone: 'danger', title: 'Alergias activas', detail: `${pendingAlerts} alertas clinicas requieren visibilidad en atencion.` },
-    { tone: 'warn', title: 'Controles por confirmar', detail: `${upcoming} pacientes tienen seguimiento cercano o cita proxima.` },
-    { tone: 'info', title: 'Presupuestos abiertos', detail: '3 planes preventivos siguen pendientes de cierre financiero.' },
+    ...(pendingAlerts > 0 ? [{ tone: 'danger', title: 'Alertas clinicas activas', detail: `${pendingAlerts} antecedentes o alertas requieren revision antes de atender.` }] : []),
+    ...(upcoming > 0 ? [{ tone: 'warn', title: 'Seguimientos con fecha', detail: `${upcoming} pacientes tienen cita o seguimiento visible.` }] : []),
+    ...(missingContactCount > 0 ? [{ tone: 'info', title: 'Datos por completar', detail: `${missingContactCount} fichas tienen RUT o telefono pendiente.` }] : []),
   ];
   const kpis = [
     { label: 'Pacientes locales', value: String(patients.length), detail: 'directorio activo', tone: 'teal' },
-    { label: 'Seguimientos visibles', value: String(visibleFollowUps.length), detail: 'citas con fecha registrada', tone: 'blue' },
-    { label: 'Citas proximas', value: String(upcoming), detail: 'agenda visible', tone: 'amber' },
-    { label: 'Alertas registradas', value: String(pendingAlerts), detail: 'alertas clinicas activas', tone: 'violet' },
-  ];
-  const finance = [
-    { label: 'Presupuesto activo', value: '$1.240.000' },
-    { label: 'Abonado', value: '$410.000' },
-    { label: 'Saldo pendiente', value: '$830.000' },
+    { label: 'Seguimientos', value: String(upcoming), detail: 'citas con fecha registrada', tone: 'blue' },
+    { label: 'Alertas clinicas', value: String(pendingAlerts), detail: 'antecedentes visibles', tone: pendingAlerts > 0 ? 'amber' : 'teal' },
+    { label: 'Datos pendientes', value: String(missingContactCount), detail: 'RUT o telefono por completar', tone: 'violet' },
   ];
 
   return (
     <div className="home-dashboard">
       <div className="home-hero card">
         <div className="home-hero-copy">
-          <div className="patients-eyebrow">Bienvenida</div>
+          <div className="home-hero-brand">
+            <span className="home-hero-logo"><img src={logoUrl} alt="DentCool" /></span>
+            <span>Centro operativo DentCool</span>
+          </div>
           <h2>{welcomeText}</h2>
-          <p>Vista rapida para abrir la jornada, revisar agenda, detectar alertas y volver a la ficha clinica sin perder el hilo.</p>
+          <p>Vista de trabajo para abrir la jornada, priorizar seguimientos, detectar alertas clinicas y continuar con el paciente activo.</p>
           <div className="home-hero-tags">
             <span className="patient-chip">{patients.length} pacientes locales</span>
-            <span className="patient-chip">{upcoming} citas proximas</span>
-            <span className="patient-chip">{pendingAlerts} alertas registradas</span>
+            <span className="patient-chip">{upcoming} seguimientos</span>
+            <span className="patient-chip">{pendingAlerts} alertas clinicas</span>
+          </div>
+          <div className="home-hero-status">
+            <span>Agenda local</span>
+            <span>Ficha clinica</span>
+            <span>Inventario conectado</span>
           </div>
         </div>
         <div className="home-hero-side">
           <div className="home-focus-card">
             <div className="home-focus-label">Paciente activo</div>
             <div className="home-focus-name">{getPatientDisplayName(activePatient, 'Sin paciente')}</div>
-            <div className="home-focus-meta">{activePatient?.recordNumber ?? 'Sin ficha'} · {activePatient?.nextVisit || 'Sin cita agendada'}</div>
+            <div className="home-focus-meta">{activePatient?.recordNumber ?? 'Sin ficha'} - {activePatient?.nextVisit || 'Sin cita agendada'}</div>
             <div className="home-focus-divider" />
-            <div className="home-focus-mini">Proxima accion: abrir antecedentes, confirmar motivo y revisar presupuesto.</div>
+            <div className="home-focus-mini">Abrir ficha, revisar alertas y continuar la atencion clinica.</div>
+            <div className="home-focus-pulse">
+              <span>{upcoming}</span>
+              <strong>seguimientos visibles</strong>
+            </div>
+            <button className="home-focus-action" type="button" onClick={onOpenActivePatient} disabled={!activePatient?.id}>
+              Abrir ficha
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="home-kpi-grid">
-        {kpis.map((kpi) => (
-          <div key={kpi.label} className={`card home-kpi-card ${kpi.tone}`}>
-            <div className="home-kpi-label">{kpi.label}</div>
-            <div className="home-kpi-value">{kpi.value}</div>
-            <div className="home-kpi-detail">{kpi.detail}</div>
+      <section className="home-kpi-section" aria-labelledby="home-kpi-heading">
+        <div className="home-section-head">
+          <div>
+            <div className="patients-eyebrow">Seccion KPI</div>
+            <h3 id="home-kpi-heading">Indicadores operativos</h3>
           </div>
-        ))}
-      </div>
+        </div>
+        <div className="home-kpi-grid">
+          {kpis.map((kpi) => (
+            <div key={kpi.label} className={`card home-kpi-card ${kpi.tone}`}>
+              <div className="home-kpi-label">{kpi.label}</div>
+              <div className="home-kpi-value">{kpi.value}</div>
+              <div className="home-kpi-detail">{kpi.detail}</div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="home-main-grid">
         <div className="home-main-column">
           <div className="card home-agenda-card">
             <div className="card-head">
               <h3>Seguimientos visibles</h3>
-              <span className="muted" style={{ fontSize: 12 }}>{visibleFollowUps.length} citas con fecha registrada</span>
+              <span className="muted" style={{ fontSize: 12 }}>{visibleFollowUps.length} de {upcoming} con fecha registrada</span>
             </div>
             <div className="home-agenda-list">
               {visibleFollowUps.length > 0 ? visibleFollowUps.map((item) => (
@@ -1687,7 +1770,26 @@ export function HomeDashboard({ patients, activePatient, currentUser }) {
                       <span className={`home-agenda-state ${item.tone}`}>{item.state}</span>
                     </div>
                     <div className="home-agenda-meta">{item.detail}</div>
-                    <div className={`home-agenda-note ${item.tone}`}>{item.reminder}</div>
+                    <div className="home-agenda-footer">
+                      <div className={`home-agenda-note ${item.tone}`}>{item.reminder}</div>
+                      {item.appointmentId ? (
+                        <label className="home-agenda-status">
+                          <span>Estado</span>
+                          <select
+                            value={item.appointmentStatus}
+                            onChange={(event) => onAppointmentStatusChange?.(item.patientId, item.appointmentId, event.target.value)}
+                          >
+                            <option value="scheduled">Programada</option>
+                            <option value="confirmed">Confirmada</option>
+                            <option value="completed">Atendida / concluida</option>
+                            <option value="cancelled">Cancelada</option>
+                            <option value="no_show">No asistio</option>
+                          </select>
+                        </label>
+                      ) : (
+                        <span className="home-agenda-legacy">Editar en agenda</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               )) : (
@@ -1701,28 +1803,32 @@ export function HomeDashboard({ patients, activePatient, currentUser }) {
           <div className="home-grid">
             <div className="card home-list-card">
               <div className="card-head">
-                <h3>Pacientes recientes</h3>
+                <h3>Pacientes para retomar</h3>
               </div>
               <div className="home-list">
-                {patients.slice(0, 4).map((patient) => (
-                  <div key={patient.id} className="home-list-row">
+                {recentPatients.map((patient) => (
+                  <button key={patient.id} type="button" className="home-list-row" onClick={() => onNavigate?.('patients')}>
                     <div className="patient-directory-avatar">{patient.initials}</div>
                     <div className="home-list-copy">
                       <div className="home-list-title">{getPatientDisplayName(patient)}</div>
                       <div className="home-list-meta">{patient.rut || 'Sin RUT'} · {patient.nextVisit || 'Sin cita'}</div>
                     </div>
-                  </div>
+                  </button>
                 ))}
+                {!recentPatients.length && <div className="home-agenda-empty">Aun no hay pacientes en el directorio.</div>}
               </div>
             </div>
 
             <div className="card home-actions-card">
               <div className="card-head">
-                <h3>Acciones rapidas</h3>
+                <h3>Accesos de trabajo</h3>
               </div>
               <div className="home-actions-list">
                 {quickActions.map((action) => (
-                  <button key={action} className="home-action-chip">{action}</button>
+                  <button key={action.label} className={`home-action-chip ${action.tone}`} type="button" onClick={action.action} disabled={!action.action}>
+                    <strong>{action.label}</strong>
+                    <span>{action.detail}</span>
+                  </button>
                 ))}
               </div>
             </div>
@@ -1732,48 +1838,23 @@ export function HomeDashboard({ patients, activePatient, currentUser }) {
         <div className="home-side-column">
           <div className="card home-alerts-card">
             <div className="card-head">
-              <h3>Alertas clinicas</h3>
+              <h3>Alertas reales</h3>
             </div>
             <div className="home-alerts-list">
-              {alerts.map((alert) => (
+              {alerts.length > 0 ? alerts.map((alert) => (
                 <div key={alert.title} className={`home-alert-item ${alert.tone}`}>
                   <div className="home-alert-title">{alert.title}</div>
                   <div className="home-alert-detail">{alert.detail}</div>
                 </div>
-              ))}
+              )) : (
+                <div className="home-agenda-empty">No hay alertas reales pendientes con los datos actuales.</div>
+              )}
             </div>
-          </div>
-
-          <div className="card home-finance-card">
-            <div className="card-head">
-              <h3>Estado financiero</h3>
-              <button
-                type="button"
-                className="home-finance-toggle"
-                onClick={() => setShowFinance((current) => !current)}
-              >
-                {showFinance ? 'Ocultar' : 'Ver estado financiero'}
-              </button>
-            </div>
-            {showFinance ? (
-              <div className="home-finance-summary">
-                {finance.map((item) => (
-                  <div key={item.label} className="home-finance-row">
-                    <span>{item.label}</span>
-                    <strong>{item.value}</strong>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="home-finance-locked">
-                Resumen financiero oculto por defecto.
-              </div>
-            )}
           </div>
 
           <div className="card home-stats-card">
             <div className="card-head">
-              <h3>Estado rapido</h3>
+              <h3>Calidad de datos</h3>
             </div>
             <div className="home-stats">
               <div className="home-stat">
@@ -1782,11 +1863,11 @@ export function HomeDashboard({ patients, activePatient, currentUser }) {
               </div>
               <div className="home-stat">
                 <span className="home-stat-value">{upcoming}</span>
-                <span className="home-stat-label">Citas visibles</span>
+                <span className="home-stat-label">Seguimientos con fecha</span>
               </div>
               <div className="home-stat">
-                <span className="home-stat-value">{pendingAlerts}</span>
-                <span className="home-stat-label">Alertas medicas</span>
+                <span className="home-stat-value">{missingContactCount}</span>
+                <span className="home-stat-label">Fichas por completar</span>
               </div>
             </div>
           </div>

@@ -9,6 +9,8 @@ coverage/
 dentcool-project/node_modules/
 dentcool-project/dist/
 dentcool-project/coverage/
+dentcool-project/test-results/
+dentcool-project/playwright-report/
 dentcool-project/src-tauri/target/
 
 # Local env files
@@ -24,3 +26,7 @@ _tmp_dental_zip/
 backups/
 dentcool-project/vite-dev.log
 dentcool-project/vite-dev.err.log
+dentcool-project/vite-visual-review*.log
+dentcool-project/vite-topbar-review*.log
+dentcool-project/vite-sidebar-review*.log
+dentcool-project/vite-inventory-tabs-review*.log

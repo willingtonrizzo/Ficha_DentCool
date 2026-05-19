@@ -28,6 +28,30 @@ Ruta activa del proyecto:
 
 ## Lo ultimo verificado
 
+- rama activa local: `ajustes-validacion-doctora`, siguiendo `origin/ajustes-validacion-doctora`
+- se guardo un stash de seguridad antes del cambio de rama: `handoff antes de cambiar a ajustes-validacion-doctora`
+- `npm test -- --run` pasa en Windows fuera del sandbox: `83` tests verdes
+- `npm run build` pasa en Windows fuera del sandbox
+- `npm run desktop:build` pasa desde `ajustes-validacion-doctora`
+- instalador Tauri actualizado generado en `dentcool-project/src-tauri/target/release/bundle/nsis/DentCool_0.1.0_x64-setup.exe`
+- backup previo a instalacion creado en `backups/ficha-dentcool-20260518-170706.db`
+- app Tauri instalada/actualizada desde la rama `ajustes-validacion-doctora`; ejecutable detectado en `C:\Users\welli\AppData\Local\DentCool\dentcool.exe`
+- base SQLite real sigue presente en `C:\Users\welli\AppData\Roaming\com.dentcool.app\ficha-dentcool.db`
+- se agrego Playwright para pruebas tipo usuario en navegador local
+- `npm run test:e2e` pasa: `2` pruebas verdes cubriendo login/permisos de `Admin` y `Staff`
+- Chromium de Playwright quedo instalado localmente usando certificados del sistema de Windows
+- `Bloque Funcionalidades - insumos/inventario`: el historial de costos guardados ya tiene boton `Detalle`, muestra lista base, extras reales, tiempo extra y comentarios
+- el panel `Insumos` permite comentarios de hasta `500` palabras al guardar un costo
+- `Restaurar panel` ya no borra el historial de costos guardados
+- los costos guardados por paciente se pueden editar o eliminar manualmente desde el mismo historial
+- `Inventario` incluye `Editor de lista de tratamientos` para modificar listas base persistentes por tratamiento
+- app Tauri recompilada e instalada con estos cambios; backup previo `backups/ficha-dentcool-20260518-200853.db`
+- el panel abierto desde `Detalle` en historial de insumos ahora usa hasta `40vw` en escritorio para evitar lectura angosta
+- app Tauri reinstalada con ese ajuste visual; backup previo `backups/ficha-dentcool-20260518-204833.db`
+- `Bloque UX/UI - Inicio operativo`: se rediseño Inicio quitando finanzas/acciones mock y dejando solo datos reales disponibles
+- Inicio ahora muestra centro operativo, KPIs reales, seguimientos, pacientes para retomar, accesos funcionales segun permisos, alertas reales y calidad de datos
+- se reforzo profundidad visual con colores de marca DentCool sin crear una landing
+- app Tauri recompilada e instalada con Inicio actualizado; backup previo `backups/ficha-dentcool-20260519-001240.db`
 - `npm test` pasa
 - `77` tests verdes
 - `npm run build` pasa
@@ -268,6 +292,18 @@ Razon:
 - `Facturacion` ahora tiene filtro por paciente y una tabla de estado de pago por tratamiento con total, abonado, saldo y ultimo pago
 - XLSX de facturacion ahora incluye `Cobros`, `Pendientes`, `ResumenMedios`, `ResumenPacientes` y `Anulados`
 - verificacion actual del MVP de facturacion ampliado: `npm test -- --run` paso con `83` tests y `npm run build` paso correctamente
+- `Inicio` mantiene el bloque superior de bienvenida `Bienvenido Admin/Staff`, ahora redisenado con mas color y profundidad visual.
+- `Inicio` muestra una `Seccion KPI` separada para los indicadores operativos y la zona de datos pendientes usa morado en vez de amarillo.
+- la bienvenida de `Inicio` fue revisada visualmente con Playwright; se corrigio que `.card` pisara el fondo del hero y ahora muestra logo DentCool, fondo de marca real, chips operativos y tarjeta de paciente activo con contraste correcto.
+- la barra superior (`Inicio / Bienvenido Admin`, buscador, mensaje y campana) ya no usa fondo blanco plano; ahora tiene fondo de marca mas marcado, buscador integrado y avatar pequeno con silueta de usuario como el login.
+- la barra lateral izquierda (`Clinico`, `Gestion`, navegacion, logo y usuario) ahora usa fondo de marca suavizado, botones capsula, activo contrastado, badges integrados y bloque de usuario con tarjeta; el logo conserva forma/tamano/radio y su borde usa el degradado turquesa/azul/violeta del icono de escritorio.
+- `Seguimientos visibles` en Inicio permite cambiar el estado de citas reales desde la misma fila: programada, confirmada, atendida/concluida, cancelada o no asistio.
+- al cerrar un seguimiento como atendido/cancelado/no asistio se recalcula la proxima cita visible del paciente y deja de quedar como vencido.
+- verificacion actual de Inicio: `npm test -- --run` paso con `83` tests, `npm run build` paso y `npm run test:e2e` paso con `2` tests.
+- Tauri quedo reinstalado con este cambio en `C:\Users\welli\AppData\Local\DentCool\dentcool.exe` con fecha `2026-05-19 02:54`; respaldo SQLite previo: `backups/ficha-dentcool-20260519-025028.db`.
+- `Inventario` ahora usa tabs superiores visibles para `Proveedor`, `Registrar compra`, `Agregar material`, `Costos por insumo`, `Ultimas compras`, `Historial proveedores` y `Lista tratamientos`; es un ajuste UX reversible y no cambia el modelo de datos.
+- verificacion actual de Inventario tabs: revision visual con Playwright y captura en `dentcool-project/test-results/inventory-tabs-review.png`, `npm test -- --run` paso con `83` tests, `npm run build` paso y `npm run test:e2e` paso con `2` tests.
+- Tauri quedo reinstalado con Inventario tabs en `C:\Users\welli\AppData\Local\DentCool\dentcool.exe` con fecha `2026-05-19 03:30`; respaldo SQLite previo: `backups/ficha-dentcool-20260519-032623.db`.
 
 ## Instruccion de retoma
 

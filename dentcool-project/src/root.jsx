@@ -134,7 +134,7 @@ function parseVisitDate(value) {
 
 function getNextVisitFromAppointments(appointments = []) {
   const next = appointments
-    .filter((appointment) => appointment?.status !== 'cancelled' && appointment?.dateLabel && appointment.dateLabel !== 'Sin cita')
+    .filter((appointment) => !['cancelled', 'completed', 'no_show'].includes(appointment?.status) && appointment?.dateLabel && appointment.dateLabel !== 'Sin cita')
     .map((appointment) => ({
       ...appointment,
       visitDate: parseVisitDate(appointment.dateLabel),
@@ -614,6 +614,30 @@ export default function App() {
         patient.id === activePatient.id
           ? { ...patient, nextVisit }
           : patient
+      )
+    );
+  };
+
+  const handleHomeAppointmentStatusChange = (patientId, appointmentId, status) => {
+    const patient = patients.find((item) => item.id === patientId);
+    if (!patient || !appointmentId) return;
+    const patientRecord = createClinicalPatientRecord(clinicalRecords[patientId], patient);
+    const nextAppointments = patientRecord.appointments.map((appointment) =>
+      appointment.id === appointmentId ? { ...appointment, status } : appointment
+    );
+    const nextVisit = getNextVisitFromAppointments(nextAppointments);
+
+    setClinicalSaveState('dirty');
+    setClinicalRecords((current) => ({
+      ...current,
+      [patientId]: {
+        ...patientRecord,
+        appointments: nextAppointments,
+      },
+    }));
+    setPatients((current) =>
+      current.map((item) =>
+        item.id === patientId ? { ...item, nextVisit } : item
       )
     );
   };
@@ -1506,7 +1530,17 @@ export default function App() {
         <TopbarInner patientName={getPatientDisplayName(visibleActivePatient, 'Paciente')} activeView={activeView} currentUser={authSession} />
         <div className="content">
           {activeView === 'home' ? (
-            <HomeDashboard patients={patients} activePatient={visibleActivePatient} currentUser={authSession} />
+            <HomeDashboard
+              patients={patients}
+              activePatient={visibleActivePatient}
+              currentUser={authSession}
+              permissions={permissions}
+              clinicalRecords={clinicalRecords}
+              onNavigate={handleNavigate}
+              onCreatePatient={handleCreatePatient}
+              onOpenActivePatient={() => handleOpenPatientFromDirectory(visibleActivePatient?.id)}
+              onAppointmentStatusChange={handleHomeAppointmentStatusChange}
+            />
           ) : activeView === 'patients' ? (
             <>
               <FloatingNewPatientButton onClick={handleCreatePatient} />
