@@ -3359,6 +3359,12 @@ export function Insumos({
             placeholder="Detalle clinico u operativo: por que se agregaron insumos extra, observaciones de lista base, tiempo extra, ajustes del caso o comentarios para revisar despues."
             style={{ minHeight: 110 }}
           />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+            <button className="btn btn-primary" type="button" onClick={handleSaveSnapshot} disabled={!selectedRecipe}>
+              <Icon.plus />
+              Guardar costo
+            </button>
+          </div>
         </label>
       </div>
 
