@@ -200,6 +200,7 @@
 - [x] Mejorar visualmente la barra superior de Inicio con fondo de marca, buscador integrado y avatar tipo login
 - [x] Mejorar visualmente la barra lateral izquierda con fondo de marca, navegacion capsula y usuario integrado
 - [x] Permitir editar estado de seguimientos/citas reales desde Inicio
+- [x] Agregar segundo boton `Guardar costo` debajo de `Detalles del costo guardado` en `Insumos`
 - [ ] Validar manualmente en Tauri que marcar una cita como `Atendida / concluida` la retire de vencidas correctamente
 - [ ] Refinar componentes UX/UI uno por uno
 - [ ] Ajustar funcionalidades de negocio vivas

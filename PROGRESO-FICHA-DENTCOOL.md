@@ -609,3 +609,11 @@ Hecho:
 - captura de revision generada en `dentcool-project/test-results/inventory-tabs-review.png`.
 - verificacion: `npm test -- --run` paso con `83` tests, `npm run build` paso y `npm run test:e2e` paso con `2` tests.
 - Tauri reinstalado con Inventario por tabs en `C:\Users\welli\AppData\Local\DentCool\dentcool.exe` con fecha `2026-05-19 03:30`; respaldo SQLite previo: `backups/ficha-dentcool-20260519-032623.db`.
+
+### Ajuste funcional 2026-05-19 - Acceso rapido Guardar costo
+
+- se agrego un segundo boton `Guardar costo` debajo del campo `Detalles del costo guardado` en `Insumos`, para no tener que subir hasta la barra superior.
+- el boton usa la misma accion del boton original (`handleSaveSnapshot`) y respeta la misma condicion de lista base seleccionada.
+- verificacion: `npm run build` paso correctamente.
+- Tauri reinstalado con el boton en `C:\Users\welli\AppData\Local\DentCool\dentcool.exe` con fecha `2026-05-19 04:00`; respaldo SQLite previo: `backups/ficha-dentcool-20260519-035336.db`.
+- cambios subidos a GitHub en rama `ajustes-validacion-doctora`, commits `9785f8d` y `0ce09d3`.

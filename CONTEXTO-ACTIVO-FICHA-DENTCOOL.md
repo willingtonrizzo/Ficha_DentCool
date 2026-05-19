@@ -304,6 +304,9 @@ Razon:
 - `Inventario` ahora usa tabs superiores visibles para `Proveedor`, `Registrar compra`, `Agregar material`, `Costos por insumo`, `Ultimas compras`, `Historial proveedores` y `Lista tratamientos`; es un ajuste UX reversible y no cambia el modelo de datos.
 - verificacion actual de Inventario tabs: revision visual con Playwright y captura en `dentcool-project/test-results/inventory-tabs-review.png`, `npm test -- --run` paso con `83` tests, `npm run build` paso y `npm run test:e2e` paso con `2` tests.
 - Tauri quedo reinstalado con Inventario tabs en `C:\Users\welli\AppData\Local\DentCool\dentcool.exe` con fecha `2026-05-19 03:30`; respaldo SQLite previo: `backups/ficha-dentcool-20260519-032623.db`.
+- `Insumos` tiene ahora un segundo boton `Guardar costo` debajo de `Detalles del costo guardado`; es el mismo guardado del boton superior, solo como acceso rapido.
+- la app de escritorio quedo reinstalada con ese boton en `C:\Users\welli\AppData\Local\DentCool\dentcool.exe` con fecha `2026-05-19 04:00`; respaldo SQLite previo: `backups/ficha-dentcool-20260519-035336.db`.
+- GitHub quedo actualizado en la rama `ajustes-validacion-doctora`: `9785f8d Mejora inicio inventario e insumos` y `0ce09d3 Agrega acceso rapido para guardar costo`.
 
 ## Instruccion de retoma
 
